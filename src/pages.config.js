@@ -1,7 +1,6 @@
 import Dashboard from './pages/Dashboard';
 import PolygonConsole from './pages/PolygonConsole';
 import Bots from './pages/Bots';
-import AIAnalysis from './pages/AIAnalysis';
 import Wallet from './pages/Wallet';
 import Referrals from './pages/Referrals';
 import Miners from './pages/Miners';
@@ -9,10 +8,6 @@ import BotRunner from './pages/BotRunner';
 import Profile from './pages/Profile';
 import Portfolio from './pages/Portfolio';
 import Landing from './pages/Landing';
-import Deposit from './pages/Deposit';
-import DeviceMining from './pages/DeviceMining';
-import VIPUpgrade from './pages/VIPUpgrade';
-import RobotsOverview from './pages/RobotsOverview';
 import __Layout from './Layout.jsx';
 
 
@@ -20,7 +15,6 @@ export const PAGES = {
     "Dashboard": Dashboard,
     "PolygonConsole": PolygonConsole,
     "Bots": Bots,
-    "AIAnalysis": AIAnalysis,
     "Wallet": Wallet,
     "Referrals": Referrals,
     "Miners": Miners,
@@ -28,10 +22,6 @@ export const PAGES = {
     "Profile": Profile,
     "Portfolio": Portfolio,
     "Landing": Landing,
-    "Deposit": Deposit,
-    "DeviceMining": DeviceMining,
-    "VIPUpgrade": VIPUpgrade,
-    "RobotsOverview": RobotsOverview,
 }
 
 export const pagesConfig = {
