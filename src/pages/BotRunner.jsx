@@ -9,7 +9,7 @@ import ProfitChart from '@/components/bots/ProfitChart';
 import LiveStats from '@/components/bots/LiveStats';
 import ProfitCalculator from '@/components/bots/ProfitCalculator';
 import TradeHistory from '@/components/bots/TradeHistory';
-import { createPageUrl } from './utils';
+import { createPageUrl } from '../utils';
 
 export default function BotRunner() {
   const navigate = useNavigate();

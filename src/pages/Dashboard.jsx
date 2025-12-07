@@ -6,7 +6,7 @@ import StatsCard from '@/components/trading/StatsCard';
 import PriceCard from '@/components/trading/PriceCard';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { createPageUrl } from './utils';
+import { createPageUrl } from '../utils';
 
 // Simulated real-time prices (in production, connect to actual WebSocket)
 const MOCK_PRICES = [
