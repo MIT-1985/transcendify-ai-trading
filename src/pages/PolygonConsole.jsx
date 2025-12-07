@@ -15,11 +15,23 @@ const CRYPTO_PAIRS = [
   'X:DOGEUSD'
 ];
 
+const TIMEFRAMES = [
+  { value: 'minute', label: '1m', multiplier: 1, limit: 60 },
+  { value: 'minute', label: '5m', multiplier: 5, limit: 60 },
+  { value: 'minute', label: '15m', multiplier: 15, limit: 100 },
+  { value: 'minute', label: '30m', multiplier: 30, limit: 100 },
+  { value: 'hour', label: '1h', multiplier: 1, limit: 100 },
+  { value: 'hour', label: '6h', multiplier: 6, limit: 100 },
+  { value: 'day', label: '1d', multiplier: 1, limit: 100 }
+];
+
 export default function PolygonConsole() {
   const [selectedPair, setSelectedPair] = useState('X:BTCUSD');
+  const [timeframe, setTimeframe] = useState(TIMEFRAMES[4]); // 1h default
   const [candleData, setCandleData] = useState([]);
   const [currentPrice, setCurrentPrice] = useState(0);
   const [priceChange, setPriceChange] = useState(0);
+  const [volume24h, setVolume24h] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Fetch real-time data
@@ -28,35 +40,52 @@ export default function PolygonConsole() {
       try {
         setLoading(true);
 
-        // Fetch candlestick data
-        const to = new Date().toISOString().split('T')[0];
-        const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        // Calculate date range based on timeframe
+        const now = Date.now();
+        let fromMs;
+        if (timeframe.value === 'minute') {
+          fromMs = now - (timeframe.limit * timeframe.multiplier * 60 * 1000);
+        } else if (timeframe.value === 'hour') {
+          fromMs = now - (timeframe.limit * timeframe.multiplier * 60 * 60 * 1000);
+        } else {
+          fromMs = now - (timeframe.limit * timeframe.multiplier * 24 * 60 * 60 * 1000);
+        }
+
+        const from = new Date(fromMs).toISOString().split('T')[0];
+        const to = new Date(now).toISOString().split('T')[0];
 
         const candleResponse = await base44.functions.invoke('polygonMarketData', {
           action: 'aggregates',
           symbol: selectedPair,
           from: from,
           to: to,
-          timespan: 'hour',
-          limit: 100
+          timespan: timeframe.value,
+          limit: timeframe.limit
         });
 
         if (candleResponse.data?.success && candleResponse.data.data?.results) {
           const results = candleResponse.data.data.results;
-          const candles = results.map(candle => ({
-            time: new Date(candle.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            timestamp: candle.t,
-            open: candle.o,
-            high: candle.h,
-            low: candle.l,
-            close: candle.c,
-            volume: candle.v,
-            wickTop: candle.h,
-            wickBottom: candle.l,
-            candleTop: Math.max(candle.o, candle.c),
-            candleBottom: Math.min(candle.o, candle.c),
-            isGreen: candle.c >= candle.o
-          }));
+          
+          const candles = results.map(candle => {
+            const date = new Date(candle.t);
+            let timeStr;
+            if (timeframe.value === 'minute' || timeframe.value === 'hour') {
+              timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else {
+              timeStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            }
+
+            return {
+              time: timeStr,
+              timestamp: candle.t,
+              open: candle.o,
+              high: candle.h,
+              low: candle.l,
+              close: candle.c,
+              volume: candle.v,
+              isGreen: candle.c >= candle.o
+            };
+          });
 
           setCandleData(candles);
           
@@ -65,6 +94,7 @@ export default function PolygonConsole() {
             const first = candles[0];
             setCurrentPrice(last.close);
             setPriceChange(((last.close - first.open) / first.open) * 100);
+            setVolume24h(results.reduce((sum, r) => sum + r.v, 0));
           }
         }
 
@@ -76,150 +106,215 @@ export default function PolygonConsole() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, timeframe.value === 'minute' ? 3000 : 5000);
     return () => clearInterval(interval);
-  }, [selectedPair]);
+  }, [selectedPair, timeframe]);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Live Trading Charts</h1>
-            <p className="text-slate-400">Real-time Polygon.io data</p>
-          </div>
-          <Select value={selectedPair} onValueChange={setSelectedPair}>
-            <SelectTrigger className="w-48 bg-slate-900 border-slate-700">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-slate-900 border-slate-700">
-              {CRYPTO_PAIRS.map(pair => (
-                <SelectItem key={pair} value={pair}>
-                  {pair.replace('X:', '').replace('USD', '/USD')}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Price Header */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-6">
-          <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-[#0A0A0F] text-white p-4">
+      <div className="max-w-[1800px] mx-auto">
+        {/* Top Bar */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <Select value={selectedPair} onValueChange={setSelectedPair}>
+              <SelectTrigger className="w-44 bg-slate-900 border-slate-700">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-900 border-slate-700">
+                {CRYPTO_PAIRS.map(pair => (
+                  <SelectItem key={pair} value={pair}>
+                    {pair.replace('X:', '').replace('USD', '/USD')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
             <div>
-              <div className="text-sm text-slate-500 mb-1">
-                {selectedPair.replace('X:', '').replace('USD', '/USD')}
-              </div>
-              <div className="text-4xl font-bold mb-2">
-                ${currentPrice.toFixed(2)}
-              </div>
-              <div className={`flex items-center gap-2 text-lg ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {priceChange >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+              <div className="text-2xl font-bold">${currentPrice.toFixed(2)}</div>
+              <div className={`text-sm ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
               </div>
             </div>
-            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-2" />
-              Live Data
-            </Badge>
           </div>
+
+          <div className="flex items-center gap-2">
+            {TIMEFRAMES.map(tf => (
+              <button
+                key={tf.label}
+                onClick={() => setTimeframe(tf)}
+                className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                  timeframe.label === tf.label
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                {tf.label}
+              </button>
+            ))}
+          </div>
+
+          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-2" />
+            Live
+          </Badge>
         </div>
 
         {/* Main Chart */}
         <Card className="bg-slate-900/50 border-slate-800">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Activity className="w-5 h-5 text-blue-400" />
-              Candlestick Chart
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-4">
             {loading ? (
-              <div className="h-96 flex items-center justify-center text-slate-400">
-                Loading real-time data from Polygon...
+              <div className="h-[600px] flex items-center justify-center text-slate-400">
+                Loading {timeframe.label} chart...
               </div>
             ) : (
               <>
-                <ResponsiveContainer width="100%" height={500}>
-                  <ComposedChart data={candleData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <ResponsiveContainer width="100%" height={600}>
+                  <ComposedChart data={candleData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    
                     <XAxis 
                       dataKey="time" 
                       stroke="#64748b" 
-                      tick={{ fontSize: 11 }}
-                      interval={Math.floor(candleData.length / 12)}
+                      tick={{ fontSize: 11, fill: '#94a3b8' }}
+                      interval={Math.floor(candleData.length / 15)}
+                      axisLine={{ stroke: '#334155' }}
                     />
+                    
                     <YAxis 
-                      domain={['auto', 'auto']} 
+                      yAxisId="price"
+                      domain={['dataMin - 50', 'dataMax + 50']} 
                       stroke="#64748b"
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: '#94a3b8' }}
+                      axisLine={{ stroke: '#334155' }}
+                      orientation="right"
                     />
+                    
+                    <YAxis 
+                      yAxisId="volume"
+                      orientation="left"
+                      stroke="#64748b"
+                      tick={{ fontSize: 11, fill: '#94a3b8' }}
+                      axisLine={{ stroke: '#334155' }}
+                    />
+                    
                     <Tooltip 
                       contentStyle={{ 
                         backgroundColor: '#1e293b', 
                         border: '1px solid #334155',
                         borderRadius: '8px',
-                        color: '#fff'
+                        color: '#fff',
+                        fontSize: '12px'
                       }}
-                      formatter={(value) => `$${value.toFixed(2)}`}
+                      formatter={(value, name) => {
+                        if (name === 'volume') return [value.toFixed(0), 'Volume'];
+                        return [`$${value.toFixed(2)}`, name.toUpperCase()];
+                      }}
                     />
                     
-                    {/* Wicks */}
-                    <Bar dataKey="high" stackId="wick" barSize={1}>
+                    {/* Volume bars */}
+                    <Bar 
+                      yAxisId="volume"
+                      dataKey="volume" 
+                      fill="url(#volumeGradient)"
+                      radius={[4, 4, 0, 0]}
+                    />
+                    
+                    {/* Candlesticks - Wicks */}
+                    <Bar 
+                      yAxisId="price"
+                      dataKey="high"
+                      barSize={2}
+                      shape={(props) => {
+                        const { x, y, width, payload } = props;
+                        const centerX = x + width / 2;
+                        const highY = y;
+                        const lowY = y + ((payload.low - payload.high) / (payload.high - payload.low)) * y;
+                        
+                        return (
+                          <line
+                            x1={centerX}
+                            y1={highY}
+                            x2={centerX}
+                            y2={lowY}
+                            stroke={payload.isGreen ? '#10b981' : '#ef4444'}
+                            strokeWidth={1.5}
+                          />
+                        );
+                      }}
+                    >
                       {candleData.map((entry, index) => (
-                        <Cell 
-                          key={`wick-${index}`}
-                          fill={entry.isGreen ? '#10b981' : '#ef4444'}
-                        />
+                        <Cell key={`wick-${index}`} />
                       ))}
                     </Bar>
                     
-                    {/* Candle bodies */}
-                    <Bar dataKey="candleTop" stackId="candle" barSize={12}>
+                    {/* Candlesticks - Bodies */}
+                    <Bar 
+                      yAxisId="price"
+                      dataKey={(d) => Math.abs(d.close - d.open)}
+                      shape={(props) => {
+                        const { x, y, width, height, payload } = props;
+                        const bodyHeight = Math.max(height, 2);
+                        const bodyY = payload.close > payload.open ? y : y - bodyHeight;
+                        
+                        return (
+                          <rect
+                            x={x}
+                            y={bodyY}
+                            width={width}
+                            height={bodyHeight}
+                            fill={payload.isGreen ? '#10b981' : '#ef4444'}
+                            stroke={payload.isGreen ? '#059669' : '#dc2626'}
+                            strokeWidth={1}
+                            rx={1}
+                          />
+                        );
+                      }}
+                      barSize={Math.max(8, Math.min(16, 800 / candleData.length))}
+                    >
                       {candleData.map((entry, index) => (
-                        <Cell 
-                          key={`candle-${index}`}
-                          fill={entry.isGreen ? '#10b981' : '#ef4444'}
-                          fillOpacity={0.9}
-                        />
+                        <Cell key={`body-${index}`} />
                       ))}
                     </Bar>
-                    
-                    {/* SMA 20 */}
-                    <Line 
-                      type="monotone" 
-                      dataKey="close"
-                      stroke="#3b82f6" 
-                      strokeWidth={2}
-                      dot={false}
-                    />
                   </ComposedChart>
                 </ResponsiveContainer>
 
-                {/* OHLC Stats */}
-                <div className="grid grid-cols-4 gap-3 mt-6">
+                {/* OHLCV Stats */}
+                <div className="grid grid-cols-5 gap-3 mt-4">
                   <div className="bg-slate-800/50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">Open</div>
-                    <div className="text-white font-semibold">
+                    <div className="text-xs text-slate-500">O</div>
+                    <div className="text-sm font-semibold text-white">
                       ${candleData.length > 0 ? candleData[0].open.toFixed(2) : '-'}
                     </div>
                   </div>
                   <div className="bg-slate-800/50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">High</div>
-                    <div className="text-emerald-400 font-semibold">
+                    <div className="text-xs text-slate-500">H</div>
+                    <div className="text-sm font-semibold text-emerald-400">
                       ${candleData.length > 0 ? Math.max(...candleData.map(c => c.high)).toFixed(2) : '-'}
                     </div>
                   </div>
                   <div className="bg-slate-800/50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">Low</div>
-                    <div className="text-red-400 font-semibold">
+                    <div className="text-xs text-slate-500">L</div>
+                    <div className="text-sm font-semibold text-red-400">
                       ${candleData.length > 0 ? Math.min(...candleData.map(c => c.low)).toFixed(2) : '-'}
                     </div>
                   </div>
                   <div className="bg-slate-800/50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">Close</div>
-                    <div className="text-white font-semibold">
+                    <div className="text-xs text-slate-500">C</div>
+                    <div className="text-sm font-semibold text-white">
                       ${currentPrice.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3">
+                    <div className="text-xs text-slate-500">Vol 24h</div>
+                    <div className="text-sm font-semibold text-blue-400">
+                      {(volume24h / 1000000).toFixed(2)}M
                     </div>
                   </div>
                 </div>
@@ -228,12 +323,11 @@ export default function PolygonConsole() {
           </CardContent>
         </Card>
 
-        {/* Quick Price Grid */}
-        <div className="mt-6">
-          <h2 className="text-lg font-semibold mb-4">Market Overview</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {/* Market Watchlist */}
+        <div className="mt-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {CRYPTO_PAIRS.map(pair => (
-              <QuickPriceCard key={pair} symbol={pair} onSelect={setSelectedPair} />
+              <QuickPriceCard key={pair} symbol={pair} onSelect={setSelectedPair} isActive={pair === selectedPair} />
             ))}
           </div>
         </div>
@@ -242,7 +336,7 @@ export default function PolygonConsole() {
   );
 }
 
-function QuickPriceCard({ symbol, onSelect }) {
+function QuickPriceCard({ symbol, onSelect, isActive }) {
   const [price, setPrice] = useState(0);
   const [change, setChange] = useState(0);
 
@@ -270,22 +364,22 @@ function QuickPriceCard({ symbol, onSelect }) {
   }, [symbol]);
 
   return (
-    <Card 
-      className="bg-slate-900/50 border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer"
+    <div 
+      className={`bg-slate-900/50 border rounded-lg p-3 hover:border-blue-500/50 transition-all cursor-pointer ${
+        isActive ? 'border-blue-500' : 'border-slate-800'
+      }`}
       onClick={() => onSelect(symbol)}
     >
-      <CardContent className="p-4">
-        <div className="text-xs text-slate-500 mb-1">
-          {symbol.replace('X:', '').replace('USD', '/USD')}
-        </div>
-        <div className="text-lg font-bold text-white mb-1">
-          ${price.toFixed(2)}
-        </div>
-        <div className={`text-xs flex items-center gap-1 ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-          {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-          {change >= 0 ? '+' : ''}{change.toFixed(2)}%
-        </div>
-      </CardContent>
-    </Card>
+      <div className="text-xs text-slate-500 mb-1">
+        {symbol.replace('X:', '').replace('USD', '/USD')}
+      </div>
+      <div className="text-base font-bold text-white mb-1">
+        ${price.toFixed(2)}
+      </div>
+      <div className={`text-xs flex items-center gap-1 ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+        {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+        {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+      </div>
+    </div>
   );
 }
