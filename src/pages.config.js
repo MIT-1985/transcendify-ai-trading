@@ -12,6 +12,7 @@ import Landing from './pages/Landing';
 import Deposit from './pages/Deposit';
 import DeviceMining from './pages/DeviceMining';
 import VIPUpgrade from './pages/VIPUpgrade';
+import RobotsOverview from './pages/RobotsOverview';
 import __Layout from './Layout.jsx';
 
 
@@ -30,6 +31,7 @@ export const PAGES = {
     "Deposit": Deposit,
     "DeviceMining": DeviceMining,
     "VIPUpgrade": VIPUpgrade,
+    "RobotsOverview": RobotsOverview,
 }
 
 export const pagesConfig = {

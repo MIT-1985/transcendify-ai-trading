@@ -5,16 +5,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, ArrowLeft } from 'lucide-react';
 import { useBotEngine } from '@/components/bots/BotEngine';
-import ProfitChart from '@/components/bots/ProfitChart';
 import LiveStats from '@/components/bots/LiveStats';
-import ProfitCalculator from '@/components/bots/ProfitCalculator';
 import TradeHistory from '@/components/bots/TradeHistory';
 import RealTimePriceDisplay from '@/components/bots/RealTimePriceDisplay';
-import VIPBenefitsCard from '@/components/bots/VIPBenefitsCard';
-import AIInsights from '@/components/bots/AIInsights';
-import TechnicalIndicators from '@/components/trading/TechnicalIndicators';
-import OrderManagement from '@/components/trading/OrderManagement';
 import LivePositions from '@/components/trading/LivePositions';
+import CandlestickChart from '@/components/trading/CandlestickChart';
 import { createPageUrl } from '../utils';
 
 export default function BotRunner() {
@@ -136,29 +131,25 @@ export default function BotRunner() {
         </div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
-          {/* Left Column - Charts & Analysis */}
-          <div className="lg:col-span-2 space-y-6">
-            <ProfitChart trades={trades} />
-            <AIInsights subscription={subscription} bot={bot} trades={trades} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Chart with trades overlay */}
+          <div className="lg:col-span-2">
+            <CandlestickChart 
+              symbol={subscription.trading_pairs?.[0] || 'X:BTCUSD'} 
+              trades={trades}
+            />
           </div>
 
-          {/* Middle Column - Technical Indicators */}
-          <div className="space-y-6">
-            <TechnicalIndicators symbol={subscription.trading_pairs?.[0] || 'X:BTCUSD'} />
-          </div>
-
-          {/* Right Column - Trading & Positions */}
-          <div className="space-y-6">
-            <OrderManagement subscription={subscription} currentPrice={currentMarketPrice} />
+          {/* Live Positions */}
+          <div>
             <LivePositions subscription={subscription} trades={trades} />
-            <ProfitCalculator bot={bot} />
-            {wallet && <VIPBenefitsCard vipLevel={vipLevel} compact />}
           </div>
         </div>
 
         {/* Trade History */}
-        <TradeHistory trades={trades} />
+        <div className="mt-6">
+          <TradeHistory trades={trades} />
+        </div>
       </div>
     </div>
   );
