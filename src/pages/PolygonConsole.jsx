@@ -40,13 +40,19 @@ export default function PolygonConsole() {
       try {
         setLoading(true);
 
-        // За минути и часове трябва по-голям период
         const now = Date.now();
-        let daysBack = 7;
-        if (timeframe.value === 'minute') daysBack = 2;
-        if (timeframe.value === 'hour' && timeframe.multiplier < 6) daysBack = 5;
+        let fromMs;
         
-        const from = new Date(now - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        // Изчислявам точния период базиран на timeframe
+        if (timeframe.value === 'minute') {
+          fromMs = now - (120 * timeframe.multiplier * 60 * 1000); // 120 candles
+        } else if (timeframe.value === 'hour') {
+          fromMs = now - (120 * timeframe.multiplier * 60 * 60 * 1000);
+        } else { // day
+          fromMs = now - (120 * 24 * 60 * 60 * 1000);
+        }
+        
+        const from = new Date(fromMs).toISOString().split('T')[0];
         const to = new Date(now).toISOString().split('T')[0];
 
         console.log('Fetching:', selectedPair, timeframe.label, 'from', from, 'to', to);
