@@ -15,8 +15,8 @@ import {
   Gift
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import LanguageSwitcher from './components/LanguageSwitcher';
-import { useTranslation } from './components/utils/translations';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import { useTranslation } from '@/components/utils/translations';
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
