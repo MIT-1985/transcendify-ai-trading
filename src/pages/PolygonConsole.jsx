@@ -113,8 +113,6 @@ export default function PolygonConsole() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, timeframe.value === 'minute' ? 3000 : 5000);
-    return () => clearInterval(interval);
   }, [selectedPair, timeframe]);
 
   return (
