@@ -54,17 +54,30 @@ export default function PolygonConsole() {
         const from = new Date(fromMs).toISOString().split('T')[0];
         const to = new Date(now).toISOString().split('T')[0];
 
+        console.log('Fetching chart data:', {
+          symbol: selectedPair,
+          timeframe: timeframe.value,
+          multiplier: timeframe.multiplier,
+          from,
+          to,
+          limit: timeframe.limit
+        });
+
         const candleResponse = await base44.functions.invoke('polygonMarketData', {
           action: 'aggregates',
           symbol: selectedPair,
           from: from,
           to: to,
           timespan: timeframe.value,
+          multiplier: timeframe.multiplier,
           limit: timeframe.limit
         });
 
+        console.log('Chart API Response:', candleResponse.data);
+
         if (candleResponse.data?.success && candleResponse.data.data?.results) {
           const results = candleResponse.data.data.results;
+          console.log('Got candles:', results.length);
           
           const candles = results.map(candle => {
             const date = new Date(candle.t);
