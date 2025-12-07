@@ -63,6 +63,8 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD' }) {
         const to = new Date().toISOString().split('T')[0];
         const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+        console.log('Fetching chart data for', symbol, 'from', from, 'to', to);
+
         const response = await base44.functions.invoke('polygonMarketData', {
           action: 'aggregates',
           symbol: symbol,
@@ -72,8 +74,11 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD' }) {
           limit: 100
         });
 
+        console.log('Chart API response:', response.data);
+
         if (response.data?.success && response.data.data?.results) {
           const results = response.data.data.results;
+          console.log('Got', results.length, 'candles');
           const candles = results.map(candle => {
             const time = new Date(candle.t);
             return {
@@ -100,7 +105,10 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD' }) {
             const closes = candles.map(c => c.close);
             const sma = calculateSMA(closes, 20);
             setSma20(sma);
+            console.log('Chart updated with real data, price:', candles[candles.length - 1].close);
           }
+        } else {
+          console.error('No results in response:', response.data);
         }
       } catch (error) {
         console.error('Error fetching chart data:', error);

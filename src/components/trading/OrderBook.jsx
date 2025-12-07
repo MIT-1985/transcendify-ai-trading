@@ -11,13 +11,17 @@ export default function OrderBook({ symbol = 'X:BTCUSD' }) {
   useEffect(() => {
     const fetchOrderBook = async () => {
       try {
+        console.log('Fetching order book for', symbol);
         const response = await base44.functions.invoke('polygonMarketData', {
           action: 'ticker',
           symbol: symbol
         });
 
+        console.log('Order book API response:', response.data);
+
         if (response.data?.success && response.data.data?.results?.[0]) {
           const ticker = response.data.data.results[0];
+          console.log('Order book price:', ticker.c);
           const midPrice = ticker.c;
           const spread = midPrice * 0.0005;
 
@@ -58,6 +62,9 @@ export default function OrderBook({ symbol = 'X:BTCUSD' }) {
           
           setBids(newBids);
           setAsks(newAsks);
+          console.log('Order book updated with real data');
+        } else {
+          console.error('No ticker results:', response.data);
         }
       } catch (error) {
         console.error('Error fetching order book:', error);
