@@ -168,122 +168,120 @@ export default function PolygonConsole() {
               </div>
             ) : (
               <>
-                <ResponsiveContainer width="100%" height={600}>
-                  <ComposedChart data={candleData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05} />
-                      </linearGradient>
-                    </defs>
-                    
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    
-                    <XAxis 
-                      dataKey="time" 
-                      stroke="#64748b" 
-                      tick={{ fontSize: 11, fill: '#94a3b8' }}
-                      interval={Math.floor(candleData.length / 15)}
-                      axisLine={{ stroke: '#334155' }}
-                    />
-                    
-                    <YAxis 
-                      yAxisId="price"
-                      domain={['dataMin - 50', 'dataMax + 50']} 
-                      stroke="#64748b"
-                      tick={{ fontSize: 11, fill: '#94a3b8' }}
-                      axisLine={{ stroke: '#334155' }}
-                      orientation="right"
-                    />
-                    
-                    <YAxis 
-                      yAxisId="volume"
-                      orientation="left"
-                      stroke="#64748b"
-                      tick={{ fontSize: 11, fill: '#94a3b8' }}
-                      axisLine={{ stroke: '#334155' }}
-                    />
-                    
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1e293b', 
-                        border: '1px solid #334155',
-                        borderRadius: '8px',
-                        color: '#fff',
-                        fontSize: '12px'
-                      }}
-                      formatter={(value, name) => {
-                        if (name === 'volume') return [value.toFixed(0), 'Volume'];
-                        return [`$${value.toFixed(2)}`, String(name).toUpperCase()];
-                      }}
-                    />
-                    
-                    {/* Volume bars */}
-                    <Bar 
-                      yAxisId="volume"
-                      dataKey="volume" 
-                      fill="url(#volumeGradient)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    
-                    {/* Candlesticks - Wicks */}
-                    <Bar 
-                      yAxisId="price"
-                      dataKey="high"
-                      barSize={2}
-                      shape={(props) => {
-                        const { x, y, width, payload } = props;
-                        const centerX = x + width / 2;
-                        const highY = y;
-                        const lowY = y + ((payload.low - payload.high) / (payload.high - payload.low)) * y;
-                        
-                        return (
-                          <line
-                            x1={centerX}
-                            y1={highY}
-                            x2={centerX}
-                            y2={lowY}
-                            stroke={payload.isGreen ? '#10b981' : '#ef4444'}
-                            strokeWidth={1.5}
+                {candleData.length === 0 ? (
+                  <div className="h-[600px] flex items-center justify-center text-slate-400">
+                    Зареждане на данни...
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={600}>
+                    <ComposedChart data={candleData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
+                      
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                      
+                      <XAxis 
+                        dataKey="time" 
+                        stroke="#64748b" 
+                        tick={{ fontSize: 11, fill: '#94a3b8' }}
+                        interval={Math.floor(candleData.length / 15)}
+                        axisLine={{ stroke: '#334155' }}
+                      />
+                      
+                      <YAxis 
+                        yAxisId="price"
+                        domain={['auto', 'auto']} 
+                        stroke="#64748b"
+                        tick={{ fontSize: 11, fill: '#94a3b8' }}
+                        axisLine={{ stroke: '#334155' }}
+                        orientation="right"
+                      />
+                      
+                      <YAxis 
+                        yAxisId="volume"
+                        orientation="left"
+                        stroke="#64748b"
+                        tick={{ fontSize: 11, fill: '#94a3b8' }}
+                        axisLine={{ stroke: '#334155' }}
+                      />
+                      
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (!active || !payload || !payload[0]) return null;
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs">
+                              <div className="text-slate-400 mb-2">{data.time}</div>
+                              <div className="space-y-1">
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-slate-500">Open:</span>
+                                  <span className="text-white font-semibold">${data.open?.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-slate-500">High:</span>
+                                  <span className="text-emerald-400 font-semibold">${data.high?.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-slate-500">Low:</span>
+                                  <span className="text-red-400 font-semibold">${data.low?.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-slate-500">Close:</span>
+                                  <span className="text-white font-semibold">${data.close?.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-slate-500">Volume:</span>
+                                  <span className="text-blue-400 font-semibold">{data.volume?.toFixed(0)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }}
+                      />
+                      
+                      {/* Volume bars */}
+                      <Bar 
+                        yAxisId="volume"
+                        dataKey="volume" 
+                        fill="url(#volumeGradient)"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      
+                      {/* Wicks */}
+                      <Bar 
+                        yAxisId="price"
+                        dataKey="high"
+                        barSize={1}
+                      >
+                        {candleData.map((entry, index) => (
+                          <Cell 
+                            key={`wick-${index}`} 
+                            fill={entry.isGreen ? '#10b981' : '#ef4444'}
                           />
-                        );
-                      }}
-                    >
-                      {candleData.map((entry, index) => (
-                        <Cell key={`wick-${index}`} />
-                      ))}
-                    </Bar>
-                    
-                    {/* Candlesticks - Bodies */}
-                    <Bar 
-                      yAxisId="price"
-                      dataKey={(d) => Math.abs(d.close - d.open)}
-                      shape={(props) => {
-                        const { x, y, width, height, payload } = props;
-                        const bodyHeight = Math.max(height, 2);
-                        const bodyY = payload.close > payload.open ? y : y - bodyHeight;
-                        
-                        return (
-                          <rect
-                            x={x}
-                            y={bodyY}
-                            width={width}
-                            height={bodyHeight}
-                            fill={payload.isGreen ? '#10b981' : '#ef4444'}
-                            stroke={payload.isGreen ? '#059669' : '#dc2626'}
-                            strokeWidth={1}
-                            rx={1}
+                        ))}
+                      </Bar>
+                      
+                      {/* Candle bodies */}
+                      <Bar 
+                        yAxisId="price"
+                        dataKey="high"
+                        barSize={Math.max(6, Math.min(14, 700 / candleData.length))}
+                      >
+                        {candleData.map((entry, index) => (
+                          <Cell 
+                            key={`candle-${index}`} 
+                            fill={entry.isGreen ? '#10b981' : '#ef4444'}
+                            fillOpacity={0.9}
                           />
-                        );
-                      }}
-                      barSize={Math.max(8, Math.min(16, 800 / candleData.length))}
-                    >
-                      {candleData.map((entry, index) => (
-                        <Cell key={`body-${index}`} />
-                      ))}
-                    </Bar>
-                  </ComposedChart>
-                </ResponsiveContainer>
+                        ))}
+                      </Bar>
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
 
                 {/* OHLCV Stats */}
                 <div className="grid grid-cols-5 gap-3 mt-4">
