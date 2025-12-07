@@ -7,14 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import BotCard from '@/components/trading/BotCard';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import BotConfigModal from '@/components/bots/BotConfigModal';
 
 export default function Bots() {
   const [search, setSearch] = useState('');
@@ -35,12 +28,13 @@ export default function Bots() {
   });
 
   const subscribeMutation = useMutation({
-    mutationFn: async (bot) => {
+    mutationFn: async ({ bot, config }) => {
       return base44.entities.UserSubscription.create({
         bot_id: bot.id,
         status: 'active',
         start_date: new Date().toISOString().split('T')[0],
         trading_pairs: bot.supported_markets?.slice(0, 3) || [],
+        ...config,
         total_profit: 0,
         total_trades: 0
       });
@@ -153,62 +147,13 @@ export default function Bots() {
           </div>
         )}
 
-        {/* Subscribe Dialog */}
-        <Dialog open={!!selectedBot} onOpenChange={() => setSelectedBot(null)}>
-          <DialogContent className="bg-slate-900 border-slate-700 text-white">
-            <DialogHeader>
-              <DialogTitle>Subscribe to {selectedBot?.name}</DialogTitle>
-              <DialogDescription className="text-slate-400">
-                You're about to activate this trading bot. Please review the details below.
-              </DialogDescription>
-            </DialogHeader>
-            
-            {selectedBot && (
-              <div className="space-y-4 py-4">
-                <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Strategy</span>
-                    <span className="capitalize">{selectedBot.strategy}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Risk Level</span>
-                    <span className="capitalize">{selectedBot.risk_level}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Min Capital</span>
-                    <span>${selectedBot.min_capital?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Expected ROI</span>
-                    <span className="text-emerald-400">{selectedBot.expected_roi}</span>
-                  </div>
-                </div>
-                
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-sm text-amber-400">
-                  <strong>Important:</strong> Past performance does not guarantee future results. 
-                  Trading involves risk. Only trade with capital you can afford to lose.
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedBot(null)}
-                    className="flex-1 border-slate-700"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => subscribeMutation.mutate(selectedBot)}
-                    disabled={subscribeMutation.isPending}
-                    className="flex-1 bg-blue-600 hover:bg-blue-500"
-                  >
-                    {subscribeMutation.isPending ? 'Processing...' : `Subscribe - $${selectedBot.price}`}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        {/* Bot Configuration Modal */}
+        <BotConfigModal
+          bot={selectedBot}
+          isOpen={!!selectedBot}
+          onClose={() => setSelectedBot(null)}
+          onSubscribe={(config) => subscribeMutation.mutate({ bot: selectedBot, config })}
+        />
       </div>
     </div>
   );
