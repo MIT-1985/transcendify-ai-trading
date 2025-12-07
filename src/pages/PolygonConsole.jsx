@@ -33,6 +33,16 @@ export default function PolygonConsole() {
   const [priceChange, setPriceChange] = useState(0);
   const [volume24h, setVolume24h] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [indicators, setIndicators] = useState({
+    sma20: false,
+    sma50: false,
+    ema12: false,
+    ema26: false,
+    bb: false,
+    rsi: false,
+    macd: false
+  });
+  const [indicatorData, setIndicatorData] = useState({});
 
   // Fetch real-time data
   useEffect(() => {
@@ -95,6 +105,7 @@ export default function PolygonConsole() {
           });
 
           setCandleData(candles);
+          calculateIndicators(candles);
           
           if (candles.length > 0) {
             const last = candles[candles.length - 1];
@@ -114,6 +125,151 @@ export default function PolygonConsole() {
 
     fetchData();
   }, [selectedPair, timeframe]);
+
+  const calculateSMA = (data, period) => {
+    const result = [];
+    for (let i = 0; i < data.length; i++) {
+      if (i < period - 1) {
+        result.push(null);
+      } else {
+        const sum = data.slice(i - period + 1, i + 1).reduce((a, b) => a + b.close, 0);
+        result.push(sum / period);
+      }
+    }
+    return result;
+  };
+
+  const calculateEMA = (data, period) => {
+    const result = [];
+    const multiplier = 2 / (period + 1);
+    let ema = data.slice(0, period).reduce((a, b) => a + b.close, 0) / period;
+    result.push(...Array(period - 1).fill(null));
+    result.push(ema);
+    
+    for (let i = period; i < data.length; i++) {
+      ema = (data[i].close - ema) * multiplier + ema;
+      result.push(ema);
+    }
+    return result;
+  };
+
+  const calculateBollingerBands = (data, period = 20, stdDev = 2) => {
+    const sma = calculateSMA(data, period);
+    const upper = [];
+    const lower = [];
+    
+    for (let i = 0; i < data.length; i++) {
+      if (i < period - 1) {
+        upper.push(null);
+        lower.push(null);
+      } else {
+        const slice = data.slice(i - period + 1, i + 1);
+        const mean = sma[i];
+        const variance = slice.reduce((sum, candle) => sum + Math.pow(candle.close - mean, 2), 0) / period;
+        const std = Math.sqrt(variance);
+        upper.push(mean + stdDev * std);
+        lower.push(mean - stdDev * std);
+      }
+    }
+    return { sma, upper, lower };
+  };
+
+  const calculateRSI = (data, period = 14) => {
+    const result = Array(period).fill(null);
+    let gains = 0;
+    let losses = 0;
+    
+    for (let i = 1; i <= period; i++) {
+      const change = data[i].close - data[i - 1].close;
+      if (change > 0) gains += change;
+      else losses -= change;
+    }
+    
+    let avgGain = gains / period;
+    let avgLoss = losses / period;
+    let rs = avgGain / avgLoss;
+    result.push(100 - (100 / (1 + rs)));
+    
+    for (let i = period + 1; i < data.length; i++) {
+      const change = data[i].close - data[i - 1].close;
+      const gain = change > 0 ? change : 0;
+      const loss = change < 0 ? -change : 0;
+      
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+      rs = avgGain / avgLoss;
+      result.push(100 - (100 / (1 + rs)));
+    }
+    return result;
+  };
+
+  const calculateMACD = (data) => {
+    const ema12 = calculateEMA(data, 12);
+    const ema26 = calculateEMA(data, 26);
+    const macdLine = [];
+    
+    for (let i = 0; i < data.length; i++) {
+      if (ema12[i] === null || ema26[i] === null) {
+        macdLine.push(null);
+      } else {
+        macdLine.push(ema12[i] - ema26[i]);
+      }
+    }
+    
+    // Signal line (9-day EMA of MACD)
+    const signalLine = [];
+    const validMacd = macdLine.filter(v => v !== null);
+    const multiplier = 2 / 10;
+    let ema = validMacd.slice(0, 9).reduce((a, b) => a + b, 0) / 9;
+    
+    signalLine.push(...Array(macdLine.indexOf(validMacd[0]) + 8).fill(null));
+    signalLine.push(ema);
+    
+    for (let i = macdLine.indexOf(validMacd[0]) + 9; i < macdLine.length; i++) {
+      if (macdLine[i] !== null) {
+        ema = (macdLine[i] - ema) * multiplier + ema;
+        signalLine.push(ema);
+      } else {
+        signalLine.push(null);
+      }
+    }
+    
+    const histogram = macdLine.map((v, i) => {
+      if (v === null || signalLine[i] === null) return null;
+      return v - signalLine[i];
+    });
+    
+    return { macdLine, signalLine, histogram };
+  };
+
+  const calculateIndicators = (candles) => {
+    const newIndicatorData = {};
+    
+    if (candles.length > 0) {
+      newIndicatorData.sma20 = calculateSMA(candles, 20);
+      newIndicatorData.sma50 = calculateSMA(candles, 50);
+      newIndicatorData.ema12 = calculateEMA(candles, 12);
+      newIndicatorData.ema26 = calculateEMA(candles, 26);
+      
+      const bb = calculateBollingerBands(candles, 20, 2);
+      newIndicatorData.bbUpper = bb.upper;
+      newIndicatorData.bbMiddle = bb.sma;
+      newIndicatorData.bbLower = bb.lower;
+      
+      newIndicatorData.rsi = calculateRSI(candles, 14);
+      
+      const macd = calculateMACD(candles);
+      newIndicatorData.macdLine = macd.macdLine;
+      newIndicatorData.macdSignal = macd.signalLine;
+      newIndicatorData.macdHistogram = macd.histogram;
+    }
+    
+    setIndicatorData(newIndicatorData);
+  };
+
+  const toggleIndicator = (key) => {
+    setIndicators(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4">
@@ -163,6 +319,92 @@ export default function PolygonConsole() {
             Live
           </Badge>
         </div>
+
+        {/* Indicators Panel */}
+        <Card className="bg-slate-900/50 border-slate-800 mb-4">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-slate-400 mr-2">Indicators:</span>
+              
+              <button
+                onClick={() => toggleIndicator('sma20')}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  indicators.sma20
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                SMA(20)
+              </button>
+              
+              <button
+                onClick={() => toggleIndicator('sma50')}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  indicators.sma50
+                    ? 'bg-orange-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                SMA(50)
+              </button>
+              
+              <button
+                onClick={() => toggleIndicator('ema12')}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  indicators.ema12
+                    ? 'bg-cyan-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                EMA(12)
+              </button>
+              
+              <button
+                onClick={() => toggleIndicator('ema26')}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  indicators.ema26
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                EMA(26)
+              </button>
+              
+              <button
+                onClick={() => toggleIndicator('bb')}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  indicators.bb
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                Bollinger Bands
+              </button>
+              
+              <button
+                onClick={() => toggleIndicator('rsi')}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  indicators.rsi
+                    ? 'bg-pink-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                RSI(14)
+              </button>
+              
+              <button
+                onClick={() => toggleIndicator('macd')}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  indicators.macd
+                    ? 'bg-green-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                MACD
+              </button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Main Chart */}
         <Card className="bg-slate-900/50 border-slate-800">
@@ -284,8 +526,146 @@ export default function PolygonConsole() {
                           />
                         ))}
                       </Bar>
+
+                      {/* Technical Indicators */}
+                      {indicators.sma20 && (
+                        <Line 
+                          yAxisId="price"
+                          type="monotone"
+                          data={candleData.map((d, i) => ({ ...d, sma20: indicatorData.sma20?.[i] }))}
+                          dataKey="sma20"
+                          stroke="#f59e0b"
+                          strokeWidth={2}
+                          dot={false}
+                          connectNulls
+                          name="SMA(20)"
+                        />
+                      )}
+
+                      {indicators.sma50 && (
+                        <Line 
+                          yAxisId="price"
+                          type="monotone"
+                          data={candleData.map((d, i) => ({ ...d, sma50: indicatorData.sma50?.[i] }))}
+                          dataKey="sma50"
+                          stroke="#fb923c"
+                          strokeWidth={2}
+                          dot={false}
+                          connectNulls
+                          name="SMA(50)"
+                        />
+                      )}
+
+                      {indicators.ema12 && (
+                        <Line 
+                          yAxisId="price"
+                          type="monotone"
+                          data={candleData.map((d, i) => ({ ...d, ema12: indicatorData.ema12?.[i] }))}
+                          dataKey="ema12"
+                          stroke="#06b6d4"
+                          strokeWidth={2}
+                          dot={false}
+                          connectNulls
+                          name="EMA(12)"
+                        />
+                      )}
+
+                      {indicators.ema26 && (
+                        <Line 
+                          yAxisId="price"
+                          type="monotone"
+                          data={candleData.map((d, i) => ({ ...d, ema26: indicatorData.ema26?.[i] }))}
+                          dataKey="ema26"
+                          stroke="#3b82f6"
+                          strokeWidth={2}
+                          dot={false}
+                          connectNulls
+                          name="EMA(26)"
+                        />
+                      )}
+
+                      {indicators.bb && (
+                        <>
+                          <Line 
+                            yAxisId="price"
+                            type="monotone"
+                            data={candleData.map((d, i) => ({ ...d, bbUpper: indicatorData.bbUpper?.[i] }))}
+                            dataKey="bbUpper"
+                            stroke="#a855f7"
+                            strokeWidth={1.5}
+                            strokeDasharray="5 5"
+                            dot={false}
+                            connectNulls
+                            name="BB Upper"
+                          />
+                          <Line 
+                            yAxisId="price"
+                            type="monotone"
+                            data={candleData.map((d, i) => ({ ...d, bbMiddle: indicatorData.bbMiddle?.[i] }))}
+                            dataKey="bbMiddle"
+                            stroke="#a855f7"
+                            strokeWidth={1.5}
+                            dot={false}
+                            connectNulls
+                            name="BB Middle"
+                          />
+                          <Line 
+                            yAxisId="price"
+                            type="monotone"
+                            data={candleData.map((d, i) => ({ ...d, bbLower: indicatorData.bbLower?.[i] }))}
+                            dataKey="bbLower"
+                            stroke="#a855f7"
+                            strokeWidth={1.5}
+                            strokeDasharray="5 5"
+                            dot={false}
+                            connectNulls
+                            name="BB Lower"
+                          />
+                        </>
+                      )}
                     </ComposedChart>
                   </ResponsiveContainer>
+                )}
+
+                {/* RSI Chart */}
+                {indicators.rsi && indicatorData.rsi && (
+                  <div className="mt-6">
+                    <div className="text-sm font-semibold text-white mb-2">RSI(14)</div>
+                    <ResponsiveContainer width="100%" height={150}>
+                      <ComposedChart data={candleData.map((d, i) => ({ ...d, rsi: indicatorData.rsi[i] }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} interval={Math.floor(candleData.length / 15)} />
+                        <YAxis domain={[0, 100]} stroke="#64748b" tick={{ fontSize: 10 }} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="rsi" stroke="#ec4899" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey={() => 70} stroke="#ef4444" strokeWidth={1} strokeDasharray="3 3" dot={false} />
+                        <Line type="monotone" dataKey={() => 30} stroke="#10b981" strokeWidth={1} strokeDasharray="3 3" dot={false} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {/* MACD Chart */}
+                {indicators.macd && indicatorData.macdLine && (
+                  <div className="mt-6">
+                    <div className="text-sm font-semibold text-white mb-2">MACD</div>
+                    <ResponsiveContainer width="100%" height={150}>
+                      <ComposedChart data={candleData.map((d, i) => ({ 
+                        ...d, 
+                        macd: indicatorData.macdLine[i],
+                        signal: indicatorData.macdSignal[i],
+                        histogram: indicatorData.macdHistogram[i]
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} interval={Math.floor(candleData.length / 15)} />
+                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                        <Tooltip />
+                        <Bar dataKey="histogram" fill="#3b82f6" fillOpacity={0.6} />
+                        <Line type="monotone" dataKey="macd" stroke="#10b981" strokeWidth={2} dot={false} connectNulls />
+                        <Line type="monotone" dataKey="signal" stroke="#ef4444" strokeWidth={2} dot={false} connectNulls />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
                 )}
 
                 {/* OHLCV Stats */}
