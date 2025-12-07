@@ -10,6 +10,7 @@ import { Shield, TrendingUp, Grid3x3, DollarSign, Zap, Settings } from 'lucide-r
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
+import AIOptimizer from './AIOptimizer';
 
 export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
   const [config, setConfig] = useState({
@@ -79,10 +80,11 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
         </DialogHeader>
 
         <Tabs defaultValue="capital" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-800">
+          <TabsList className="grid w-full grid-cols-4 bg-slate-800">
             <TabsTrigger value="capital">Capital</TabsTrigger>
             <TabsTrigger value="risk">Risk Management</TabsTrigger>
             <TabsTrigger value="strategy">Strategy</TabsTrigger>
+            <TabsTrigger value="ai">AI Optimizer</TabsTrigger>
           </TabsList>
 
           {/* Capital Tab */}
@@ -335,9 +337,30 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
               )}
             </div>
           </TabsContent>
-        </Tabs>
 
-        <div className="flex gap-3 pt-4 border-t border-slate-700">
+          {/* AI Optimizer Tab */}
+          <TabsContent value="ai" className="space-y-4 mt-4">
+            <AIOptimizer
+              bot={bot}
+              currentConfig={config}
+              onApplyRecommendations={(recommendations) => {
+                setConfig({
+                  ...config,
+                  stop_loss: recommendations.stop_loss || config.stop_loss,
+                  take_profit: recommendations.take_profit || config.take_profit,
+                  grid_levels: recommendations.grid_levels || config.grid_levels,
+                  grid_spacing: recommendations.grid_spacing || config.grid_spacing,
+                  dca_interval: recommendations.dca_interval || config.dca_interval,
+                  dca_amount: recommendations.dca_amount || config.dca_amount,
+                  momentum_period: recommendations.momentum_period || config.momentum_period,
+                  momentum_threshold: recommendations.momentum_threshold || config.momentum_threshold
+                });
+              }}
+            />
+          </TabsContent>
+          </Tabs>
+
+          <div className="flex gap-3 pt-4 border-t border-slate-700">
           <Button
             variant="outline"
             onClick={onClose}

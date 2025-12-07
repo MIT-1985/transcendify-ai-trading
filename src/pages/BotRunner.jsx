@@ -11,6 +11,7 @@ import ProfitCalculator from '@/components/bots/ProfitCalculator';
 import TradeHistory from '@/components/bots/TradeHistory';
 import RealTimePriceDisplay from '@/components/bots/RealTimePriceDisplay';
 import VIPBenefitsCard from '@/components/bots/VIPBenefitsCard';
+import AIInsights from '@/components/bots/AIInsights';
 import { createPageUrl } from '../utils';
 
 export default function BotRunner() {
@@ -122,6 +123,7 @@ export default function BotRunner() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-2 space-y-6">
             <ProfitChart trades={trades} />
+            <AIInsights subscription={subscription} bot={bot} trades={trades} />
             {wallet && <VIPBenefitsCard vipLevel={vipLevel} />}
           </div>
           <div>
