@@ -1,0 +1,220 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
+
+const CustomTooltip = ({ active, payload }) => {
+  if (!active || !payload || !payload[0]) return null;
+  
+  const data = payload[0].payload;
+  return (
+    <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs">
+      <div className="text-slate-400 mb-2">{data.time}</div>
+      <div className="space-y-1">
+        <div className="flex justify-between gap-4">
+          <span className="text-slate-500">Open:</span>
+          <span className="text-white font-semibold">${data.open?.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-slate-500">High:</span>
+          <span className="text-emerald-400 font-semibold">${data.high?.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-slate-500">Low:</span>
+          <span className="text-red-400 font-semibold">${data.low?.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-slate-500">Close:</span>
+          <span className="text-white font-semibold">${data.close?.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-slate-500">Volume:</span>
+          <span className="text-blue-400 font-semibold">{data.volume?.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function CandlestickChart({ symbol = 'BTC/USD', interval = '5m' }) {
+  const [chartData, setChartData] = useState([]);
+  const [currentPrice, setCurrentPrice] = useState(0);
+  const [priceChange, setPriceChange] = useState(0);
+  const [sma20, setSma20] = useState([]);
+
+  // Generate realistic candlestick data
+  useEffect(() => {
+    const generateCandles = () => {
+      let basePrice = 67000;
+      const candles = [];
+      const now = Date.now();
+      
+      for (let i = 100; i >= 0; i--) {
+        const timestamp = now - (i * 5 * 60 * 1000); // 5 min intervals
+        const volatility = basePrice * 0.002;
+        
+        const open = basePrice;
+        const close = open + (Math.random() - 0.48) * volatility;
+        const high = Math.max(open, close) + Math.random() * volatility * 0.5;
+        const low = Math.min(open, close) - Math.random() * volatility * 0.5;
+        const volume = Math.random() * 50 + 10;
+        
+        candles.push({
+          time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp,
+          open,
+          high,
+          low,
+          close,
+          volume,
+          wickTop: high,
+          wickBottom: low,
+          candleTop: Math.max(open, close),
+          candleBottom: Math.min(open, close),
+          isGreen: close >= open
+        });
+        
+        basePrice = close;
+      }
+      
+      setChartData(candles);
+      setCurrentPrice(candles[candles.length - 1].close);
+      setPriceChange(((candles[candles.length - 1].close - candles[0].open) / candles[0].open) * 100);
+      
+      // Calculate SMA20
+      const closes = candles.map(c => c.close);
+      const sma = calculateSMA(closes, 20);
+      setSma20(sma);
+    };
+
+    generateCandles();
+    const interval = setInterval(generateCandles, 5000);
+    return () => clearInterval(interval);
+  }, [symbol]);
+
+  const calculateSMA = (values, period) => {
+    const result = [];
+    for (let i = 0; i < values.length; i++) {
+      if (i < period - 1) {
+        result.push(null);
+      } else {
+        const sum = values.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0);
+        result.push(sum / period);
+      }
+    }
+    return result;
+  };
+
+  return (
+    <Card className="bg-slate-900/50 border-slate-800">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Activity className="w-5 h-5 text-blue-400" />
+              {symbol} Chart
+            </CardTitle>
+            <div className="flex items-center gap-3 mt-2">
+              <div className="text-2xl font-bold text-white">
+                ${currentPrice.toFixed(2)}
+              </div>
+              <div className={`flex items-center gap-1 text-sm ${
+                priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'
+              }`}>
+                {priceChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="text-xs text-slate-400">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 bg-emerald-500/30 border border-emerald-500 rounded" />
+                <span>Bullish</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-red-500/30 border border-red-500 rounded" />
+                <span>Bearish</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={400}>
+          <ComposedChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+            <XAxis 
+              dataKey="time" 
+              stroke="#64748b" 
+              tick={{ fontSize: 10 }}
+              interval={Math.floor(chartData.length / 10)}
+            />
+            <YAxis 
+              domain={['auto', 'auto']} 
+              stroke="#64748b"
+              tick={{ fontSize: 10 }}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            
+            {/* Wicks */}
+            <Bar dataKey="wickTop" stackId="wick">
+              {chartData.map((entry, index) => (
+                <Cell 
+                  key={`wick-${index}`} 
+                  fill="transparent" 
+                  stroke={entry.isGreen ? '#10b981' : '#ef4444'}
+                  strokeWidth={1}
+                />
+              ))}
+            </Bar>
+            
+            {/* Candle bodies */}
+            <Bar dataKey="candleTop" stackId="candle" barSize={8}>
+              {chartData.map((entry, index) => (
+                <Cell 
+                  key={`candle-${index}`} 
+                  fill={entry.isGreen ? '#10b981' : '#ef4444'}
+                  fillOpacity={0.8}
+                />
+              ))}
+            </Bar>
+            
+            {/* SMA Line */}
+            <Line 
+              type="monotone" 
+              data={chartData.map((d, i) => ({ ...d, sma: sma20[i] }))}
+              dataKey="sma" 
+              stroke="#3b82f6" 
+              strokeWidth={2}
+              dot={false}
+              connectNulls
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+        
+        {/* Technical Indicators */}
+        <div className="grid grid-cols-3 gap-3 mt-4">
+          <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="text-xs text-slate-500 mb-1">SMA(20)</div>
+            <div className="text-white font-semibold">
+              ${sma20[sma20.length - 1]?.toFixed(2) || '-'}
+            </div>
+          </div>
+          <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="text-xs text-slate-500 mb-1">24h High</div>
+            <div className="text-emerald-400 font-semibold">
+              ${Math.max(...chartData.map(c => c.high)).toFixed(2)}
+            </div>
+          </div>
+          <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="text-xs text-slate-500 mb-1">24h Low</div>
+            <div className="text-red-400 font-semibold">
+              ${Math.min(...chartData.map(c => c.low)).toFixed(2)}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Activity, Bot, DollarSign, TrendingUp, Zap, BarChart3 } from 'lucide-react';
 import StatsCard from '@/components/trading/StatsCard';
 import PriceCard from '@/components/trading/PriceCard';
+import CandlestickChart from '@/components/trading/CandlestickChart';
+import OrderBook from '@/components/trading/OrderBook';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createPageUrl } from '../utils';
@@ -106,10 +108,20 @@ export default function Dashboard() {
                 volume={p.volume}
               />
             ))}
-          </div>
-        </div>
+            </div>
+            </div>
 
-        {/* Active Subscriptions */}
+            {/* Trading Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div className="lg:col-span-2">
+            <CandlestickChart symbol="BTC/USD" />
+            </div>
+            <div>
+            <OrderBook symbol="BTC/USD" />
+            </div>
+            </div>
+
+            {/* Active Subscriptions */}
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Zap className="w-5 h-5 text-amber-400" />
