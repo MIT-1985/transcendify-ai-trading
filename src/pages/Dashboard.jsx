@@ -67,7 +67,7 @@ export default function Dashboard() {
     };
 
     fetchPrices();
-    const interval = setInterval(fetchPrices, 30000); // Update every 30 seconds
+    const interval = setInterval(fetchPrices, 5000); // Update every 5 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -140,7 +140,7 @@ export default function Dashboard() {
             {/* Trading Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="lg:col-span-2">
-            <CandlestickChart symbol="X:BTCUSD" />
+            <CandlestickChart symbol="X:BTCUSD" trades={[]} />
             </div>
             <div>
             <OrderBook symbol="X:BTCUSD" />

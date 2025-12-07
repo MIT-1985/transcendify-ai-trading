@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Scatter } from 'recharts';
+import { TrendingUp, TrendingDown, Activity, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
 const CustomTooltip = ({ active, payload }) => {
@@ -37,12 +37,13 @@ const CustomTooltip = ({ active, payload }) => {
   );
 };
 
-export default function CandlestickChart({ symbol = 'X:BTCUSD' }) {
+export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
   const [chartData, setChartData] = useState([]);
   const [currentPrice, setCurrentPrice] = useState(0);
   const [priceChange, setPriceChange] = useState(0);
   const [sma20, setSma20] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tradeMarkers, setTradeMarkers] = useState([]);
 
   const calculateSMA = (values, period) => {
     const result = [];
@@ -106,6 +107,24 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD' }) {
             const sma = calculateSMA(closes, 20);
             setSma20(sma);
             console.log('Chart updated with real data, price:', candles[candles.length - 1].close);
+            
+            // Map trades to chart
+            if (trades && trades.length > 0) {
+              const markers = trades.map(trade => {
+                const tradeTime = new Date(trade.timestamp).getTime();
+                const candle = candles.find(c => Math.abs(c.timestamp - tradeTime) < 3600000); // Within 1 hour
+                if (candle) {
+                  return {
+                    time: candle.time,
+                    price: trade.price,
+                    side: trade.side,
+                    profit: trade.profit_loss
+                  };
+                }
+                return null;
+              }).filter(m => m !== null);
+              setTradeMarkers(markers);
+            }
           }
         } else {
           console.error('No results in response:', response.data);
@@ -118,9 +137,9 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD' }) {
     };
 
     fetchRealData();
-    const interval = setInterval(fetchRealData, 60000);
+    const interval = setInterval(fetchRealData, 5000); // Update every 5 seconds
     return () => clearInterval(interval);
-  }, [symbol]);
+  }, [symbol, trades]);
 
   if (loading) {
     return (
@@ -217,6 +236,43 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD' }) {
               dot={false}
               connectNulls
             />
+
+            {/* Trade Markers */}
+            {tradeMarkers.length > 0 && (
+              <Scatter 
+                data={tradeMarkers} 
+                dataKey="price"
+                shape={(props) => {
+                  const { cx, cy, payload } = props;
+                  const isBuy = payload.side === 'BUY';
+                  const isProfit = payload.profit >= 0;
+                  return (
+                    <g>
+                      <circle 
+                        cx={cx} 
+                        cy={cy} 
+                        r={8} 
+                        fill={isBuy ? '#10b981' : '#ef4444'}
+                        opacity={0.8}
+                      />
+                      {isBuy ? (
+                        <path 
+                          d={`M ${cx} ${cy - 3} L ${cx} ${cy + 3} M ${cx - 3} ${cy} L ${cx + 3} ${cy}`} 
+                          stroke="white" 
+                          strokeWidth={2}
+                        />
+                      ) : (
+                        <path 
+                          d={`M ${cx - 3} ${cy} L ${cx + 3} ${cy}`} 
+                          stroke="white" 
+                          strokeWidth={2}
+                        />
+                      )}
+                    </g>
+                  );
+                }}
+              />
+            )}
           </ComposedChart>
         </ResponsiveContainer>
         

@@ -12,6 +12,9 @@ import TradeHistory from '@/components/bots/TradeHistory';
 import RealTimePriceDisplay from '@/components/bots/RealTimePriceDisplay';
 import VIPBenefitsCard from '@/components/bots/VIPBenefitsCard';
 import AIInsights from '@/components/bots/AIInsights';
+import TechnicalIndicators from '@/components/trading/TechnicalIndicators';
+import OrderManagement from '@/components/trading/OrderManagement';
+import LivePositions from '@/components/trading/LivePositions';
 import { createPageUrl } from '../utils';
 
 export default function BotRunner() {
@@ -55,6 +58,19 @@ export default function BotRunner() {
       return wallets[0];
     },
     enabled: !!user?.email
+  });
+
+  const { data: currentMarketPrice = 0 } = useQuery({
+    queryKey: ['marketPrice', subscription?.trading_pairs?.[0]],
+    queryFn: async () => {
+      const response = await base44.functions.invoke('polygonMarketData', {
+        action: 'ticker',
+        symbol: subscription.trading_pairs[0] || 'X:BTCUSD'
+      });
+      return response.data?.data?.results?.[0]?.c || 0;
+    },
+    enabled: !!subscription?.trading_pairs?.[0],
+    refetchInterval: 5000
   });
 
   const vipLevel = wallet?.vip_level || 'none';
@@ -120,14 +136,24 @@ export default function BotRunner() {
         </div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+          {/* Left Column - Charts & Analysis */}
           <div className="lg:col-span-2 space-y-6">
             <ProfitChart trades={trades} />
             <AIInsights subscription={subscription} bot={bot} trades={trades} />
-            {wallet && <VIPBenefitsCard vipLevel={vipLevel} />}
           </div>
-          <div>
+
+          {/* Middle Column - Technical Indicators */}
+          <div className="space-y-6">
+            <TechnicalIndicators symbol={subscription.trading_pairs?.[0] || 'X:BTCUSD'} />
+          </div>
+
+          {/* Right Column - Trading & Positions */}
+          <div className="space-y-6">
+            <OrderManagement subscription={subscription} currentPrice={currentMarketPrice} />
+            <LivePositions subscription={subscription} trades={trades} />
             <ProfitCalculator bot={bot} />
+            {wallet && <VIPBenefitsCard vipLevel={vipLevel} compact />}
           </div>
         </div>
 
