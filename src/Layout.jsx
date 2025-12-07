@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Users,
   Gift,
-  TrendingUp
+  TrendingUp,
+  Crown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
