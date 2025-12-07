@@ -40,28 +40,16 @@ export default function PolygonConsole() {
       try {
         setLoading(true);
 
-        // Calculate date range based on timeframe
+        // За минути и часове трябва по-голям период
         const now = Date.now();
-        let fromMs;
-        if (timeframe.value === 'minute') {
-          fromMs = now - (timeframe.limit * timeframe.multiplier * 60 * 1000);
-        } else if (timeframe.value === 'hour') {
-          fromMs = now - (timeframe.limit * timeframe.multiplier * 60 * 60 * 1000);
-        } else {
-          fromMs = now - (timeframe.limit * timeframe.multiplier * 24 * 60 * 60 * 1000);
-        }
-
-        const from = new Date(fromMs).toISOString().split('T')[0];
+        let daysBack = 7;
+        if (timeframe.value === 'minute') daysBack = 2;
+        if (timeframe.value === 'hour' && timeframe.multiplier < 6) daysBack = 5;
+        
+        const from = new Date(now - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const to = new Date(now).toISOString().split('T')[0];
 
-        console.log('Fetching chart data:', {
-          symbol: selectedPair,
-          timeframe: timeframe.value,
-          multiplier: timeframe.multiplier,
-          from,
-          to,
-          limit: timeframe.limit
-        });
+        console.log('Fetching:', selectedPair, timeframe.label, 'from', from, 'to', to);
 
         const candleResponse = await base44.functions.invoke('polygonMarketData', {
           action: 'aggregates',
@@ -70,14 +58,14 @@ export default function PolygonConsole() {
           to: to,
           timespan: timeframe.value,
           multiplier: timeframe.multiplier,
-          limit: timeframe.limit
+          limit: 120
         });
 
-        console.log('Chart API Response:', candleResponse.data);
+        console.log('Response:', candleResponse.data);
 
         if (candleResponse.data?.success && candleResponse.data.data?.results) {
           const results = candleResponse.data.data.results;
-          console.log('Got candles:', results.length);
+          console.log('Got', results.length, 'candles');
           
           const candles = results.map(candle => {
             const date = new Date(candle.t);
