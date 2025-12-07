@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
 
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload || !payload[0]) return null;
@@ -36,61 +37,12 @@ const CustomTooltip = ({ active, payload }) => {
   );
 };
 
-export default function CandlestickChart({ symbol = 'BTC/USD', interval = '5m' }) {
+export default function CandlestickChart({ symbol = 'X:BTCUSD' }) {
   const [chartData, setChartData] = useState([]);
   const [currentPrice, setCurrentPrice] = useState(0);
   const [priceChange, setPriceChange] = useState(0);
   const [sma20, setSma20] = useState([]);
-
-  // Generate realistic candlestick data
-  useEffect(() => {
-    const generateCandles = () => {
-      let basePrice = 67000;
-      const candles = [];
-      const now = Date.now();
-      
-      for (let i = 100; i >= 0; i--) {
-        const timestamp = now - (i * 5 * 60 * 1000); // 5 min intervals
-        const volatility = basePrice * 0.002;
-        
-        const open = basePrice;
-        const close = open + (Math.random() - 0.48) * volatility;
-        const high = Math.max(open, close) + Math.random() * volatility * 0.5;
-        const low = Math.min(open, close) - Math.random() * volatility * 0.5;
-        const volume = Math.random() * 50 + 10;
-        
-        candles.push({
-          time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          timestamp,
-          open,
-          high,
-          low,
-          close,
-          volume,
-          wickTop: high,
-          wickBottom: low,
-          candleTop: Math.max(open, close),
-          candleBottom: Math.min(open, close),
-          isGreen: close >= open
-        });
-        
-        basePrice = close;
-      }
-      
-      setChartData(candles);
-      setCurrentPrice(candles[candles.length - 1].close);
-      setPriceChange(((candles[candles.length - 1].close - candles[0].open) / candles[0].open) * 100);
-      
-      // Calculate SMA20
-      const closes = candles.map(c => c.close);
-      const sma = calculateSMA(closes, 20);
-      setSma20(sma);
-    };
-
-    generateCandles();
-    const interval = setInterval(generateCandles, 5000);
-    return () => clearInterval(interval);
-  }, [symbol]);
+  const [loading, setLoading] = useState(true);
 
   const calculateSMA = (values, period) => {
     const result = [];
@@ -104,6 +56,73 @@ export default function CandlestickChart({ symbol = 'BTC/USD', interval = '5m' }
     }
     return result;
   };
+
+  useEffect(() => {
+    const fetchRealData = async () => {
+      try {
+        const to = new Date().toISOString().split('T')[0];
+        const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        const response = await base44.functions.invoke('polygonMarketData', {
+          action: 'aggregates',
+          symbol: symbol,
+          from: from,
+          to: to,
+          timespan: 'hour',
+          limit: 100
+        });
+
+        if (response.data?.success && response.data.data?.results) {
+          const results = response.data.data.results;
+          const candles = results.map(candle => {
+            const time = new Date(candle.t);
+            return {
+              time: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              timestamp: candle.t,
+              open: candle.o,
+              high: candle.h,
+              low: candle.l,
+              close: candle.c,
+              volume: candle.v,
+              wickTop: candle.h,
+              wickBottom: candle.l,
+              candleTop: Math.max(candle.o, candle.c),
+              candleBottom: Math.min(candle.o, candle.c),
+              isGreen: candle.c >= candle.o
+            };
+          });
+
+          setChartData(candles);
+          if (candles.length > 0) {
+            setCurrentPrice(candles[candles.length - 1].close);
+            setPriceChange(((candles[candles.length - 1].close - candles[0].open) / candles[0].open) * 100);
+            
+            const closes = candles.map(c => c.close);
+            const sma = calculateSMA(closes, 20);
+            setSma20(sma);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching chart data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRealData();
+    const interval = setInterval(fetchRealData, 60000);
+    return () => clearInterval(interval);
+  }, [symbol]);
+
+  if (loading) {
+    return (
+      <Card className="bg-slate-900/50 border-slate-800">
+        <CardContent className="p-6">
+          <div className="text-center text-slate-400">Loading real-time data...</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="bg-slate-900/50 border-slate-800">
@@ -204,13 +223,13 @@ export default function CandlestickChart({ symbol = 'BTC/USD', interval = '5m' }
           <div className="bg-slate-800/50 rounded-lg p-3">
             <div className="text-xs text-slate-500 mb-1">24h High</div>
             <div className="text-emerald-400 font-semibold">
-              ${Math.max(...chartData.map(c => c.high)).toFixed(2)}
+              ${chartData.length > 0 ? Math.max(...chartData.map(c => c.high)).toFixed(2) : '-'}
             </div>
           </div>
           <div className="bg-slate-800/50 rounded-lg p-3">
             <div className="text-xs text-slate-500 mb-1">24h Low</div>
             <div className="text-red-400 font-semibold">
-              ${Math.min(...chartData.map(c => c.low)).toFixed(2)}
+              ${chartData.length > 0 ? Math.min(...chartData.map(c => c.low)).toFixed(2) : '-'}
             </div>
           </div>
         </div>

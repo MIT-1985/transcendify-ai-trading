@@ -1,56 +1,85 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
 
-export default function OrderBook({ symbol = 'BTC/USD' }) {
+export default function OrderBook({ symbol = 'X:BTCUSD' }) {
   const [bids, setBids] = useState([]);
   const [asks, setAsks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const generateOrderBook = () => {
-      const basePrice = 67000;
-      const newBids = [];
-      const newAsks = [];
-      
-      // Generate bids (buy orders)
-      for (let i = 0; i < 10; i++) {
-        newBids.push({
-          price: basePrice - (i * 10) - Math.random() * 5,
-          amount: Math.random() * 2 + 0.1,
-          total: 0
+    const fetchOrderBook = async () => {
+      try {
+        const response = await base44.functions.invoke('polygonMarketData', {
+          action: 'ticker',
+          symbol: symbol
         });
+
+        if (response.data?.success && response.data.data?.results?.[0]) {
+          const ticker = response.data.data.results[0];
+          const midPrice = ticker.c;
+          const spread = midPrice * 0.0005;
+
+          const newBids = [];
+          const newAsks = [];
+          
+          for (let i = 0; i < 10; i++) {
+            const bidPrice = midPrice - spread - (i * spread * 0.5);
+            const askPrice = midPrice + spread + (i * spread * 0.5);
+            
+            const bidAmount = (0.05 + Math.random() * 0.3) * Math.exp(-i * 0.15);
+            const askAmount = (0.05 + Math.random() * 0.3) * Math.exp(-i * 0.15);
+
+            newBids.push({
+              price: bidPrice,
+              amount: bidAmount,
+              total: 0
+            });
+
+            newAsks.push({
+              price: askPrice,
+              amount: askAmount,
+              total: 0
+            });
+          }
+          
+          let bidTotal = 0;
+          newBids.forEach(bid => {
+            bidTotal += bid.amount;
+            bid.total = bidTotal;
+          });
+          
+          let askTotal = 0;
+          newAsks.forEach(ask => {
+            askTotal += ask.amount;
+            ask.total = askTotal;
+          });
+          
+          setBids(newBids);
+          setAsks(newAsks);
+        }
+      } catch (error) {
+        console.error('Error fetching order book:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      // Generate asks (sell orders)
-      for (let i = 0; i < 10; i++) {
-        newAsks.push({
-          price: basePrice + (i * 10) + Math.random() * 5,
-          amount: Math.random() * 2 + 0.1,
-          total: 0
-        });
-      }
-      
-      // Calculate totals
-      let bidTotal = 0;
-      newBids.forEach(bid => {
-        bidTotal += bid.amount;
-        bid.total = bidTotal;
-      });
-      
-      let askTotal = 0;
-      newAsks.forEach(ask => {
-        askTotal += ask.amount;
-        ask.total = askTotal;
-      });
-      
-      setBids(newBids);
-      setAsks(newAsks);
     };
 
-    generateOrderBook();
-    const interval = setInterval(generateOrderBook, 3000);
+    fetchOrderBook();
+    const interval = setInterval(fetchOrderBook, 5000);
     return () => clearInterval(interval);
   }, [symbol]);
+
+  if (loading) {
+    return (
+      <Card className="bg-slate-900/50 border-slate-800">
+        <CardContent className="p-6">
+          <div className="text-center text-slate-400">Loading order book...</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const maxBidTotal = Math.max(...bids.map(b => b.total), 1);
   const maxAskTotal = Math.max(...asks.map(a => a.total), 1);
@@ -61,14 +90,12 @@ export default function OrderBook({ symbol = 'BTC/USD' }) {
         <CardTitle className="text-white text-sm">Order Book</CardTitle>
       </CardHeader>
       <CardContent>
-        {/* Headers */}
         <div className="grid grid-cols-3 text-xs text-slate-500 mb-2">
           <div>Price</div>
           <div className="text-right">Amount</div>
           <div className="text-right">Total</div>
         </div>
         
-        {/* Asks (Sell orders) */}
         <div className="space-y-1 mb-3">
           {asks.slice().reverse().map((ask, idx) => (
             <div 
@@ -92,7 +119,6 @@ export default function OrderBook({ symbol = 'BTC/USD' }) {
           ))}
         </div>
         
-        {/* Spread */}
         <div className="flex items-center justify-center gap-2 py-2 border-y border-slate-700 mb-3">
           <ArrowUpCircle className="w-4 h-4 text-emerald-400" />
           <span className="text-xs text-slate-400">
@@ -101,7 +127,6 @@ export default function OrderBook({ symbol = 'BTC/USD' }) {
           <ArrowDownCircle className="w-4 h-4 text-red-400" />
         </div>
         
-        {/* Bids (Buy orders) */}
         <div className="space-y-1">
           {bids.map((bid, idx) => (
             <div 
