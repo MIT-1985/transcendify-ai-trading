@@ -8,6 +8,8 @@ export const translations = {
     aiAnalysis: 'AI Analysis',
     wallet: 'Wallet',
     referrals: 'Referrals',
+    portfolio: 'Portfolio',
+    profile: 'Profile',
     
     // Dashboard
     activeBots: 'Active Bots',
@@ -152,6 +154,8 @@ export const translations = {
     aiAnalysis: 'AI Анализ',
     wallet: 'Портфейл',
     referrals: 'Препоръки',
+    portfolio: 'Портфолио',
+    profile: 'Профил',
     
     // Dashboard
     activeBots: 'Активни Ботове',
@@ -296,6 +300,8 @@ export const translations = {
     aiAnalysis: 'KI-Analyse',
     wallet: 'Wallet',
     referrals: 'Empfehlungen',
+    portfolio: 'Portfolio',
+    profile: 'Profil',
     
     // Dashboard
     activeBots: 'Aktive Bots',
