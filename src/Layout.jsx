@@ -20,6 +20,7 @@ const navItems = [
   { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
   { name: 'Polygon Console', page: 'PolygonConsole', icon: Terminal },
   { name: 'Trading Bots', page: 'Bots', icon: Bot },
+  { name: 'Fuel Miners', page: 'Miners', icon: Zap },
   { name: 'AI Analysis', page: 'AIAnalysis', icon: Brain },
   { name: 'Wallet', page: 'Wallet', icon: Users },
   { name: 'Referrals', page: 'Referrals', icon: Gift },
