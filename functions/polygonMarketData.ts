@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { action, symbol, from, to, timespan, limit } = await req.json();
+    const { action, symbol, from, to, timespan, multiplier, limit } = await req.json();
 
     let url;
     switch (action) {
@@ -31,7 +31,9 @@ Deno.serve(async (req) => {
         const fromDate = from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const toDate = to || new Date().toISOString().split('T')[0];
         const span = timespan || 'day';
-        url = `${BASE_URL}/v2/aggs/ticker/${symbol}/range/1/${span}/${fromDate}/${toDate}?adjusted=true&sort=asc&limit=${limit || 50}&apiKey=${POLYGON_API_KEY}`;
+        const mult = multiplier || 1;
+        url = `${BASE_URL}/v2/aggs/ticker/${symbol}/range/${mult}/${span}/${fromDate}/${toDate}?adjusted=true&sort=asc&limit=${limit || 120}&apiKey=${POLYGON_API_KEY}`;
+        console.log('Polygon URL:', url);
         break;
       
       case 'quote':
