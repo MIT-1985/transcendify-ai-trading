@@ -6,6 +6,8 @@ import Wallet from './pages/Wallet';
 import Referrals from './pages/Referrals';
 import Miners from './pages/Miners';
 import BotRunner from './pages/BotRunner';
+import Profile from './pages/Profile';
+import Portfolio from './pages/Portfolio';
 import __Layout from './Layout.jsx';
 
 
@@ -18,6 +20,8 @@ export const PAGES = {
     "Referrals": Referrals,
     "Miners": Miners,
     "BotRunner": BotRunner,
+    "Profile": Profile,
+    "Portfolio": Portfolio,
 }
 
 export const pagesConfig = {
