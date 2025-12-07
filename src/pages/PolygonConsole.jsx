@@ -214,7 +214,7 @@ export default function PolygonConsole() {
                       }}
                       formatter={(value, name) => {
                         if (name === 'volume') return [value.toFixed(0), 'Volume'];
-                        return [`$${value.toFixed(2)}`, name.toUpperCase()];
+                        return [`$${value.toFixed(2)}`, String(name).toUpperCase()];
                       }}
                     />
                     
