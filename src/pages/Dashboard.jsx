@@ -10,18 +10,17 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createPageUrl } from '../utils';
 
-// Simulated real-time prices (in production, connect to actual WebSocket)
-const MOCK_PRICES = [
-  { symbol: 'BTC/USD', price: 67842.50, change: 2.34, volume: 28500000000 },
-  { symbol: 'ETH/USD', price: 3456.78, change: -0.89, volume: 15200000000 },
-  { symbol: 'SOL/USD', price: 178.45, change: 5.67, volume: 3800000000 },
-  { symbol: 'XRP/USD', price: 0.5234, change: 1.23, volume: 1200000000 },
-  { symbol: 'DOGE/USD', price: 0.1567, change: -2.45, volume: 890000000 },
-  { symbol: 'ADA/USD', price: 0.4523, change: 0.78, volume: 560000000 },
+const CRYPTO_SYMBOLS = [
+  'X:BTCUSD',
+  'X:ETHUSD', 
+  'X:SOLUSD',
+  'X:XRPUSD',
+  'X:DOGEUSD',
+  'X:ADAUSD'
 ];
 
 export default function Dashboard() {
-  const [prices, setPrices] = useState(MOCK_PRICES);
+  const [prices, setPrices] = useState([]);
   
   const { data: subscriptions = [], isLoading: loadingSubs } = useQuery({
     queryKey: ['subscriptions'],
@@ -33,15 +32,37 @@ export default function Dashboard() {
     queryFn: () => base44.entities.TradingBot.list()
   });
 
-  // Simulate price updates
+  // Fetch real-time prices
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPrices(prev => prev.map(p => ({
-        ...p,
-        price: p.price * (1 + (Math.random() - 0.5) * 0.001),
-        change: p.change + (Math.random() - 0.5) * 0.1
-      })));
-    }, 2000);
+    const fetchPrices = async () => {
+      try {
+        const pricePromises = CRYPTO_SYMBOLS.map(async (symbol) => {
+          const response = await base44.functions.invoke('polygonMarketData', {
+            action: 'ticker',
+            symbol: symbol
+          });
+          
+          if (response.data?.success && response.data.data?.results?.[0]) {
+            const result = response.data.data.results[0];
+            return {
+              symbol: symbol.replace('X:', '').replace('USD', '/USD'),
+              price: result.c,
+              change: ((result.c - result.o) / result.o) * 100,
+              volume: result.v
+            };
+          }
+          return null;
+        });
+
+        const results = await Promise.all(pricePromises);
+        setPrices(results.filter(p => p !== null));
+      } catch (error) {
+        console.error('Error fetching prices:', error);
+      }
+    };
+
+    fetchPrices();
+    const interval = setInterval(fetchPrices, 30000); // Update every 30 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -114,10 +135,10 @@ export default function Dashboard() {
             {/* Trading Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="lg:col-span-2">
-            <CandlestickChart symbol="BTC/USD" />
+            <CandlestickChart symbol="X:BTCUSD" />
             </div>
             <div>
-            <OrderBook symbol="BTC/USD" />
+            <OrderBook symbol="X:BTCUSD" />
             </div>
             </div>
 
