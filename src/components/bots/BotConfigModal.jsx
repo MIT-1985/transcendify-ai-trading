@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Shield, TrendingUp, Grid3x3, DollarSign, Zap, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
 
 export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
   const [config, setConfig] = useState({
@@ -20,8 +23,37 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
     momentum_period: bot?.momentum_period || 15,
     momentum_threshold: bot?.momentum_threshold || 2,
     max_position_size: 25,
-    trailing_stop: false
+    trailing_stop: false,
+    trading_pairs: ['X:BTCUSD']
   });
+
+  const [availableTickers, setAvailableTickers] = useState([]);
+  const [loadingTickers, setLoadingTickers] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchTickers();
+    }
+  }, [isOpen]);
+
+  const fetchTickers = async () => {
+    setLoadingTickers(true);
+    try {
+      const response = await base44.functions.invoke('polygonMarketData', {
+        action: 'tickers',
+        limit: 50
+      });
+      
+      if (response.data?.success && response.data.data?.results) {
+        const tickers = response.data.data.results.map(t => t.ticker);
+        setAvailableTickers(tickers);
+      }
+    } catch (error) {
+      toast.error('Failed to load trading pairs');
+    } finally {
+      setLoadingTickers(false);
+    }
+  };
 
   const handleSubmit = () => {
     onSubscribe(config);
@@ -70,6 +102,33 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
                 />
                 <p className="text-xs text-slate-500 mt-1">
                   Minimum: ${bot.min_capital?.toLocaleString()}
+                </p>
+              </div>
+
+              <div>
+                <Label className="text-slate-300 mb-2">Trading Pair</Label>
+                <Select
+                  value={config.trading_pairs[0]}
+                  onValueChange={(value) => setConfig({ ...config, trading_pairs: [value] })}
+                  disabled={loadingTickers}
+                >
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectValue placeholder={loadingTickers ? "Loading..." : "Select trading pair"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    {availableTickers.length > 0 ? (
+                      availableTickers.map((ticker) => (
+                        <SelectItem key={ticker} value={ticker}>
+                          {ticker}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="X:BTCUSD">X:BTCUSD (default)</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-slate-500 mt-1">
+                  Select cryptocurrency pair to trade
                 </p>
               </div>
 

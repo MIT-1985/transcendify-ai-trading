@@ -9,6 +9,8 @@ import ProfitChart from '@/components/bots/ProfitChart';
 import LiveStats from '@/components/bots/LiveStats';
 import ProfitCalculator from '@/components/bots/ProfitCalculator';
 import TradeHistory from '@/components/bots/TradeHistory';
+import RealTimePriceDisplay from '@/components/bots/RealTimePriceDisplay';
+import VIPBenefitsCard from '@/components/bots/VIPBenefitsCard';
 import { createPageUrl } from '../utils';
 
 export default function BotRunner() {
@@ -37,10 +39,25 @@ export default function BotRunner() {
     queryKey: ['trades', subscriptionId],
     queryFn: () => base44.entities.Trade.filter({ subscription_id: subscriptionId }),
     enabled: !!subscriptionId,
-    refetchInterval: 2000 // Refresh every 2 seconds
+    refetchInterval: 2000
   });
 
-  const { isRunning, setIsRunning, elapsedSeconds, currentProfit } = useBotEngine(subscription);
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => base44.auth.me()
+  });
+
+  const { data: wallet } = useQuery({
+    queryKey: ['wallet', user?.email],
+    queryFn: async () => {
+      const wallets = await base44.entities.Wallet.filter({ created_by: user.email });
+      return wallets[0];
+    },
+    enabled: !!user?.email
+  });
+
+  const vipLevel = wallet?.vip_level || 'none';
+  const { isRunning, setIsRunning, elapsedSeconds, currentProfit } = useBotEngine(subscription, vipLevel);
 
   if (!subscription || !bot) {
     return (
@@ -66,7 +83,10 @@ export default function BotRunner() {
             </Button>
             <div>
               <h1 className="text-3xl font-bold">{bot.name}</h1>
-              <p className="text-slate-400">{bot.strategy} strategy • {bot.risk_level} risk</p>
+              <div className="flex items-center gap-4">
+                <p className="text-slate-400">{bot.strategy} strategy • {bot.risk_level} risk</p>
+                <RealTimePriceDisplay symbol={subscription.trading_pairs?.[0] || 'X:BTCUSD'} />
+              </div>
             </div>
           </div>
           <Button
@@ -100,8 +120,9 @@ export default function BotRunner() {
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-6">
             <ProfitChart trades={trades} />
+            {wallet && <VIPBenefitsCard vipLevel={vipLevel} />}
           </div>
           <div>
             <ProfitCalculator bot={bot} />

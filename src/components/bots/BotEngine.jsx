@@ -2,11 +2,22 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
 
-export function useBotEngine(subscription) {
+export function useBotEngine(subscription, vipLevel = 'none') {
   const [isRunning, setIsRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentProfit, setCurrentProfit] = useState(subscription?.total_profit || 0);
   const queryClient = useQueryClient();
+
+  // VIP multipliers
+  const getVIPBoost = (level) => {
+    const boosts = { none: 0, bronze: 0.05, silver: 0.10, gold: 0.15, platinum: 0.20, diamond: 0.25 };
+    return boosts[level] || 0;
+  };
+
+  const getVIPFeeDiscount = (level) => {
+    const discounts = { none: 0, bronze: 0.10, silver: 0.20, gold: 0.30, platinum: 0.40, diamond: 0.50 };
+    return discounts[level] || 0;
+  };
 
   useEffect(() => {
     if (!subscription || subscription.status !== 'active' || !isRunning) return;
@@ -33,30 +44,44 @@ export function useBotEngine(subscription) {
           case 'momentum': profitPct = isWin ? (3 + Math.random() * 7) : -(2 + Math.random() * 5); break;
         }
 
+        // Apply VIP profit boost
+        const vipBoost = getVIPBoost(vipLevel);
+        if (profitPct > 0) {
+          profitPct *= (1 + vipBoost);
+        }
+
         // Apply stop loss and take profit
         const stopLoss = subscription.stop_loss || 5;
         const takeProfit = subscription.take_profit || 10;
         
         if (profitPct < 0 && Math.abs(profitPct) > stopLoss) {
-          profitPct = -stopLoss; // Trigger stop loss
+          profitPct = -stopLoss;
         } else if (profitPct > 0 && profitPct > takeProfit) {
-          profitPct = takeProfit; // Trigger take profit
+          profitPct = takeProfit;
         }
 
         const capital = subscription.capital_allocated || 1000;
         const positionSize = Math.min(capital, (capital * (subscription.max_position_size || 25)) / 100);
-        const profit = (positionSize * profitPct) / 100;
+        let profit = (positionSize * profitPct) / 100;
         const price = 20000 + Math.random() * 10000;
+
+        // Apply VIP fee discount
+        const baseFee = capital * 0.001;
+        const feeDiscount = getVIPFeeDiscount(vipLevel);
+        const fee = baseFee * (1 - feeDiscount);
+        
+        // Subtract fees from profit
+        profit -= fee;
 
         // Create trade
         await base44.entities.Trade.create({
           subscription_id: subscription.id,
-          symbol: 'BTC/USD',
+          symbol: subscription.trading_pairs?.[0] || 'BTC/USD',
           side: isWin ? 'BUY' : 'SELL',
           quantity: capital / price,
           price: price,
           total_value: capital,
-          fee: capital * 0.001,
+          fee: fee,
           profit_loss: profit,
           entry_price: price,
           exit_price: price * (1 + profitPct / 100),
@@ -79,7 +104,7 @@ export function useBotEngine(subscription) {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [subscription, isRunning, currentProfit, queryClient]);
+  }, [subscription, isRunning, currentProfit, queryClient, vipLevel]);
 
   return {
     isRunning,
