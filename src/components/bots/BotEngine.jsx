@@ -33,8 +33,19 @@ export function useBotEngine(subscription) {
           case 'momentum': profitPct = isWin ? (3 + Math.random() * 7) : -(2 + Math.random() * 5); break;
         }
 
+        // Apply stop loss and take profit
+        const stopLoss = subscription.stop_loss || 5;
+        const takeProfit = subscription.take_profit || 10;
+        
+        if (profitPct < 0 && Math.abs(profitPct) > stopLoss) {
+          profitPct = -stopLoss; // Trigger stop loss
+        } else if (profitPct > 0 && profitPct > takeProfit) {
+          profitPct = takeProfit; // Trigger take profit
+        }
+
         const capital = subscription.capital_allocated || 1000;
-        const profit = (capital * profitPct) / 100;
+        const positionSize = Math.min(capital, (capital * (subscription.max_position_size || 25)) / 100);
+        const profit = (positionSize * profitPct) / 100;
         const price = 20000 + Math.random() * 10000;
 
         // Create trade
