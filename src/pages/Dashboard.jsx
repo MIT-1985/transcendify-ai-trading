@@ -4,7 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Activity, Bot, DollarSign, TrendingUp, Zap, BarChart3 } from 'lucide-react';
 import StatsCard from '@/components/trading/StatsCard';
 import PriceCard from '@/components/trading/PriceCard';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { createPageUrl } from './utils';
 
 // Simulated real-time prices (in production, connect to actual WebSocket)
 const MOCK_PRICES = [
@@ -155,6 +157,12 @@ export default function Dashboard() {
                         <div className="text-white font-semibold">{sub.total_trades || 0}</div>
                       </div>
                     </div>
+                    <Button
+                      onClick={() => window.location.href = createPageUrl('BotRunner') + '?id=' + sub.id}
+                      className="w-full mt-4 bg-blue-600 hover:bg-blue-500"
+                    >
+                      View Live Dashboard
+                    </Button>
                   </div>
                 );
               })}
