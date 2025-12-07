@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { 
@@ -15,19 +15,30 @@ import {
   Gift
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const navItems = [
-  { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
-  { name: 'Polygon Console', page: 'PolygonConsole', icon: Terminal },
-  { name: 'Trading Bots', page: 'Bots', icon: Bot },
-  { name: 'Fuel Miners', page: 'Miners', icon: Zap },
-  { name: 'AI Analysis', page: 'AIAnalysis', icon: Brain },
-  { name: 'Wallet', page: 'Wallet', icon: Users },
-  { name: 'Referrals', page: 'Referrals', icon: Gift },
-];
+import LanguageSwitcher from './components/LanguageSwitcher';
+import { useTranslation } from './utils/translations';
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [language, setLanguage] = useState(() => {
+    return localStorage.getItem('language') || 'en';
+  });
+  
+  const { t } = useTranslation(language);
+  
+  useEffect(() => {
+    localStorage.setItem('language', language);
+  }, [language]);
+  
+  const navItems = [
+    { nameKey: 'dashboard', page: 'Dashboard', icon: LayoutDashboard },
+    { nameKey: 'polygonConsole', page: 'PolygonConsole', icon: Terminal },
+    { nameKey: 'tradingBots', page: 'Bots', icon: Bot },
+    { nameKey: 'fuelMiners', page: 'Miners', icon: Zap },
+    { nameKey: 'aiAnalysis', page: 'AIAnalysis', icon: Brain },
+    { nameKey: 'wallet', page: 'Wallet', icon: Users },
+    { nameKey: 'referrals', page: 'Referrals', icon: Gift },
+  ];
 
   return (
     <div className="min-h-screen bg-[#0A0A0F]">
@@ -60,7 +71,7 @@ export default function Layout({ children, currentPageName }) {
           </div>
           <div>
             <span className="font-bold text-white text-lg">Transcendify</span>
-            <div className="text-xs text-slate-500">Trading Platform</div>
+            <div className="text-xs text-slate-500">{language === 'bg' ? 'Платформа за Търговия' : language === 'de' ? 'Handelsplattform' : 'Trading Platform'}</div>
           </div>
         </div>
 
@@ -69,7 +80,7 @@ export default function Layout({ children, currentPageName }) {
           {navItems.map((item) => {
             const isActive = currentPageName === item.page;
             const Icon = item.icon;
-            
+
             return (
               <Link
                 key={item.page}
@@ -83,7 +94,7 @@ export default function Layout({ children, currentPageName }) {
                 )}
               >
                 <Icon className="w-5 h-5" />
-                <span className="font-medium">{item.name}</span>
+                <span className="font-medium">{t(item.nameKey)}</span>
                 {isActive && (
                   <ChevronRight className="w-4 h-4 ml-auto" />
                 )}
@@ -94,17 +105,26 @@ export default function Layout({ children, currentPageName }) {
 
         {/* Bottom Section */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800">
-          <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl p-4 border border-blue-500/20">
-            <div className="flex items-center gap-2 mb-2">
-              <Bot className="w-5 h-5 text-blue-400" />
-              <span className="text-sm font-semibold text-white">Pro Features</span>
+          <div className="space-y-3">
+            <LanguageSwitcher language={language} onLanguageChange={setLanguage} />
+            <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl p-4 border border-blue-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Bot className="w-5 h-5 text-blue-400" />
+                <span className="text-sm font-semibold text-white">
+                  {language === 'bg' ? 'Pro Функции' : language === 'de' ? 'Pro-Funktionen' : 'Pro Features'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mb-3">
+                {language === 'bg' 
+                  ? 'Отключете разширени ботове и AI инструменти' 
+                  : language === 'de'
+                  ? 'Erweiterte Bots und KI-Analysetools freischalten'
+                  : 'Unlock advanced bots and AI analysis tools'}
+              </p>
+              <button className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2 rounded-lg transition-colors">
+                {language === 'bg' ? 'Надградете Сега' : language === 'de' ? 'Jetzt Upgraden' : 'Upgrade Now'}
+              </button>
             </div>
-            <p className="text-xs text-slate-400 mb-3">
-              Unlock advanced bots and AI analysis tools
-            </p>
-            <button className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2 rounded-lg transition-colors">
-              Upgrade Now
-            </button>
           </div>
         </div>
       </aside>
