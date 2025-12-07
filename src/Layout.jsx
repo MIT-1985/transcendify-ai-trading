@@ -37,8 +37,11 @@ export default function Layout({ children, currentPageName }) {
     { nameKey: 'polygonConsole', page: 'PolygonConsole', icon: Terminal },
     { nameKey: 'tradingBots', page: 'Bots', icon: Bot },
     { nameKey: 'fuelMiners', page: 'Miners', icon: Zap },
+    { nameKey: 'deviceMining', page: 'DeviceMining', icon: Zap },
     { nameKey: 'aiAnalysis', page: 'AIAnalysis', icon: Brain },
     { nameKey: 'wallet', page: 'Wallet', icon: Users },
+    { nameKey: 'deposit', page: 'Deposit', icon: TrendingUp },
+    { nameKey: 'vipUpgrade', page: 'VIPUpgrade', icon: Crown },
     { nameKey: 'referrals', page: 'Referrals', icon: Gift },
     { nameKey: 'profile', page: 'Profile', icon: Settings },
   ];

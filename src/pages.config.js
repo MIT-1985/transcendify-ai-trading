@@ -9,6 +9,9 @@ import BotRunner from './pages/BotRunner';
 import Profile from './pages/Profile';
 import Portfolio from './pages/Portfolio';
 import Landing from './pages/Landing';
+import Deposit from './pages/Deposit';
+import DeviceMining from './pages/DeviceMining';
+import VIPUpgrade from './pages/VIPUpgrade';
 import __Layout from './Layout.jsx';
 
 
@@ -24,6 +27,9 @@ export const PAGES = {
     "Profile": Profile,
     "Portfolio": Portfolio,
     "Landing": Landing,
+    "Deposit": Deposit,
+    "DeviceMining": DeviceMining,
+    "VIPUpgrade": VIPUpgrade,
 }
 
 export const pagesConfig = {
