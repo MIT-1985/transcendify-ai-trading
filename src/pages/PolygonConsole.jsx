@@ -254,62 +254,36 @@ export default function PolygonConsole() {
                       <Bar 
                         yAxisId="volume"
                         dataKey="volume" 
-                        fill="url(#volumeGradient)"
-                        radius={[4, 4, 0, 0]}
+                        fill="#3b82f6"
+                        fillOpacity={0.3}
+                        radius={[2, 2, 0, 0]}
                       />
                       
-                      {/* Candlesticks */}
+                      {/* Candlestick wicks */}
                       <Bar 
                         yAxisId="price"
-                        dataKey="high"
-                        shape={(props) => {
-                          const { x, width, payload } = props;
-                          if (!payload || !payload.high) return null;
-                          
-                          const chartHeight = 600;
-                          const yScale = chartHeight / (Math.max(...candleData.map(d => d.high)) - Math.min(...candleData.map(d => d.low)));
-                          const minPrice = Math.min(...candleData.map(d => d.low));
-                          
-                          const getY = (price) => chartHeight - ((price - minPrice) * yScale) + 10;
-                          
-                          const highY = getY(payload.high);
-                          const lowY = getY(payload.low);
-                          const openY = getY(payload.open);
-                          const closeY = getY(payload.close);
-                          
-                          const centerX = x + width / 2;
-                          const bodyWidth = Math.max(6, Math.min(14, 700 / candleData.length));
-                          const bodyX = centerX - bodyWidth / 2;
-                          const bodyTop = Math.min(openY, closeY);
-                          const bodyHeight = Math.abs(closeY - openY) || 1;
-                          
-                          return (
-                            <g>
-                              {/* Wick */}
-                              <line
-                                x1={centerX}
-                                y1={highY}
-                                x2={centerX}
-                                y2={lowY}
-                                stroke={payload.isGreen ? '#10b981' : '#ef4444'}
-                                strokeWidth={1.5}
-                              />
-                              {/* Body */}
-                              <rect
-                                x={bodyX}
-                                y={bodyTop}
-                                width={bodyWidth}
-                                height={bodyHeight}
-                                fill={payload.isGreen ? '#10b981' : '#ef4444'}
-                                stroke={payload.isGreen ? '#059669' : '#dc2626'}
-                                strokeWidth={1}
-                              />
-                            </g>
-                          );
-                        }}
+                        dataKey={entry => [entry.low, entry.high]}
+                        barSize={1}
                       >
                         {candleData.map((entry, index) => (
-                          <Cell key={`candle-${index}`} />
+                          <Cell 
+                            key={`wick-${index}`}
+                            fill={entry.isGreen ? '#10b981' : '#ef4444'}
+                          />
+                        ))}
+                      </Bar>
+                      
+                      {/* Candlestick bodies */}
+                      <Bar 
+                        yAxisId="price"
+                        dataKey={entry => [Math.min(entry.open, entry.close), Math.max(entry.open, entry.close)]}
+                        barSize={10}
+                      >
+                        {candleData.map((entry, index) => (
+                          <Cell 
+                            key={`body-${index}`}
+                            fill={entry.isGreen ? '#10b981' : '#ef4444'}
+                          />
                         ))}
                       </Bar>
                     </ComposedChart>
