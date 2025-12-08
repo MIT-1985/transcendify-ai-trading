@@ -15,6 +15,7 @@ import VIPUpgrade from './pages/VIPUpgrade';
 import AIAnalysis from './pages/AIAnalysis';
 import Deposit from './pages/Deposit';
 import CustomStrategies from './pages/CustomStrategies';
+import BotWizard from './pages/BotWizard';
 import __Layout from './Layout.jsx';
 
 
@@ -36,6 +37,7 @@ export const PAGES = {
     "AIAnalysis": AIAnalysis,
     "Deposit": Deposit,
     "CustomStrategies": CustomStrategies,
+    "BotWizard": BotWizard,
 }
 
 export const pagesConfig = {
