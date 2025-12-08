@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
 import { analyzeStrategy } from './TechnicalAnalysis';
+import { AILearningEngine } from './AILearningEngine';
 
 export function useBotEngine(subscription, vipLevel = 'none') {
   const [isRunning, setIsRunning] = useState(true); // Auto-start in test mode
@@ -22,6 +23,23 @@ export function useBotEngine(subscription, vipLevel = 'none') {
 
   useEffect(() => {
     if (!subscription || subscription.status !== 'active' || !isRunning) return;
+
+    // Initialize AI learning engine
+    let learningEngine = null;
+    const initLearning = async () => {
+      const trades = await base44.entities.Trade.filter({ subscription_id: subscription.id });
+      learningEngine = new AILearningEngine(subscription, trades);
+      
+      // Run AI learning every 50 trades
+      if (trades.length > 0 && trades.length % 50 === 0) {
+        const learningResult = await learningEngine.applyLearning();
+        if (learningResult.success) {
+          console.log('AI Learning applied:', learningResult);
+          queryClient.invalidateQueries({ queryKey: ['subscription', subscription.id] });
+        }
+      }
+    };
+    initLearning();
 
     const interval = setInterval(async () => {
       setElapsedSeconds(prev => prev + 1);
@@ -76,8 +94,37 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const vipBoost = getVIPBoost(vipLevel);
         if (profitPct > 0) profitPct *= (1 + vipBoost);
 
-        const stopLoss = subscription.stop_loss || 5;
-        const takeProfit = subscription.take_profit || 10;
+        // Get AI-adjusted parameters if available
+        let stopLoss = subscription.stop_loss || 5;
+        let takeProfit = subscription.take_profit || 10;
+        
+        // Check if learning objectives are enabled
+        if (learningEngine && subscription.learning_objectives) {
+          const analysis = await learningEngine.analyzePastPerformance();
+          if (analysis.hasLearned && analysis.recommendations) {
+            stopLoss = analysis.recommendations.adjustedStopLoss;
+            takeProfit = analysis.recommendations.adjustedTakeProfit;
+            
+            // Use preferred symbols if enabled
+            if (subscription.learning_objectives.focus_best_symbols && 
+                analysis.recommendations.preferredSymbols.length > 0) {
+              const preferredSymbols = analysis.recommendations.preferredSymbols;
+              if (!preferredSymbols.includes(symbol)) {
+                return; // Skip trade if not in preferred symbols
+              }
+            }
+            
+            // Check optimal timing
+            if (subscription.learning_objectives.optimize_timing && 
+                analysis.recommendations.preferredHours.length > 0) {
+              const currentHour = new Date().getHours();
+              if (!analysis.recommendations.preferredHours.includes(currentHour)) {
+                // Skip trade if not optimal time
+                if (Math.random() > 0.3) return;
+              }
+            }
+          }
+        }
         
         if (profitPct < 0 && Math.abs(profitPct) > stopLoss) profitPct = -stopLoss;
         else if (profitPct > 0 && profitPct > takeProfit) profitPct = takeProfit;

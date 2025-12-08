@@ -10,6 +10,7 @@ import TradeHistory from '@/components/bots/TradeHistory';
 import RealTimePriceDisplay from '@/components/bots/RealTimePriceDisplay';
 import LivePositions from '@/components/trading/LivePositions';
 import CandlestickChart from '@/components/trading/CandlestickChart';
+import AILearningPanel from '@/components/bots/AILearningPanel';
 import { createPageUrl } from '../utils';
 
 export default function BotRunner() {
@@ -159,9 +160,10 @@ export default function BotRunner() {
             />
           </div>
 
-          {/* Live Positions */}
-          <div>
+          {/* Live Positions & AI Learning */}
+          <div className="space-y-6">
             <LivePositions subscription={subscription} trades={trades} />
+            <AILearningPanel subscription={subscription} trades={trades} />
           </div>
         </div>
 
