@@ -157,24 +157,20 @@ export default function BacktestEngine({ onResultsReady }) {
           </TabsContent>
         </Tabs>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-
-          <div>
-            <Label className="text-slate-400">Symbol</Label>
-            <Select value={symbol} onValueChange={setSymbol}>
-              <SelectTrigger className="bg-slate-800 border-slate-700">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-900 border-slate-700">
-                {CRYPTO_SYMBOLS.map(s => (
-                  <SelectItem key={s} value={s}>
-                    {s.replace('X:', '').replace('USD', '/USD')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div>
+          <Label className="text-slate-400">Symbol</Label>
+          <Select value={symbol} onValueChange={setSymbol}>
+            <SelectTrigger className="bg-slate-800 border-slate-700">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-900 border-slate-700">
+              {CRYPTO_SYMBOLS.map(s => (
+                <SelectItem key={s} value={s}>
+                  {s.replace('X:', '').replace('USD', '/USD')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
