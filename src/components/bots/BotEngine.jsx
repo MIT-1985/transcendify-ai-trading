@@ -31,7 +31,9 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const bot = await base44.entities.TradingBot.filter({ id: subscription.bot_id });
         if (!bot[0]) return;
 
-        const symbol = subscription.trading_pairs?.[0] || 'X:BTCUSD';
+        // Select random trading pair from configured pairs
+        const tradingPairs = subscription.trading_pairs || ['X:BTCUSD'];
+        const symbol = tradingPairs[Math.floor(Math.random() * tradingPairs.length)];
         const strategy = bot[0].strategy;
         
         // Analyze market using technical indicators

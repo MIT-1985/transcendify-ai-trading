@@ -25,7 +25,7 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
     momentum_threshold: bot?.momentum_threshold || 2,
     max_position_size: 25,
     trailing_stop: false,
-    trading_pairs: ['X:BTCUSD']
+    trading_pairs: ['X:BTCUSD', 'X:ETHUSD', 'X:SOLUSD', 'X:XRPUSD', 'X:ADAUSD']
   });
 
   const [availableTickers, setAvailableTickers] = useState([]);
@@ -108,29 +108,28 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
               </div>
 
               <div>
-                <Label className="text-slate-300 mb-2">Trading Pair</Label>
-                <Select
-                  value={config.trading_pairs[0]}
-                  onValueChange={(value) => setConfig({ ...config, trading_pairs: [value] })}
-                  disabled={loadingTickers}
-                >
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                    <SelectValue placeholder={loadingTickers ? "Loading..." : "Select trading pair"} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700">
-                    {availableTickers.length > 0 ? (
-                      availableTickers.map((ticker) => (
-                        <SelectItem key={ticker} value={ticker}>
-                          {ticker}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="X:BTCUSD">X:BTCUSD (default)</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-slate-500 mt-1">
-                  Select cryptocurrency pair to trade
+                <Label className="text-slate-300 mb-2">Trading Pairs</Label>
+                <div className="space-y-2">
+                  {['X:BTCUSD', 'X:ETHUSD', 'X:SOLUSD', 'X:XRPUSD', 'X:ADAUSD', 'X:DOGEUSD', 'X:BNBUSD', 'X:MATICUSD'].map((pair) => (
+                    <label key={pair} className="flex items-center gap-2 p-2 bg-slate-700/50 rounded hover:bg-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={config.trading_pairs.includes(pair)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setConfig({ ...config, trading_pairs: [...config.trading_pairs, pair] });
+                          } else {
+                            setConfig({ ...config, trading_pairs: config.trading_pairs.filter(p => p !== pair) });
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-500"
+                      />
+                      <span className="text-sm text-slate-300">{pair.replace('X:', '').replace('USD', '/USD')}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  Bot will trade all selected pairs ({config.trading_pairs.length} selected)
                 </p>
               </div>
 
