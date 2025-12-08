@@ -21,10 +21,12 @@ import {
   Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import CloneBotModal from '@/components/bots/CloneBotModal';
 
 export default function BotDashboard() {
   const queryClient = useQueryClient();
   const [selectedBots, setSelectedBots] = useState(new Set());
+  const [cloneModal, setCloneModal] = useState({ open: false, subscription: null, botInfo: null });
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -53,21 +55,7 @@ export default function BotDashboard() {
     }
   });
 
-  const cloneMutation = useMutation({
-    mutationFn: async (subscription) => {
-      const { id, created_date, updated_date, created_by, ...config } = subscription;
-      await base44.entities.UserSubscription.create({
-        ...config,
-        status: 'paused',
-        total_profit: 0,
-        total_trades: 0
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userSubscriptions'] });
-      toast.success('Bot cloned successfully');
-    }
-  });
+
 
   const deleteMutation = useMutation({
     mutationFn: async (id) => {
@@ -289,11 +277,14 @@ export default function BotDashboard() {
                     {/* Secondary Actions */}
                     <div className="flex gap-2">
                       <Button
-                        onClick={() => cloneMutation.mutate(subscription)}
+                        onClick={() => setCloneModal({ 
+                          open: true, 
+                          subscription, 
+                          botInfo: getBotInfo(subscription.bot_id) 
+                        })}
                         size="sm"
                         variant="outline"
                         className="flex-1 border-slate-600 text-slate-300"
-                        disabled={cloneMutation.isPending}
                       >
                         <Copy className="w-4 h-4 mr-1" />
                         Clone
@@ -318,6 +309,14 @@ export default function BotDashboard() {
             })}
           </div>
         )}
+
+        {/* Clone Modal */}
+        <CloneBotModal
+          subscription={cloneModal.subscription}
+          botInfo={cloneModal.botInfo}
+          isOpen={cloneModal.open}
+          onClose={() => setCloneModal({ open: false, subscription: null, botInfo: null })}
+        />
       </div>
     </div>
   );
