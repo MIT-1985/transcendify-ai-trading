@@ -21,7 +21,9 @@ export class ConstantsService {
       'bollinger': ['Mathematics', 'Signal Processing', 'Artificial Intelligence'],
       'scalping': ['Signal Processing', 'Artificial Intelligence', 'DimGPT Grid'],
       'swing': ['Mathematics', 'Artificial Intelligence', 'Economics'],
-      'momentum': ['Physics', 'Signal Processing', 'Artificial Intelligence']
+      'momentum': ['Physics', 'Signal Processing', 'Artificial Intelligence'],
+      'arbitrage': ['Economics', 'Mathematics', 'Information Theory'],
+      'mean_reversion': ['Mathematics', 'Signal Processing', 'Physics']
     };
 
     const relevantDomains = domains[strategy] || ['Artificial Intelligence'];

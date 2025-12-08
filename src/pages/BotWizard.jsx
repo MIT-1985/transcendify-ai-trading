@@ -101,22 +101,26 @@ export default function BotWizard() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
-                {['rsi', 'macd', 'bollinger'].map(strat => (
+                {[
+                  { id: 'rsi', name: 'RSI', desc: 'Momentum oscillator strategy' },
+                  { id: 'macd', name: 'MACD', desc: 'Trend following strategy' },
+                  { id: 'bollinger', name: 'Bollinger Bands', desc: 'Volatility-based mean reversion' },
+                  { id: 'scalping', name: 'Scalping', desc: 'High-frequency short-term trades' },
+                  { id: 'momentum', name: 'Momentum', desc: 'Trend strength & ROC strategy' },
+                  { id: 'arbitrage', name: 'Arbitrage', desc: 'Cross-exchange price differences' },
+                  { id: 'mean_reversion', name: 'Mean Reversion', desc: 'Z-score based reversion' }
+                ].map(strat => (
                   <button
-                    key={strat}
-                    onClick={() => setConfig({...config, strategy: strat})}
+                    key={strat.id}
+                    onClick={() => setConfig({...config, strategy: strat.id})}
                     className={`p-6 rounded-lg border-2 transition-all ${
-                      config.strategy === strat
+                      config.strategy === strat.id
                         ? 'border-purple-500 bg-purple-500/20'
                         : 'border-slate-700 hover:border-slate-600'
                     }`}
                   >
-                    <div className="font-bold text-lg mb-2">{strat.toUpperCase()}</div>
-                    <div className="text-sm text-slate-400">
-                      {strat === 'rsi' && 'Momentum oscillator strategy'}
-                      {strat === 'macd' && 'Trend following strategy'}
-                      {strat === 'bollinger' && 'Mean reversion strategy'}
-                    </div>
+                    <div className="font-bold text-lg mb-2">{strat.name}</div>
+                    <div className="text-sm text-slate-400">{strat.desc}</div>
                   </button>
                 ))}
               </div>
@@ -217,6 +221,97 @@ export default function BotWizard() {
                         type="number"
                         value={config.overbought}
                         onChange={(e) => setConfig({...config, overbought: parseInt(e.target.value)})}
+                        className="bg-slate-800 border-slate-700"
+                      />
+                    </div>
+                  </>
+                )}
+                
+                {config.strategy === 'scalping' && (
+                  <>
+                    <div>
+                      <Label>Profit Target (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={(config.profitTarget || 0.3)}
+                        onChange={(e) => setConfig({...config, profitTarget: parseFloat(e.target.value) / 100})}
+                        className="bg-slate-800 border-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <Label>Spread Threshold (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={(config.spreadThreshold || 0.1)}
+                        onChange={(e) => setConfig({...config, spreadThreshold: parseFloat(e.target.value) / 100})}
+                        className="bg-slate-800 border-slate-700"
+                      />
+                    </div>
+                  </>
+                )}
+                
+                {config.strategy === 'momentum' && (
+                  <>
+                    <div>
+                      <Label>Lookback Period</Label>
+                      <Input
+                        type="number"
+                        value={config.lookbackPeriod || 20}
+                        onChange={(e) => setConfig({...config, lookbackPeriod: parseInt(e.target.value)})}
+                        className="bg-slate-800 border-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <Label>Momentum Threshold (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={(config.momentumThreshold || 2)}
+                        onChange={(e) => setConfig({...config, momentumThreshold: parseFloat(e.target.value) / 100})}
+                        className="bg-slate-800 border-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <Label>Trailing Stop (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={(config.trailingStop || 3)}
+                        onChange={(e) => setConfig({...config, trailingStop: parseFloat(e.target.value) / 100})}
+                        className="bg-slate-800 border-slate-700"
+                      />
+                    </div>
+                  </>
+                )}
+                
+                {config.strategy === 'arbitrage' && (
+                  <div className="col-span-2 bg-yellow-900/20 border border-yellow-900 rounded-lg p-4">
+                    <div className="text-sm text-yellow-200">
+                      ⚠️ Arbitrage requires API keys for multiple exchanges and sufficient balance on each exchange.
+                    </div>
+                  </div>
+                )}
+                
+                {config.strategy === 'mean_reversion' && (
+                  <>
+                    <div>
+                      <Label>Lookback Period</Label>
+                      <Input
+                        type="number"
+                        value={config.lookback || 50}
+                        onChange={(e) => setConfig({...config, lookback: parseInt(e.target.value)})}
+                        className="bg-slate-800 border-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <Label>Std Deviation Multiplier</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={config.stdMultiplier || 2.0}
+                        onChange={(e) => setConfig({...config, stdMultiplier: parseFloat(e.target.value)})}
                         className="bg-slate-800 border-slate-700"
                       />
                     </div>

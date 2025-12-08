@@ -260,6 +260,377 @@ class BollingerBandsBot:
 if __name__ == "__main__":
     bot = BollingerBandsBot()
     bot.run(demo=${config.demo || true})
+`,
+
+  scalping: (config) => `
+import ccxt
+import pandas as pd
+import numpy as np
+import time
+
+class ScalpingBot:
+    def __init__(self, exchange_id='binance', symbol='BTC/USDT'):
+        self.exchange = ccxt.${config.exchange || 'binance'}({
+            'apiKey': '${config.apiKey || 'YOUR_API_KEY'}',
+            'secret': '${config.apiSecret || 'YOUR_API_SECRET'}',
+            'enableRateLimit': True
+        })
+        self.symbol = '${config.symbol || 'BTC/USDT'}'
+        self.timeframe = '${config.timeframe || '1m'}'
+        self.profit_target = ${config.profitTarget || 0.003}  # 0.3%
+        self.stop_loss = ${config.stopLoss || 0.002}  # 0.2%
+        self.position_size = ${config.positionSize || 0.02}
+        self.spread_threshold = ${config.spreadThreshold || 0.001}
+        self.position = None
+        
+    def get_spread(self, ticker):
+        bid = ticker['bid']
+        ask = ticker['ask']
+        spread = (ask - bid) / bid
+        return spread
+    
+    def calculate_momentum(self, prices):
+        if len(prices) < 5:
+            return 0
+        short_ma = np.mean(prices[-3:])
+        long_ma = np.mean(prices[-5:])
+        momentum = (short_ma - long_ma) / long_ma
+        return momentum
+    
+    def run(self, demo=False):
+        print(f"Starting Scalping Bot on {self.symbol} - High Frequency")
+        while True:
+            try:
+                ticker = self.exchange.fetch_ticker(self.symbol)
+                ohlcv = self.exchange.fetch_ohlcv(self.symbol, self.timeframe, limit=10)
+                df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                
+                current_price = ticker['last']
+                spread = self.get_spread(ticker)
+                momentum = self.calculate_momentum(df['close'].values)
+                
+                print(f"Price: {current_price:.2f}, Spread: {spread:.4f}, Momentum: {momentum:.4f}")
+                
+                # Only trade when spread is tight
+                if spread > self.spread_threshold:
+                    print("Spread too wide, waiting...")
+                    time.sleep(2)
+                    continue
+                
+                # Entry conditions
+                if self.position is None:
+                    if momentum > 0.001:  # Slight upward momentum
+                        print("SCALP BUY - Quick momentum detected")
+                        if not demo:
+                            amount = (self.position_size * self.exchange.fetch_balance()['USDT']['free']) / current_price
+                            self.exchange.create_market_buy_order(self.symbol, amount)
+                            self.position = {
+                                'side': 'long',
+                                'entry': current_price,
+                                'target': current_price * (1 + self.profit_target),
+                                'stop': current_price * (1 - self.stop_loss)
+                            }
+                
+                # Exit conditions
+                elif self.position:
+                    if current_price >= self.position['target'] or current_price <= self.position['stop']:
+                        print(f"EXIT - Price: {current_price:.2f}, Entry: {self.position['entry']:.2f}")
+                        if not demo:
+                            balance = self.exchange.fetch_balance()[self.symbol.split('/')[0]]['free']
+                            self.exchange.create_market_sell_order(self.symbol, balance)
+                        self.position = None
+                
+                time.sleep(2)  # High frequency - check every 2 seconds
+            except Exception as e:
+                print(f"Error: {e}")
+                time.sleep(5)
+
+if __name__ == "__main__":
+    bot = ScalpingBot()
+    bot.run(demo=${config.demo || true})
+`,
+
+  momentum: (config) => `
+import ccxt
+import pandas as pd
+import numpy as np
+import time
+
+class MomentumBot:
+    def __init__(self, exchange_id='binance', symbol='BTC/USDT'):
+        self.exchange = ccxt.${config.exchange || 'binance'}({
+            'apiKey': '${config.apiKey || 'YOUR_API_KEY'}',
+            'secret': '${config.apiSecret || 'YOUR_API_SECRET'}',
+            'enableRateLimit': True
+        })
+        self.symbol = '${config.symbol || 'BTC/USDT'}'
+        self.timeframe = '${config.timeframe || '15m'}'
+        self.lookback_period = ${config.lookbackPeriod || 20}
+        self.momentum_threshold = ${config.momentumThreshold || 0.02}  # 2%
+        self.position_size = ${config.positionSize || 0.01}
+        self.trailing_stop = ${config.trailingStop || 0.03}
+        self.position = None
+        self.highest_price = 0
+        
+    def calculate_roc(self, prices, period):
+        # Rate of Change
+        if len(prices) < period:
+            return 0
+        roc = (prices[-1] - prices[-period]) / prices[-period]
+        return roc
+    
+    def calculate_adx(self, df, period=14):
+        # Average Directional Index
+        high = df['high'].values
+        low = df['low'].values
+        close = df['close'].values
+        
+        plus_dm = np.where((high[1:] - high[:-1]) > (low[:-1] - low[1:]), high[1:] - high[:-1], 0)
+        minus_dm = np.where((low[:-1] - low[1:]) > (high[1:] - high[:-1]), low[:-1] - low[1:], 0)
+        
+        atr = np.mean(high[-period:] - low[-period:])
+        if atr == 0:
+            return 0
+            
+        plus_di = 100 * np.mean(plus_dm[-period:]) / atr
+        minus_di = 100 * np.mean(minus_dm[-period:]) / atr
+        
+        dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di) if (plus_di + minus_di) > 0 else 0
+        return dx
+    
+    def run(self, demo=False):
+        print(f"Starting Momentum Bot on {self.symbol}")
+        while True:
+            try:
+                ohlcv = self.exchange.fetch_ohlcv(self.symbol, self.timeframe, limit=100)
+                df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                
+                roc = self.calculate_roc(df['close'].values, self.lookback_period)
+                adx = self.calculate_adx(df)
+                current_price = df['close'].iloc[-1]
+                
+                print(f"Price: {current_price:.2f}, ROC: {roc:.4f}, ADX: {adx:.2f}")
+                
+                # Strong momentum + trend strength
+                if self.position is None and roc > self.momentum_threshold and adx > 25:
+                    print("BUY - Strong upward momentum detected")
+                    if not demo:
+                        amount = (self.position_size * self.exchange.fetch_balance()['USDT']['free']) / current_price
+                        self.exchange.create_market_buy_order(self.symbol, amount)
+                        self.position = 'long'
+                        self.highest_price = current_price
+                
+                # Trailing stop
+                elif self.position:
+                    if current_price > self.highest_price:
+                        self.highest_price = current_price
+                    
+                    trailing_stop_price = self.highest_price * (1 - self.trailing_stop)
+                    
+                    if current_price <= trailing_stop_price or adx < 20:
+                        print(f"EXIT - Trailing stop or weak trend")
+                        if not demo:
+                            balance = self.exchange.fetch_balance()[self.symbol.split('/')[0]]['free']
+                            self.exchange.create_market_sell_order(self.symbol, balance)
+                        self.position = None
+                        self.highest_price = 0
+                
+                time.sleep(60)
+            except Exception as e:
+                print(f"Error: {e}")
+                time.sleep(60)
+
+if __name__ == "__main__":
+    bot = MomentumBot()
+    bot.run(demo=${config.demo || true})
+`,
+
+  arbitrage: (config) => `
+import ccxt
+import time
+
+class ArbitrageBot:
+    def __init__(self, symbol='BTC/USDT'):
+        self.symbol = '${config.symbol || 'BTC/USDT'}'
+        self.exchanges = []
+        
+        # Initialize multiple exchanges
+        exchange_configs = [
+            ('binance', '${config.binanceKey || 'KEY1'}', '${config.binanceSecret || 'SECRET1'}'),
+            ('coinbase', '${config.coinbaseKey || 'KEY2'}', '${config.coinbaseSecret || 'SECRET2'}')
+        ]
+        
+        for exchange_id, api_key, api_secret in exchange_configs:
+            try:
+                ExchangeClass = getattr(ccxt, exchange_id)
+                exchange = ExchangeClass({
+                    'apiKey': api_key,
+                    'secret': api_secret,
+                    'enableRateLimit': True
+                })
+                self.exchanges.append({'id': exchange_id, 'client': exchange})
+            except:
+                print(f"Failed to initialize {exchange_id}")
+        
+        self.min_profit_threshold = ${config.minProfitThreshold || 0.005}  # 0.5%
+        self.position_size = ${config.positionSize || 0.01}
+    
+    def get_prices(self):
+        prices = {}
+        for exchange in self.exchanges:
+            try:
+                ticker = exchange['client'].fetch_ticker(self.symbol)
+                prices[exchange['id']] = {
+                    'bid': ticker['bid'],
+                    'ask': ticker['ask'],
+                    'last': ticker['last']
+                }
+            except Exception as e:
+                print(f"Error fetching from {exchange['id']}: {e}")
+        return prices
+    
+    def find_arbitrage_opportunity(self, prices):
+        opportunities = []
+        exchange_ids = list(prices.keys())
+        
+        for i in range(len(exchange_ids)):
+            for j in range(i + 1, len(exchange_ids)):
+                ex1, ex2 = exchange_ids[i], exchange_ids[j]
+                
+                # Buy on ex1, sell on ex2
+                profit1 = (prices[ex2]['bid'] - prices[ex1]['ask']) / prices[ex1]['ask']
+                if profit1 > self.min_profit_threshold:
+                    opportunities.append({
+                        'buy_exchange': ex1,
+                        'sell_exchange': ex2,
+                        'buy_price': prices[ex1]['ask'],
+                        'sell_price': prices[ex2]['bid'],
+                        'profit_pct': profit1 * 100
+                    })
+                
+                # Buy on ex2, sell on ex1
+                profit2 = (prices[ex1]['bid'] - prices[ex2]['ask']) / prices[ex2]['ask']
+                if profit2 > self.min_profit_threshold:
+                    opportunities.append({
+                        'buy_exchange': ex2,
+                        'sell_exchange': ex1,
+                        'buy_price': prices[ex2]['ask'],
+                        'sell_price': prices[ex1]['bid'],
+                        'profit_pct': profit2 * 100
+                    })
+        
+        return opportunities
+    
+    def execute_arbitrage(self, opportunity, demo=False):
+        print(f"ARBITRAGE: Buy on {opportunity['buy_exchange']} at {opportunity['buy_price']:.2f}")
+        print(f"           Sell on {opportunity['sell_exchange']} at {opportunity['sell_price']:.2f}")
+        print(f"           Expected profit: {opportunity['profit_pct']:.2f}%")
+        
+        if not demo:
+            buy_exchange = next(e['client'] for e in self.exchanges if e['id'] == opportunity['buy_exchange'])
+            sell_exchange = next(e['client'] for e in self.exchanges if e['id'] == opportunity['sell_exchange'])
+            
+            balance = buy_exchange.fetch_balance()['USDT']['free']
+            amount = (balance * self.position_size) / opportunity['buy_price']
+            
+            # Execute simultaneously
+            buy_exchange.create_market_buy_order(self.symbol, amount)
+            sell_exchange.create_market_sell_order(self.symbol, amount)
+    
+    def run(self, demo=False):
+        print(f"Starting Arbitrage Bot for {self.symbol} across {len(self.exchanges)} exchanges")
+        while True:
+            try:
+                prices = self.get_prices()
+                
+                if len(prices) < 2:
+                    print("Need at least 2 exchanges for arbitrage")
+                    time.sleep(10)
+                    continue
+                
+                opportunities = self.find_arbitrage_opportunity(prices)
+                
+                if opportunities:
+                    best = max(opportunities, key=lambda x: x['profit_pct'])
+                    self.execute_arbitrage(best, demo)
+                else:
+                    print("No arbitrage opportunity found")
+                
+                time.sleep(5)
+            except Exception as e:
+                print(f"Error: {e}")
+                time.sleep(10)
+
+if __name__ == "__main__":
+    bot = ArbitrageBot()
+    bot.run(demo=${config.demo || true})
+`,
+
+  mean_reversion: (config) => `
+import ccxt
+import pandas as pd
+import numpy as np
+import time
+
+class MeanReversionBot:
+    def __init__(self, exchange_id='binance', symbol='BTC/USDT'):
+        self.exchange = ccxt.${config.exchange || 'binance'}({
+            'apiKey': '${config.apiKey || 'YOUR_API_KEY'}',
+            'secret': '${config.apiSecret || 'YOUR_API_SECRET'}',
+            'enableRateLimit': True
+        })
+        self.symbol = '${config.symbol || 'BTC/USDT'}'
+        self.timeframe = '${config.timeframe || '5m'}'
+        self.lookback = ${config.lookback || 50}
+        self.std_multiplier = ${config.stdMultiplier || 2.0}
+        self.position_size = ${config.positionSize || 0.01}
+        self.position = None
+        
+    def calculate_z_score(self, prices):
+        mean = np.mean(prices)
+        std = np.std(prices)
+        if std == 0:
+            return 0
+        z_score = (prices[-1] - mean) / std
+        return z_score
+    
+    def run(self, demo=False):
+        print(f"Starting Mean Reversion Bot on {self.symbol}")
+        while True:
+            try:
+                ohlcv = self.exchange.fetch_ohlcv(self.symbol, self.timeframe, limit=self.lookback)
+                df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                
+                z_score = self.calculate_z_score(df['close'].values)
+                current_price = df['close'].iloc[-1]
+                mean_price = np.mean(df['close'].values)
+                
+                print(f"Price: {current_price:.2f}, Mean: {mean_price:.2f}, Z-Score: {z_score:.2f}")
+                
+                # Buy when significantly below mean
+                if self.position is None and z_score < -self.std_multiplier:
+                    print("BUY - Price significantly below mean")
+                    if not demo:
+                        amount = (self.position_size * self.exchange.fetch_balance()['USDT']['free']) / current_price
+                        self.exchange.create_market_buy_order(self.symbol, amount)
+                        self.position = {'side': 'long', 'entry': current_price}
+                
+                # Sell when back to mean or above
+                elif self.position and (z_score > -0.5 or z_score > self.std_multiplier):
+                    print("SELL - Price reverted to mean")
+                    if not demo:
+                        balance = self.exchange.fetch_balance()[self.symbol.split('/')[0]]['free']
+                        self.exchange.create_market_sell_order(self.symbol, balance)
+                    self.position = None
+                
+                time.sleep(60)
+            except Exception as e:
+                print(f"Error: {e}")
+                time.sleep(60)
+
+if __name__ == "__main__":
+    bot = MeanReversionBot()
+    bot.run(demo=${config.demo || true})
 `
 };
 
@@ -311,10 +682,11 @@ Deno.serve(async (req) => {
     const { strategy, config } = await req.json();
 
     // Validate strategy
-    if (!BOT_TEMPLATES[strategy]) {
+    const validStrategies = ['rsi', 'macd', 'bollinger', 'scalping', 'momentum', 'arbitrage', 'mean_reversion'];
+    if (!validStrategies.includes(strategy)) {
       return Response.json({ 
         error: 'Invalid strategy',
-        available: Object.keys(BOT_TEMPLATES)
+        available: validStrategies
       }, { status: 400 });
     }
 
