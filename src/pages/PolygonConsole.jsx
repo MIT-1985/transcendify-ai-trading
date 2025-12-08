@@ -4,6 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import WatchlistPanel from '@/components/trading/WatchlistPanel';
+import PriceAlertsPanel from '@/components/trading/PriceAlertsPanel';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const CRYPTO_PAIRS = [
   'X:BTCUSD',
@@ -29,6 +32,7 @@ export default function PolygonConsole() {
   const [timeframe, setTimeframe] = useState(TIMEFRAMES[4]); // 1h default
   const [currentPrice, setCurrentPrice] = useState(0);
   const [priceChange, setPriceChange] = useState(0);
+  const [isChartLoading, setIsChartLoading] = useState(true);
 
   useEffect(() => {
     const fetchPrice = async () => {
@@ -55,6 +59,25 @@ export default function PolygonConsole() {
 
   const tvSymbol = selectedPair.replace('X:', '').replace('USD', 'USD');
   const tvInterval = timeframe.label === '1m' ? '1' : timeframe.label === '5m' ? '5' : timeframe.label === '15m' ? '15' : timeframe.label === '30m' ? '30' : timeframe.label === '1h' ? '60' : timeframe.label === '6h' ? '360' : 'D';
+  
+  // Advanced TradingView features
+  const tvFeatures = [
+    'header_widget',
+    'left_toolbar',
+    'timeframes_toolbar',
+    'edit_buttons_in_legend',
+    'context_menus',
+    'control_bar',
+    'border_around_the_chart'
+  ].join('%2C');
+  
+  const tvStudies = [
+    'STD%3BMoving%20Average',
+    'STD%3BVolume',
+    'STD%3BMACD',
+    'STD%3BRSI',
+    'STD%3BBollinger%20Bands'
+  ].join('%2C');
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4">
@@ -105,33 +128,53 @@ export default function PolygonConsole() {
           </Badge>
         </div>
 
-        {/* Main Chart */}
-        <Card className="bg-slate-900/50 border-slate-800">
-          <CardContent className="p-0">
-            <div className="w-full h-[600px]">
-              <iframe
-                src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=CRYPTO:${tvSymbol}&interval=${tvInterval}&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=0A0A0F&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&hideideas=1&locale=en`}
-                style={{ width: '100%', height: '100%', border: 'none' }}
-                title="TradingView Chart"
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-3 p-4">
-              <div className="bg-slate-800/50 rounded-lg p-3">
-                <div className="text-xs text-slate-500">Current Price</div>
-                <div className="text-lg font-semibold text-white">
-                  ${currentPrice.toFixed(2)}
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* Chart - Takes 3 columns */}
+          <div className="lg:col-span-3">
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardContent className="p-0 relative">
+                {isChartLoading && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/90">
+                    <div className="text-center">
+                      <Skeleton className="h-12 w-12 rounded-full mx-auto mb-4" />
+                      <p className="text-slate-400">Loading advanced chart...</p>
+                    </div>
+                  </div>
+                )}
+                <div className="w-full h-[700px]">
+                  <iframe
+                    src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=CRYPTO:${tvSymbol}&interval=${tvInterval}&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=0A0A0F&studies=${tvStudies}&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&hideideas=1&locale=en&drawings_access=all&enabled_features=${tvFeatures}&allow_symbol_change=1&details=1&hotlist=1&calendar=1`}
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                    title="TradingView Chart"
+                    onLoad={() => setIsChartLoading(false)}
+                  />
                 </div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-3">
-                <div className="text-xs text-slate-500">24h Change</div>
-                <div className={`text-lg font-semibold ${priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
+                
+                <div className="grid grid-cols-2 gap-3 p-4">
+                  <div className="bg-slate-800/50 rounded-lg p-3">
+                    <div className="text-xs text-slate-500">Current Price</div>
+                    <div className="text-lg font-semibold text-white">
+                      ${currentPrice.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3">
+                    <div className="text-xs text-slate-500">24h Change</div>
+                    <div className={`text-lg font-semibold ${priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar - Takes 1 column */}
+          <div className="space-y-4">
+            <WatchlistPanel onSymbolSelect={setSelectedPair} />
+            <PriceAlertsPanel />
+          </div>
+        </div>
 
         {/* Market Watchlist */}
         <div className="mt-4">
