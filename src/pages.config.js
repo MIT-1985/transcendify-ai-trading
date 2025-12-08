@@ -8,6 +8,7 @@ import BotRunner from './pages/BotRunner';
 import Profile from './pages/Profile';
 import Portfolio from './pages/Portfolio';
 import Landing from './pages/Landing';
+import Backtesting from './pages/Backtesting';
 import __Layout from './Layout.jsx';
 
 
@@ -22,6 +23,7 @@ export const PAGES = {
     "Profile": Profile,
     "Portfolio": Portfolio,
     "Landing": Landing,
+    "Backtesting": Backtesting,
 }
 
 export const pagesConfig = {
