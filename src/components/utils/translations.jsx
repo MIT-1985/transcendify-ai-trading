@@ -153,9 +153,10 @@ export const translations = {
     // Navigation
     dashboard: 'Табло',
     polygonConsole: 'Polygon Конзола',
+    backtesting: 'Бектестинг',
     tradingBots: 'Търговски Ботове',
     fuelMiners: 'Копачи на Гориво',
-    deviceMining: 'Device Mining',
+    deviceMining: 'Копаене с Устройство',
     aiAnalysis: 'AI Анализ',
     wallet: 'Портфейл',
     deposit: 'Депозит',
@@ -302,6 +303,7 @@ export const translations = {
     // Navigation
     dashboard: 'Dashboard',
     polygonConsole: 'Polygon Konsole',
+    backtesting: 'Backtesting',
     tradingBots: 'Handels-Bots',
     fuelMiners: 'Treibstoff-Miner',
     deviceMining: 'Gerät-Mining',

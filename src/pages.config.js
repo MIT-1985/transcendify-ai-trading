@@ -10,6 +10,7 @@ import Portfolio from './pages/Portfolio';
 import Landing from './pages/Landing';
 import Backtesting from './pages/Backtesting';
 import BotAnalytics from './pages/BotAnalytics';
+import DeviceMining from './pages/DeviceMining';
 import __Layout from './Layout.jsx';
 
 
@@ -26,6 +27,7 @@ export const PAGES = {
     "Landing": Landing,
     "Backtesting": Backtesting,
     "BotAnalytics": BotAnalytics,
+    "DeviceMining": DeviceMining,
 }
 
 export const pagesConfig = {
