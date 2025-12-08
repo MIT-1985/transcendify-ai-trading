@@ -83,6 +83,9 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
         if (response.data?.success && response.data.data?.results) {
           const results = response.data.data.results;
           console.log('Got', results.length, 'candles');
+          console.log('First candle:', results[0]);
+          console.log('Last candle:', results[results.length - 1]);
+          
           const candles = results.map(candle => {
             const time = new Date(candle.t);
             return {
@@ -93,13 +96,11 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
               low: candle.l,
               close: candle.c,
               volume: candle.v,
-              wickTop: candle.h,
-              wickBottom: candle.l,
-              candleTop: Math.max(candle.o, candle.c),
-              candleBottom: Math.min(candle.o, candle.c),
               isGreen: candle.c >= candle.o
             };
           });
+          
+          console.log('Processed candles:', candles.slice(0, 3));
 
           setChartData(candles);
           if (candles.length > 0) {
@@ -208,22 +209,26 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
             <Bar 
               dataKey="high"
               shape={(props) => {
-                const { x, width, payload } = props;
-                if (!payload || !payload.high) return null;
+                const { x, y, width, height, payload, yAxis } = props;
+                if (!payload || !payload.high || !yAxis) return null;
                 
-                const yScale = props.yAxisMap?.yAxis?.scale;
-                if (!yScale) return null;
+                const chartHeight = 400;
+                const priceRange = yAxis.domain[1] - yAxis.domain[0];
+                const pixelsPerUnit = chartHeight / priceRange;
                 
-                const highY = yScale(payload.high);
-                const lowY = yScale(payload.low);
-                const openY = yScale(payload.open);
-                const closeY = yScale(payload.close);
+                const highY = chartHeight - ((payload.high - yAxis.domain[0]) * pixelsPerUnit) + 10;
+                const lowY = chartHeight - ((payload.low - yAxis.domain[0]) * pixelsPerUnit) + 10;
+                const openY = chartHeight - ((payload.open - yAxis.domain[0]) * pixelsPerUnit) + 10;
+                const closeY = chartHeight - ((payload.close - yAxis.domain[0]) * pixelsPerUnit) + 10;
                 
                 const centerX = x + width / 2;
-                const bodyWidth = Math.max(6, Math.min(10, 600 / chartData.length));
+                const bodyWidth = Math.max(8, Math.min(14, 700 / chartData.length));
                 const bodyX = centerX - bodyWidth / 2;
                 const bodyTop = Math.min(openY, closeY);
-                const bodyHeight = Math.abs(closeY - openY) || 1;
+                const bodyHeight = Math.max(Math.abs(closeY - openY), 2);
+                
+                const color = payload.isGreen ? '#10b981' : '#ef4444';
+                const darkColor = payload.isGreen ? '#059669' : '#dc2626';
                 
                 return (
                   <g>
@@ -233,8 +238,8 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
                       y1={highY}
                       x2={centerX}
                       y2={lowY}
-                      stroke={payload.isGreen ? '#10b981' : '#ef4444'}
-                      strokeWidth={1.5}
+                      stroke={color}
+                      strokeWidth={2}
                     />
                     {/* Body */}
                     <rect
@@ -242,9 +247,9 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
                       y={bodyTop}
                       width={bodyWidth}
                       height={bodyHeight}
-                      fill={payload.isGreen ? '#10b981' : '#ef4444'}
-                      stroke={payload.isGreen ? '#059669' : '#dc2626'}
-                      strokeWidth={1}
+                      fill={color}
+                      stroke={darkColor}
+                      strokeWidth={1.5}
                     />
                   </g>
                 );
