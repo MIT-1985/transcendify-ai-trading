@@ -17,6 +17,7 @@ import Deposit from './pages/Deposit';
 import CustomStrategies from './pages/CustomStrategies';
 import BotWizard from './pages/BotWizard';
 import ConstantsLibrary from './pages/ConstantsLibrary';
+import AgentOrchestrator from './pages/AgentOrchestrator';
 import __Layout from './Layout.jsx';
 
 
@@ -40,6 +41,7 @@ export const PAGES = {
     "CustomStrategies": CustomStrategies,
     "BotWizard": BotWizard,
     "ConstantsLibrary": ConstantsLibrary,
+    "AgentOrchestrator": AgentOrchestrator,
 }
 
 export const pagesConfig = {
