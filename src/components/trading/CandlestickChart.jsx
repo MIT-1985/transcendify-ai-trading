@@ -61,8 +61,10 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
   useEffect(() => {
     const fetchRealData = async () => {
       try {
-        const to = new Date().toISOString().split('T')[0];
-        const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const now = Date.now();
+        const fromMs = now - (100 * 60 * 60 * 1000); // 100 hours
+        const from = new Date(fromMs).toISOString().split('T')[0];
+        const to = new Date(now).toISOString().split('T')[0];
 
         console.log('Fetching chart data for', symbol, 'from', from, 'to', to);
 
@@ -72,6 +74,7 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
           from: from,
           to: to,
           timespan: 'hour',
+          multiplier: 1,
           limit: 100
         });
 
@@ -137,8 +140,6 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
     };
 
     fetchRealData();
-    const interval = setInterval(fetchRealData, 5000); // Update every 5 seconds
-    return () => clearInterval(interval);
   }, [symbol, trades]);
 
   if (loading) {
@@ -203,25 +204,28 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
             />
             <Tooltip content={<CustomTooltip />} />
             
-            {/* Wicks */}
-            <Bar dataKey="wickTop" stackId="wick">
+            {/* Candlestick wicks */}
+            <Bar 
+              dataKey={entry => [entry.low, entry.high]}
+              barSize={1}
+            >
               {chartData.map((entry, index) => (
                 <Cell 
-                  key={`wick-${index}`} 
-                  fill="transparent" 
-                  stroke={entry.isGreen ? '#10b981' : '#ef4444'}
-                  strokeWidth={1}
+                  key={`wick-${index}`}
+                  fill={entry.isGreen ? '#10b981' : '#ef4444'}
                 />
               ))}
             </Bar>
             
-            {/* Candle bodies */}
-            <Bar dataKey="candleTop" stackId="candle" barSize={8}>
+            {/* Candlestick bodies */}
+            <Bar 
+              dataKey={entry => [Math.min(entry.open, entry.close), Math.max(entry.open, entry.close)]}
+              barSize={8}
+            >
               {chartData.map((entry, index) => (
                 <Cell 
-                  key={`candle-${index}`} 
+                  key={`body-${index}`}
                   fill={entry.isGreen ? '#10b981' : '#ef4444'}
-                  fillOpacity={0.8}
                 />
               ))}
             </Bar>
