@@ -17,7 +17,8 @@ import {
         Crown,
         Activity,
         Database,
-        Network
+        Network,
+        Shield
       } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -45,6 +46,7 @@ export default function Layout({ children, currentPageName }) {
     { nameKey: 'constantsLibrary', page: 'ConstantsLibrary', icon: Database },
     { nameKey: 'botWizard', page: 'BotWizard', icon: Brain },
     { nameKey: 'agentOrchestrator', page: 'AgentOrchestrator', icon: Network },
+    { nameKey: 'riskProfiles', page: 'RiskProfiles', icon: Shield },
     { nameKey: 'fuelMiners', page: 'Miners', icon: Zap },
     { nameKey: 'deviceMining', page: 'DeviceMining', icon: Zap },
     { nameKey: 'aiAnalysis', page: 'AIAnalysis', icon: Brain },

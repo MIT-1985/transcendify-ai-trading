@@ -10,6 +10,7 @@ import AgentCard from '@/components/agents/AgentCard';
 import AgentConversationMonitor from '@/components/agents/AgentConversationMonitor';
 import WorkflowBuilder from '@/components/agents/WorkflowBuilder';
 import CreateAgentModal from '@/components/agents/CreateAgentModal';
+import ExecutionPanel from '@/components/execution/ExecutionPanel';
 
 export default function AgentOrchestrator() {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -140,7 +141,8 @@ export default function AgentOrchestrator() {
           </TabsContent>
 
           <TabsContent value="tasks" className="mt-6">
-            <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-6">
+              <div className="col-span-2 space-y-3">
               {tasks.map(task => (
                 <Card key={task.id} className="bg-slate-900 border-slate-800">
                   <CardContent className="pt-6">
@@ -164,6 +166,10 @@ export default function AgentOrchestrator() {
                 </Card>
               ))}
             </div>
+            <div>
+              <ExecutionPanel />
+            </div>
+          </div>
           </TabsContent>
         </Tabs>
 

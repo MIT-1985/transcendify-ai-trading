@@ -18,6 +18,7 @@ import CustomStrategies from './pages/CustomStrategies';
 import BotWizard from './pages/BotWizard';
 import ConstantsLibrary from './pages/ConstantsLibrary';
 import AgentOrchestrator from './pages/AgentOrchestrator';
+import RiskProfiles from './pages/RiskProfiles';
 import __Layout from './Layout.jsx';
 
 
@@ -42,6 +43,7 @@ export const PAGES = {
     "BotWizard": BotWizard,
     "ConstantsLibrary": ConstantsLibrary,
     "AgentOrchestrator": AgentOrchestrator,
+    "RiskProfiles": RiskProfiles,
 }
 
 export const pagesConfig = {
