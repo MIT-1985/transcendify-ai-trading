@@ -111,6 +111,15 @@ export default function BotRunner() {
               <div className="text-sm font-semibold text-white">{trades.length}</div>
             </div>
             <Button
+              onClick={() => window.location.href = createPageUrl('BotAnalytics') + '?id=' + subscriptionId}
+              size="lg"
+              variant="outline"
+              className="border-blue-500 text-blue-400 hover:bg-blue-500/10"
+            >
+              <Activity className="w-5 h-5 mr-2" />
+              View Analytics
+            </Button>
+            <Button
               onClick={() => setIsRunning(!isRunning)}
               size="lg"
               className={isRunning ? "bg-red-600 hover:bg-red-500" : "bg-emerald-600 hover:bg-emerald-500"}

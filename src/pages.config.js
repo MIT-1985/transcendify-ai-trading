@@ -9,6 +9,7 @@ import Profile from './pages/Profile';
 import Portfolio from './pages/Portfolio';
 import Landing from './pages/Landing';
 import Backtesting from './pages/Backtesting';
+import BotAnalytics from './pages/BotAnalytics';
 import __Layout from './Layout.jsx';
 
 
@@ -24,6 +25,7 @@ export const PAGES = {
     "Portfolio": Portfolio,
     "Landing": Landing,
     "Backtesting": Backtesting,
+    "BotAnalytics": BotAnalytics,
 }
 
 export const pagesConfig = {
