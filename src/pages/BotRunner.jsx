@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, ArrowLeft } from 'lucide-react';
+import { Play, Pause, ArrowLeft, Activity } from 'lucide-react';
 import { useBotEngine } from '@/components/bots/BotEngine';
 import LiveStats from '@/components/bots/LiveStats';
 import TradeHistory from '@/components/bots/TradeHistory';
