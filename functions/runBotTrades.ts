@@ -33,9 +33,15 @@ Deno.serve(async (req) => {
         const vipBoost = vipBoosts[vipLevel] || 0;
         const feeDiscount = feeDiscounts[vipLevel] || 0;
         
-        const symbol = subscription.trading_pairs?.[0] || 'X:BTCUSD';
+        // Trade on all configured pairs
+        const tradingPairs = subscription.trading_pairs || ['X:BTCUSD'];
         const strategy = bot.strategy;
         const capital = subscription.capital_allocated || 1000;
+        
+        // Process multiple pairs (up to 3 simultaneously)
+        const pairsToTrade = tradingPairs.slice(0, Math.min(3, tradingPairs.length));
+        
+        for (const symbol of pairsToTrade) {
         
         // Fetch current market price and candles
         const polygonKey = Deno.env.get('POLYGON_API_KEY');
@@ -208,8 +214,10 @@ Deno.serve(async (req) => {
         results.push({
           subscription_id: subscription.id,
           bot_name: bot.name,
+          symbol: symbol,
           trade: { side: isBuy ? 'BUY' : 'SELL', profit, price: entryPrice }
         });
+        } // End of pairs loop
         
       } catch (error) {
         console.error(`Error processing subscription ${subscription.id}:`, error);

@@ -17,6 +17,7 @@ import DetailedTradeHistory from '@/components/bots/DetailedTradeHistory';
 import AIStrategyPromptEditor from '@/components/ai/AIStrategyPromptEditor';
 import StrategyFeedbackPanel from '@/components/ai/StrategyFeedbackPanel';
 import AIOptimizationSuggestions from '@/components/ai/AIOptimizationSuggestions';
+import MultiPairPerformance from '@/components/bots/MultiPairPerformance';
 import { createPageUrl } from '../utils';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -224,6 +225,7 @@ export default function BotRunner() {
           {/* Monitoring & Controls */}
           <div className="space-y-6">
             <RealTimeMonitor subscription={subscription} trades={trades} isRunning={isRunning} />
+            <MultiPairPerformance trades={trades} />
             <LivePositions subscription={subscription} trades={trades} />
             <StrategyFeedbackPanel subscription={subscription} />
             <AIOptimizationSuggestions subscription={subscription} />
