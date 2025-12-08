@@ -9,7 +9,11 @@ import PriceAlertsPanel from '@/components/trading/PriceAlertsPanel';
 import OrderManagement from '@/components/trading/OrderManagement';
 import OrderHistory from '@/components/trading/OrderHistory';
 import OrderBook from '@/components/trading/OrderBook';
+import NewsSentiment from '@/components/market/NewsSentiment';
+import AdvancedIndicators from '@/components/market/AdvancedIndicators';
+import ComplexAlerts from '@/components/market/ComplexAlerts';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const CRYPTO_PAIRS = [
   'X:BTCUSD',
@@ -165,9 +169,28 @@ export default function PolygonConsole() {
 
           {/* Sidebar - Takes 1 column */}
           <div className="space-y-4">
-            <OrderManagement symbol={selectedPair} />
-            <WatchlistPanel onSymbolSelect={setSelectedPair} />
-            <PriceAlertsPanel />
+            <Tabs defaultValue="trading" className="w-full">
+              <TabsList className="grid grid-cols-3 bg-slate-900 border border-slate-800">
+                <TabsTrigger value="trading">Trading</TabsTrigger>
+                <TabsTrigger value="analysis">Analysis</TabsTrigger>
+                <TabsTrigger value="alerts">Alerts</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="trading" className="space-y-4 mt-4">
+                <OrderManagement symbol={selectedPair} />
+                <WatchlistPanel onSymbolSelect={setSelectedPair} />
+              </TabsContent>
+
+              <TabsContent value="analysis" className="space-y-4 mt-4">
+                <NewsSentiment symbol={selectedPair} />
+                <AdvancedIndicators />
+              </TabsContent>
+
+              <TabsContent value="alerts" className="space-y-4 mt-4">
+                <ComplexAlerts symbol={selectedPair} />
+                <PriceAlertsPanel />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
 
