@@ -22,6 +22,7 @@ const CRYPTO_SYMBOLS = [
 
 export default function Dashboard() {
   const [prices, setPrices] = useState([]);
+  const [unrealisedPnL, setUnrealisedPnL] = useState(0);
   
   const { data: subscriptions = [], isLoading: loadingSubs } = useQuery({
     queryKey: ['subscriptions'],
@@ -32,6 +33,22 @@ export default function Dashboard() {
     queryKey: ['bots'],
     queryFn: () => base44.entities.TradingBot.list()
   });
+
+  // Auto-run bot trades in background
+  useEffect(() => {
+    const runBotTrades = async () => {
+      try {
+        await base44.functions.invoke('runBotTrades');
+      } catch (error) {
+        console.error('Bot trade error:', error);
+      }
+    };
+    
+    runBotTrades();
+    const botInterval = setInterval(runBotTrades, 3000);
+    
+    return () => clearInterval(botInterval);
+  }, []);
 
   // Fetch real-time prices
   useEffect(() => {
@@ -75,14 +92,30 @@ export default function Dashboard() {
   const activeBots = subscriptions.filter(s => s.status === 'active').length;
   const totalProfit = subscriptions.reduce((sum, s) => sum + (s.total_profit || 0), 0);
   const totalTrades = subscriptions.reduce((sum, s) => sum + (s.total_trades || 0), 0);
+  
+  useEffect(() => {
+    setUnrealisedPnL(totalProfit);
+  }, [totalProfit]);
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-          <p className="text-slate-400">Monitor your trading bots and market performance</p>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
+            <p className="text-slate-400">Monitor your trading bots and market performance</p>
+            <div className="mt-3 flex items-center gap-2">
+              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+              <span className="text-emerald-400 text-sm font-semibold">Bots Running Live</span>
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 border border-slate-700 rounded-xl p-5 min-w-[200px]">
+            <div className="text-xs text-slate-400 mb-1">Total Unrealised P&L</div>
+            <div className={`text-3xl font-bold ${unrealisedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {unrealisedPnL >= 0 ? '+' : ''}${unrealisedPnL.toFixed(2)}
+            </div>
+          </div>
         </div>
 
         {/* Real-Time Earnings */}
