@@ -38,6 +38,7 @@ export default function Layout({ children, currentPageName }) {
   
   const navItems = [
     { nameKey: 'dashboard', page: 'Dashboard', icon: LayoutDashboard },
+    { nameKey: 'botDashboard', page: 'BotDashboard', icon: Activity },
     { nameKey: 'portfolio', page: 'Portfolio', icon: TrendingUp },
     { nameKey: 'polygonConsole', page: 'PolygonConsole', icon: Terminal },
     { nameKey: 'tradingBots', page: 'Bots', icon: Bot },

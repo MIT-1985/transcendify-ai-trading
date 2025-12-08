@@ -2,6 +2,7 @@ export const translations = {
   en: {
     // Navigation
     dashboard: 'Dashboard',
+    botDashboard: 'Bot Dashboard',
     polygonConsole: 'Polygon Console',
     tradingBots: 'Trading Bots',
     customStrategies: 'Custom Strategies',
@@ -190,6 +191,7 @@ export const translations = {
   bg: {
     // Navigation
     dashboard: 'Табло',
+    botDashboard: 'Табло за Ботове',
     polygonConsole: 'Polygon Конзола',
     backtesting: 'Бектестинг',
     constantsLibrary: 'Библиотека Константи',
@@ -378,6 +380,7 @@ export const translations = {
   de: {
     // Navigation
     dashboard: 'Dashboard',
+    botDashboard: 'Bot-Dashboard',
     polygonConsole: 'Polygon Konsole',
     backtesting: 'Backtesting',
     constantsLibrary: 'Konstantenbibliothek',
