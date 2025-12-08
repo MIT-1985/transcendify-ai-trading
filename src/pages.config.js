@@ -12,6 +12,7 @@ import Backtesting from './pages/Backtesting';
 import BotAnalytics from './pages/BotAnalytics';
 import DeviceMining from './pages/DeviceMining';
 import VIPUpgrade from './pages/VIPUpgrade';
+import AIAnalysis from './pages/AIAnalysis';
 import __Layout from './Layout.jsx';
 
 
@@ -30,6 +31,7 @@ export const PAGES = {
     "BotAnalytics": BotAnalytics,
     "DeviceMining": DeviceMining,
     "VIPUpgrade": VIPUpgrade,
+    "AIAnalysis": AIAnalysis,
 }
 
 export const pagesConfig = {
