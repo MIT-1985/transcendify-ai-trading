@@ -6,6 +6,7 @@ import StatsCard from '@/components/trading/StatsCard';
 import PriceCard from '@/components/trading/PriceCard';
 import CandlestickChart from '@/components/trading/CandlestickChart';
 import OrderBook from '@/components/trading/OrderBook';
+import RealTimeEarnings from '@/components/dashboard/RealTimeEarnings';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createPageUrl } from '../utils';
@@ -82,6 +83,11 @@ export default function Dashboard() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
           <p className="text-slate-400">Monitor your trading bots and market performance</p>
+        </div>
+
+        {/* Real-Time Earnings */}
+        <div className="mb-8">
+          <RealTimeEarnings subscriptions={subscriptions} />
         </div>
 
         {/* Stats Grid */}
