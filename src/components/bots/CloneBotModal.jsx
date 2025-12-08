@@ -12,13 +12,33 @@ export default function CloneBotModal({ subscription, botInfo, isOpen, onClose }
   const [clonePrice, setClonePrice] = useState(0);
   const [discount, setDiscount] = useState(0);
 
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => base44.auth.me(),
+    enabled: isOpen
+  });
+
   const { data: wallet } = useQuery({
     queryKey: ['wallet'],
     queryFn: async () => {
-      const user = await base44.auth.me();
       return base44.entities.Wallet.filter({ created_by: user.email }).then(w => w[0]);
     },
-    enabled: isOpen
+    enabled: isOpen && !!user
+  });
+
+  const { data: cloneCount = 0 } = useQuery({
+    queryKey: ['cloneCount', subscription?.id],
+    queryFn: async () => {
+      if (!subscription) return 0;
+      // Брой клонирания от този оригинален бот
+      const allSubs = await base44.entities.UserSubscription.filter({ 
+        bot_id: subscription.bot_id,
+        created_by: user.email
+      });
+      // Брои само клониранията (без оригиналния)
+      return allSubs.length - 1;
+    },
+    enabled: isOpen && !!subscription && !!user
   });
 
   useEffect(() => {
@@ -49,6 +69,21 @@ export default function CloneBotModal({ subscription, botInfo, isOpen, onClose }
 
   const cloneMutation = useMutation({
     mutationFn: async () => {
+      // Провери собственост
+      if (subscription.created_by !== user.email) {
+        throw new Error('Можете да клонирате само свои ботове');
+      }
+
+      // Провери VIP статус (минимум Bronze)
+      if (!wallet || !['bronze', 'silver', 'gold', 'platinum', 'diamond'].includes(wallet.vip_level)) {
+        throw new Error('Клонирането изисква минимум Bronze VIP статус');
+      }
+
+      // Лимит на клонирания (макс 5 клона на бот)
+      if (cloneCount >= 5) {
+        throw new Error('Достигнахте максималния лимит от 5 клонирания на този бот');
+      }
+
       // Провери дали има достатъчно средства
       if (!wallet || wallet.balance_tfi < clonePrice) {
         throw new Error('Недостатъчно средства в портфейла');
@@ -95,6 +130,9 @@ export default function CloneBotModal({ subscription, botInfo, isOpen, onClose }
   const startDate = new Date(subscription.start_date || subscription.created_date);
   const ageInDays = Math.floor((new Date() - startDate) / (1000 * 60 * 60 * 24));
   const hasEnoughFunds = wallet && wallet.balance_tfi >= clonePrice;
+  const isOwner = subscription.created_by === user?.email;
+  const isVIP = wallet && ['bronze', 'silver', 'gold', 'platinum', 'diamond'].includes(wallet.vip_level);
+  const canClone = isOwner && isVIP && cloneCount < 5 && hasEnoughFunds;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -160,6 +198,26 @@ export default function CloneBotModal({ subscription, botInfo, isOpen, onClose }
             </div>
           </div>
 
+          {/* VIP Status */}
+          <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-400">VIP Статус:</span>
+              <Badge className={isVIP ? 'bg-yellow-500/20 text-yellow-300' : 'bg-slate-700 text-slate-400'}>
+                {wallet ? wallet.vip_level : 'Зареждане...'}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Clone Count */}
+          <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-400">Клонирания:</span>
+              <span className={cloneCount >= 5 ? 'text-red-400' : 'text-slate-300'}>
+                {cloneCount} / 5
+              </span>
+            </div>
+          </div>
+
           {/* Wallet Balance */}
           <div className="bg-slate-800/50 rounded-lg p-3">
             <div className="flex items-center justify-between text-sm">
@@ -170,8 +228,41 @@ export default function CloneBotModal({ subscription, botInfo, isOpen, onClose }
             </div>
           </div>
 
-          {/* Warning if not enough funds */}
-          {!hasEnoughFunds && wallet && (
+          {/* Warnings */}
+          {!isOwner && (
+            <div className="bg-red-900/20 border border-red-900 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-red-300">
+                  Можете да клонирате само свои ботове.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!isVIP && isOwner && (
+            <div className="bg-red-900/20 border border-red-900 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-red-300">
+                  Клонирането изисква минимум Bronze VIP статус. Надградете профила си за достъп.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {cloneCount >= 5 && isOwner && isVIP && (
+            <div className="bg-red-900/20 border border-red-900 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-red-300">
+                  Достигнахте максималния лимит от 5 клонирания на този бот.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!hasEnoughFunds && wallet && isOwner && isVIP && cloneCount < 5 && (
             <div className="bg-red-900/20 border border-red-900 rounded-lg p-3">
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
@@ -205,8 +296,8 @@ export default function CloneBotModal({ subscription, botInfo, isOpen, onClose }
             </Button>
             <Button
               onClick={() => cloneMutation.mutate()}
-              disabled={!hasEnoughFunds || cloneMutation.isPending}
-              className="flex-1 bg-blue-600 hover:bg-blue-500"
+              disabled={!canClone || cloneMutation.isPending}
+              className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50"
             >
               {cloneMutation.isPending ? 'Клониране...' : 'Клонирай'}
             </Button>
