@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import calculateStochasticRSI from './StochasticRSI';
 
 // Crypto/Forex Constants
 const CONSTANTS = {
@@ -64,7 +65,7 @@ export async function fetchCandles(symbol, timespan = 'minute', multiplier = 5, 
 export function calculateSMA(candles, period) {
   if (candles.length < period) return null;
   const slice = candles.slice(-period);
-  const sum = slice.reduce((acc, c) => acc + c.close, 0);
+  const sum = slice.reduce((acc, c) => acc + (typeof c === 'number' ? c : c.close), 0);
   return sum / period;
 }
 
@@ -100,17 +101,41 @@ export function calculateRSI(candles, period = 14) {
   return 100 - (100 / (1 + rs));
 }
 
-// Calculate MACD
-export function calculateMACD(candles) {
-  const ema12 = calculateEMA(candles, 12);
-  const ema26 = calculateEMA(candles, 26);
+// Calculate MACD with signal line and histogram
+export function calculateMACD(candles, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
+  const ema12 = calculateEMA(candles, fastPeriod);
+  const ema26 = calculateEMA(candles, slowPeriod);
   if (!ema12 || !ema26) return null;
   
-  const macd = ema12 - ema26;
-  return { macd, ema12, ema26 };
+  const macdLine = ema12 - ema26;
+  
+  // Calculate signal line (9-period EMA of MACD)
+  const macdHistory = [];
+  for (let i = Math.max(fastPeriod, slowPeriod); i < candles.length; i++) {
+    const slice = candles.slice(0, i + 1);
+    const e12 = calculateEMA(slice, fastPeriod);
+    const e26 = calculateEMA(slice, slowPeriod);
+    if (e12 && e26) macdHistory.push({ close: e12 - e26 });
+  }
+  
+  const signalLine = macdHistory.length >= signalPeriod ? calculateEMA(macdHistory, signalPeriod) : macdLine;
+  const histogram = macdLine - (signalLine || macdLine);
+  
+  // Determine crossover signal
+  let crossoverSignal = 'HOLD';
+  if (histogram > 0 && macdLine > 0) crossoverSignal = 'BUY';
+  else if (histogram < 0 && macdLine < 0) crossoverSignal = 'SELL';
+  
+  return { 
+    macd: macdLine, 
+    signal: signalLine,
+    histogram,
+    crossoverSignal,
+    strength: Math.abs(histogram)
+  };
 }
 
-// Calculate Bollinger Bands
+// Calculate Bollinger Bands with %B and bandwidth
 export function calculateBollingerBands(candles, period = 20, stdDev = 2) {
   if (candles.length < period) return null;
   
@@ -121,10 +146,29 @@ export function calculateBollingerBands(candles, period = 20, stdDev = 2) {
   const variance = slice.reduce((acc, c) => acc + Math.pow(c.close - sma, 2), 0) / period;
   const std = Math.sqrt(variance);
   
+  const upper = sma + (std * stdDev);
+  const middle = sma;
+  const lower = sma - (std * stdDev);
+  const currentPrice = candles[candles.length - 1].close;
+  
+  // %B indicator (0-1 range, shows where price is within bands)
+  const percentB = (currentPrice - lower) / (upper - lower);
+  
+  // Bandwidth (volatility indicator)
+  const bandwidth = ((upper - lower) / middle) * 100;
+  
+  // Signal based on %B
+  let signal = 'HOLD';
+  if (percentB < 0.2) signal = 'BUY'; // Price near lower band (oversold)
+  else if (percentB > 0.8) signal = 'SELL'; // Price near upper band (overbought)
+  
   return {
-    upper: sma + (std * stdDev),
-    middle: sma,
-    lower: sma - (std * stdDev)
+    upper,
+    middle,
+    lower,
+    percentB,
+    bandwidth,
+    signal
   };
 }
 
@@ -135,6 +179,7 @@ export async function analyzeStrategy(symbol, strategy) {
   
   const currentPrice = candles[candles.length - 1].close;
   const rsi = calculateRSI(candles);
+  const stochRSI = calculateStochasticRSI(candles);
   const macd = calculateMACD(candles);
   const bb = calculateBollingerBands(candles);
   const sma20 = calculateSMA(candles, 20);
@@ -219,21 +264,78 @@ export async function analyzeStrategy(symbol, strategy) {
       break;
   }
   
+  // Combine signals for better accuracy
+  const signals = [signal];
+  if (macd?.crossoverSignal !== 'HOLD') signals.push(macd.crossoverSignal);
+  if (bb?.signal !== 'HOLD') signals.push(bb.signal);
+  if (stochRSI?.signal !== 'HOLD') signals.push(stochRSI.signal);
+  
+  const buySignals = signals.filter(s => s === 'BUY').length;
+  const sellSignals = signals.filter(s => s === 'SELL').length;
+  
+  // Enhance signal if multiple indicators agree
+  if (buySignals >= 2) {
+    signal = 'BUY';
+    confidence = Math.min(0.95, confidence + (buySignals * 0.08));
+  } else if (sellSignals >= 2) {
+    signal = 'SELL';
+    confidence = Math.min(0.95, confidence + (sellSignals * 0.08));
+  }
+  
+  // Calculate stop-loss and take-profit based on ATR
+  const atr = calculateATR(candles);
+  const stopLossDistance = atr * 2; // 2x ATR for stop-loss
+  const takeProfitDistance = atr * 3; // 3x ATR for take-profit
+  
   return {
     signal,
     confidence,
     currentPrice,
     targetPrice,
+    stopLoss: signal === 'BUY' ? currentPrice - stopLossDistance : currentPrice + stopLossDistance,
+    takeProfit: signal === 'BUY' ? currentPrice + takeProfitDistance : currentPrice - takeProfitDistance,
+    atr,
     indicators: {
       rsi: rsi?.toFixed(2),
-      macd: macd?.macd.toFixed(2),
-      bb_upper: bb?.upper.toFixed(2),
-      bb_lower: bb?.lower.toFixed(2),
+      stochRSI_K: stochRSI?.k?.toFixed(2),
+      stochRSI_D: stochRSI?.d?.toFixed(2),
+      stochRSI_signal: stochRSI?.signal,
+      macd: macd?.macd?.toFixed(2),
+      macd_signal: macd?.signal?.toFixed(2),
+      macd_histogram: macd?.histogram?.toFixed(2),
+      macd_crossover: macd?.crossoverSignal,
+      bb_upper: bb?.upper?.toFixed(2),
+      bb_middle: bb?.middle?.toFixed(2),
+      bb_lower: bb?.lower?.toFixed(2),
+      bb_percentB: bb?.percentB?.toFixed(2),
+      bb_signal: bb?.signal,
       sma20: sma20?.toFixed(2),
       sma50: sma50?.toFixed(2)
     },
-    candles: candles.slice(-5) // Last 5 candles for reference
+    candles: candles.slice(-5)
   };
+}
+
+// Calculate ATR (Average True Range) for volatility-based stop-loss/take-profit
+export function calculateATR(candles, period = 14) {
+  if (candles.length < period + 1) return 0;
+  
+  const trueRanges = [];
+  for (let i = 1; i < candles.length; i++) {
+    const high = candles[i].high;
+    const low = candles[i].low;
+    const prevClose = candles[i - 1].close;
+    
+    const tr = Math.max(
+      high - low,
+      Math.abs(high - prevClose),
+      Math.abs(low - prevClose)
+    );
+    trueRanges.push(tr);
+  }
+  
+  const recentTR = trueRanges.slice(-period);
+  return recentTR.reduce((a, b) => a + b, 0) / period;
 }
 
 // Validate trade distribution using Benford's Law
