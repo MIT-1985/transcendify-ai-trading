@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
         }
         
         // Determine trade based on technical analysis
-        const shouldTrade = technicalSignal !== 'HOLD' && Math.random() < confidence;
+        const shouldTrade = technicalSignal !== 'HOLD' ? Math.random() < confidence : Math.random() > 0.4;
         if (!shouldTrade) continue;
         
         const isBuy = technicalSignal === 'BUY';

@@ -53,8 +53,8 @@ export function useBotEngine(subscription, vipLevel = 'none') {
     const interval = setInterval(async () => {
       setElapsedSeconds(prev => prev + 1);
 
-      // Trade every 2-4 seconds (high frequency) - can trade on multiple pairs simultaneously
-      if (Math.random() > 0.5) {
+      // Trade every 1-2 seconds (high frequency) - can trade on multiple pairs simultaneously
+      if (Math.random() > 0.2) {
         const bot = await base44.entities.TradingBot.filter({ id: subscription.bot_id });
         if (!bot[0]) return;
 
@@ -77,7 +77,7 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const analysis = await analyzeStrategy(symbol, strategy);
         
         // Trade based on analysis or random for high frequency
-        const shouldTrade = analysis.signal !== 'HOLD' || Math.random() > 0.5;
+        const shouldTrade = analysis.signal !== 'HOLD' || Math.random() > 0.3;
         
         const capital = subscription.capital_allocated || 1000;
         const currentPrice = analysis.currentPrice;
