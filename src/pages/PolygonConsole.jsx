@@ -70,25 +70,6 @@ export default function PolygonConsole() {
 
   const tvSymbol = selectedPair.replace('X:', '').replace('USD', 'USD');
   const tvInterval = timeframe.label === '1m' ? '1' : timeframe.label === '5m' ? '5' : timeframe.label === '15m' ? '15' : timeframe.label === '30m' ? '30' : timeframe.label === '1h' ? '60' : timeframe.label === '6h' ? '360' : 'D';
-  
-  // Advanced TradingView features
-  const tvFeatures = [
-    'header_widget',
-    'left_toolbar',
-    'timeframes_toolbar',
-    'edit_buttons_in_legend',
-    'context_menus',
-    'control_bar',
-    'border_around_the_chart'
-  ].join('%2C');
-  
-  const tvStudies = [
-    'STD%3BMoving%20Average',
-    'STD%3BVolume',
-    'STD%3BMACD',
-    'STD%3BRSI',
-    'STD%3BBollinger%20Bands'
-  ].join('%2C');
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4">
@@ -152,12 +133,12 @@ export default function PolygonConsole() {
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/90">
                       <div className="text-center">
                         <Skeleton className="h-12 w-12 rounded-full mx-auto mb-4" />
-                        <p className="text-slate-400">Loading advanced chart...</p>
+                        <p className="text-slate-400">Loading chart...</p>
                       </div>
                     </div>
                   )}
                   <iframe
-                    src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=CRYPTO:${tvSymbol}&interval=${tvInterval}&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=0A0A0F&studies=${tvStudies}&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&hideideas=1&locale=en&drawings_access=all&enabled_features=${tvFeatures}&allow_symbol_change=1&details=1&hotlist=1&calendar=1`}
+                    src={`https://www.tradingview.com/widgetembed/?symbol=CRYPTO:${tvSymbol}&interval=${tvInterval}&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=0A0A0F&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&locale=en&allow_symbol_change=1`}
                     style={{ width: '100%', height: '100%', border: 'none' }}
                     title="TradingView Chart"
                     onLoad={() => setIsChartLoading(false)}
