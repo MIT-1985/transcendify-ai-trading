@@ -93,8 +93,15 @@ export default function PolygonConsole() {
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4">
       <div className="max-w-[1800px] mx-auto">
+        {/* Debug Info */}
+        {currentPrice === 0 && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4">
+            <div className="text-amber-400 text-sm">⚠️ Loading market data...</div>
+          </div>
+        )}
+        
         {/* Top Bar */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-4">
             <Select value={selectedPair} onValueChange={setSelectedPair}>
               <SelectTrigger className="w-44 bg-slate-900 border-slate-700">
@@ -140,9 +147,9 @@ export default function PolygonConsole() {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
           {/* Chart - Takes 3 columns */}
-          <div className="lg:col-span-3">
+          <div className="xl:col-span-3">
             <Card className="bg-slate-900/50 border-slate-800">
               <CardContent className="p-0">
                 <div className="w-full h-[700px] relative">
@@ -189,8 +196,8 @@ export default function PolygonConsole() {
         </div>
 
         {/* Trading Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
+          <div className="xl:col-span-2">
             <OrderHistory />
           </div>
           <div>
