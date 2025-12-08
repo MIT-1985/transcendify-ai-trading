@@ -408,18 +408,22 @@ export default function PolygonConsole() {
 
         {/* Main Chart */}
         <Card className="bg-slate-900/50 border-slate-800">
-          <CardContent className="p-4">
-            {loading ? (
-              <div className="h-[600px] flex items-center justify-center text-slate-400">
-                Loading {timeframe.label} chart...
-              </div>
-            ) : (
-              <>
-                {candleData.length === 0 ? (
-                  <div className="h-[600px] flex items-center justify-center text-slate-400">
-                    Зареждане на данни...
-                  </div>
-                ) : (
+          <CardContent className="p-0">
+            <div className="w-full h-[600px]">
+              <iframe
+                src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=CRYPTO:${selectedPair.replace('X:', '').replace('USD', 'USD')}&interval=${timeframe.label === '1m' ? '1' : timeframe.label === '5m' ? '5' : timeframe.label === '15m' ? '15' : timeframe.label === '30m' ? '30' : timeframe.label === '1h' ? '60' : timeframe.label === '6h' ? '360' : 'D'}&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=0A0A0F&studies=${indicators.sma20 || indicators.sma50 || indicators.ema12 || indicators.ema26 || indicators.bb || indicators.rsi || indicators.macd ? 
+                  JSON.stringify([
+                    indicators.sma20 && 'MASimple@tv-basicstudies',
+                    indicators.sma50 && 'MASimple@tv-basicstudies',
+                    indicators.ema12 && 'MAExp@tv-basicstudies',
+                    indicators.ema26 && 'MAExp@tv-basicstudies',
+                    indicators.bb && 'BB@tv-basicstudies',
+                    indicators.rsi && 'RSI@tv-basicstudies',
+                    indicators.macd && 'MACD@tv-basicstudies'
+                  ].filter(Boolean)) : '[]'}&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&hideideas=1&locale=en`}
+                style={{ width: '100%', height: '100%', border: 'none' }}
+                title="TradingView Chart"
+              />
                   <ResponsiveContainer width="100%" height={600}>
                     <ComposedChart data={candleData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
                       <defs>
@@ -624,10 +628,10 @@ export default function PolygonConsole() {
                         </>
                       )}
                     </ComposedChart>
-                  </ResponsiveContainer>
-                )}
+                  </div>
 
-                {/* RSI Chart */}
+                  {/* OHLCV Stats */}
+                  <div className="grid grid-cols-5 gap-3 p-4"
                 {indicators.rsi && indicatorData.rsi && (
                   <div className="mt-6">
                     <div className="text-sm font-semibold text-white mb-2">RSI(14)</div>
@@ -671,39 +675,19 @@ export default function PolygonConsole() {
                 {/* OHLCV Stats */}
                 <div className="grid grid-cols-5 gap-3 mt-4">
                   <div className="bg-slate-800/50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500">O</div>
-                    <div className="text-sm font-semibold text-white">
-                      ${candleData.length > 0 ? candleData[0].open.toFixed(2) : '-'}
-                    </div>
-                  </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500">H</div>
-                    <div className="text-sm font-semibold text-emerald-400">
-                      ${candleData.length > 0 ? Math.max(...candleData.map(c => c.high)).toFixed(2) : '-'}
-                    </div>
-                  </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500">L</div>
-                    <div className="text-sm font-semibold text-red-400">
-                      ${candleData.length > 0 ? Math.min(...candleData.map(c => c.low)).toFixed(2) : '-'}
-                    </div>
-                  </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3">
                     <div className="text-xs text-slate-500">C</div>
                     <div className="text-sm font-semibold text-white">
                       ${currentPrice.toFixed(2)}
                     </div>
                   </div>
                   <div className="bg-slate-800/50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500">Vol 24h</div>
-                    <div className="text-sm font-semibold text-blue-400">
-                      {(volume24h / 1000000).toFixed(2)}M
+                    <div className="text-xs text-slate-500">Change</div>
+                    <div className={`text-sm font-semibold ${priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
                     </div>
                   </div>
-                </div>
-              </>
-            )}
-          </CardContent>
+                  </div>
+                  </CardContent>
         </Card>
 
         {/* Market Watchlist */}
