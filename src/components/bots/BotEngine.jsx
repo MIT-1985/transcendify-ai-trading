@@ -26,8 +26,8 @@ export function useBotEngine(subscription, vipLevel = 'none') {
     const interval = setInterval(async () => {
       setElapsedSeconds(prev => prev + 1);
 
-      // Analyze market every 5-10 seconds
-      if (Math.random() > 0.85) {
+      // Trade every 3-8 seconds
+      if (Math.random() > 0.7) {
         const bot = await base44.entities.TradingBot.filter({ id: subscription.bot_id });
         if (!bot[0]) return;
 
@@ -37,24 +37,39 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         // Analyze market using technical indicators
         const analysis = await analyzeStrategy(symbol, strategy);
         
-        // Only trade if signal is not HOLD
-        if (analysis.signal === 'HOLD') return;
+        // Trade based on analysis or random for high frequency
+        const shouldTrade = analysis.signal !== 'HOLD' || Math.random() > 0.5;
         
         const capital = subscription.capital_allocated || 1000;
         const currentPrice = analysis.currentPrice;
-        const isBuy = analysis.signal === 'BUY';
+        
+        // Determine trade direction
+        let isBuy;
+        if (analysis.signal === 'BUY') isBuy = true;
+        else if (analysis.signal === 'SELL') isBuy = false;
+        else isBuy = Math.random() > 0.5; // Random for HOLD signal
         
         // Calculate profit based on technical analysis confidence and target
-        const targetReached = Math.random() < analysis.confidence;
+        const targetReached = Math.random() < (analysis.confidence || 0.6);
         let profitPct = 0;
         
-        if (targetReached) {
+        if (targetReached && analysis.targetPrice) {
           profitPct = ((analysis.targetPrice - currentPrice) / currentPrice) * 100;
-          if (!isBuy) profitPct = -profitPct; // Invert for SELL
+          if (!isBuy) profitPct = -profitPct;
         } else {
-          // Failed trade - small loss
-          profitPct = -(0.2 + Math.random() * 0.8);
+          // Market movement profit
+          const isWin = Math.random() > 0.35;
+          switch(strategy) {
+            case 'scalping': profitPct = isWin ? (0.5 + Math.random() * 1) : -(0.3 + Math.random() * 0.6); break;
+            case 'swing': profitPct = isWin ? (2 + Math.random() * 4) : -(1 + Math.random() * 2.5); break;
+            case 'arbitrage': profitPct = isWin ? (0.2 + Math.random() * 0.5) : -(0.1 + Math.random() * 0.3); break;
+            case 'grid': profitPct = isWin ? (0.8 + Math.random() * 1.5) : -(0.4 + Math.random() * 0.8); break;
+            case 'dca': profitPct = isWin ? (1 + Math.random() * 2.5) : -(0.6 + Math.random() * 1.5); break;
+            case 'momentum': profitPct = isWin ? (2.5 + Math.random() * 5) : -(1.5 + Math.random() * 4); break;
+          }
         }
+        
+        if (!shouldTrade) return;
 
         const vipBoost = getVIPBoost(vipLevel);
         if (profitPct > 0) profitPct *= (1 + vipBoost);
@@ -74,8 +89,8 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const fee = baseFee * (1 - feeDiscount);
         profit -= fee;
 
-        const entryPrice = currentPrice;
-        const exitPrice = analysis.targetPrice;
+        const entryPrice = currentPrice * (1 + (Math.random() - 0.5) * 0.001);
+        const exitPrice = entryPrice * (1 + profitPct / 100);
 
         // Create real ORDER first
         const order = await base44.entities.Order.create({
