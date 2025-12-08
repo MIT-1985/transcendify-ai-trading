@@ -45,7 +45,7 @@ export default function Dashboard() {
     };
     
     runBotTrades();
-    const botInterval = setInterval(runBotTrades, 2000);
+    const botInterval = setInterval(runBotTrades, 5000);
     
     return () => clearInterval(botInterval);
   }, []);

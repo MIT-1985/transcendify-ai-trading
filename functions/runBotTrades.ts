@@ -38,10 +38,9 @@ Deno.serve(async (req) => {
         const strategy = bot.strategy;
         const capital = subscription.capital_allocated || 1000;
         
-        // Process multiple pairs (up to 3 simultaneously)
-        const pairsToTrade = tradingPairs.slice(0, Math.min(3, tradingPairs.length));
-        
-        for (const symbol of pairsToTrade) {
+        // Process only 1 pair per execution to avoid rate limits
+        const symbol = tradingPairs[Math.floor(Math.random() * tradingPairs.length)];
+        {
         
         // Fetch current market price and candles
         const polygonKey = Deno.env.get('POLYGON_API_KEY');
@@ -217,7 +216,7 @@ Deno.serve(async (req) => {
           symbol: symbol,
           trade: { side: isBuy ? 'BUY' : 'SELL', profit, price: entryPrice }
         });
-        } // End of pairs loop
+        }
         
       } catch (error) {
         console.error(`Error processing subscription ${subscription.id}:`, error);

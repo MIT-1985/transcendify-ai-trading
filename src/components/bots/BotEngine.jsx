@@ -53,8 +53,8 @@ export function useBotEngine(subscription, vipLevel = 'none') {
     const interval = setInterval(async () => {
       setElapsedSeconds(prev => prev + 1);
 
-      // Trade every 1-2 seconds (high frequency) - can trade on multiple pairs simultaneously
-      if (Math.random() > 0.2) {
+      // Trade every 5-10 seconds to avoid rate limits
+      if (Math.random() > 0.7) {
         const bot = await base44.entities.TradingBot.filter({ id: subscription.bot_id });
         if (!bot[0]) return;
 
@@ -62,16 +62,9 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const tradingPairs = subscription.trading_pairs || ['X:BTCUSD'];
         const strategy = bot[0].strategy;
         
-        // Trade on multiple pairs simultaneously (1-3 pairs per cycle)
-        const pairsToTrade = Math.min(tradingPairs.length, Math.floor(Math.random() * 3) + 1);
-        const selectedPairs = [];
-        for (let i = 0; i < pairsToTrade; i++) {
-          const pair = tradingPairs[Math.floor(Math.random() * tradingPairs.length)];
-          if (!selectedPairs.includes(pair)) selectedPairs.push(pair);
-        }
-        
-        // Execute trades on all selected pairs
-        for (const symbol of selectedPairs) {
+        // Trade on 1 pair at a time to avoid rate limits
+        const symbol = tradingPairs[Math.floor(Math.random() * tradingPairs.length)];
+        {
         
         // Analyze market using technical indicators
         const analysis = await analyzeStrategy(symbol, strategy);
@@ -232,9 +225,9 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         queryClient.invalidateQueries({ queryKey: ['userSubscriptions'] });
         queryClient.invalidateQueries({ queryKey: ['trades'] });
         queryClient.invalidateQueries({ queryKey: ['orders'] });
-        } // End of pair loop
+        }
       }
-    }, 1000);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [subscription, isRunning, currentProfit, queryClient, vipLevel]);
