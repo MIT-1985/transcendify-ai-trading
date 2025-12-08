@@ -136,16 +136,16 @@ export default function PolygonConsole() {
           {/* Chart - Takes 3 columns */}
           <div className="lg:col-span-3">
             <Card className="bg-slate-900/50 border-slate-800">
-              <CardContent className="p-0 relative">
-                {isChartLoading && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/90">
-                    <div className="text-center">
-                      <Skeleton className="h-12 w-12 rounded-full mx-auto mb-4" />
-                      <p className="text-slate-400">Loading advanced chart...</p>
+              <CardContent className="p-0">
+                <div className="w-full h-[700px] relative">
+                  {isChartLoading && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/90">
+                      <div className="text-center">
+                        <Skeleton className="h-12 w-12 rounded-full mx-auto mb-4" />
+                        <p className="text-slate-400">Loading advanced chart...</p>
+                      </div>
                     </div>
-                  </div>
-                )}
-                <div className="w-full h-[700px]">
+                  )}
                   <iframe
                     src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=CRYPTO:${tvSymbol}&interval=${tvInterval}&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=0A0A0F&studies=${tvStudies}&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&hideideas=1&locale=en&drawings_access=all&enabled_features=${tvFeatures}&allow_symbol_change=1&details=1&hotlist=1&calendar=1`}
                     style={{ width: '100%', height: '100%', border: 'none' }}
