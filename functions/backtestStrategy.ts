@@ -15,7 +15,8 @@ Deno.serve(async (req) => {
       startDate, 
       endDate, 
       initialCapital,
-      parameters 
+      parameters,
+      customStrategy 
     } = await req.json();
 
     // Fetch historical data from Polygon
@@ -44,26 +45,30 @@ Deno.serve(async (req) => {
 
     // Run backtest based on strategy
     let result;
-    switch(strategy) {
-      case 'sma_crossover':
-        result = backtestSMACrossover(candles, initialCapital, parameters);
-        break;
-      case 'rsi':
-        result = backtestRSI(candles, initialCapital, parameters);
-        break;
-      case 'bollinger_bands':
-        result = backtestBollingerBands(candles, initialCapital, parameters);
-        break;
-      case 'macd':
-        result = backtestMACD(candles, initialCapital, parameters);
-        break;
-      default:
-        return Response.json({ error: 'Unknown strategy' }, { status: 400 });
+    if (strategy === 'custom' && customStrategy) {
+      result = backtestCustomStrategy(candles, initialCapital, parameters, customStrategy);
+    } else {
+      switch(strategy) {
+        case 'sma_crossover':
+          result = backtestSMACrossover(candles, initialCapital, parameters);
+          break;
+        case 'rsi':
+          result = backtestRSI(candles, initialCapital, parameters);
+          break;
+        case 'bollinger_bands':
+          result = backtestBollingerBands(candles, initialCapital, parameters);
+          break;
+        case 'macd':
+          result = backtestMACD(candles, initialCapital, parameters);
+          break;
+        default:
+          return Response.json({ error: 'Unknown strategy' }, { status: 400 });
+      }
     }
 
     // Save result to database
     await base44.entities.BacktestResult.create({
-      strategy_name: strategy,
+      strategy_name: strategy === 'custom' ? customStrategy.name : strategy,
       symbol: symbol,
       start_date: startDate,
       end_date: endDate,
@@ -446,6 +451,188 @@ function calculateMACD(candles) {
   }
   
   return { line, signal };
+}
+
+// Custom Strategy Backtest
+function backtestCustomStrategy(candles, initialCapital, params, customStrategy) {
+  const { feeRate = 0.001 } = params;
+  const { indicators, entry_conditions, exit_conditions, risk_management } = customStrategy;
+  
+  let capital = initialCapital;
+  let position = 0;
+  let trades = [];
+  let equity = [{ timestamp: candles[0].timestamp, value: capital }];
+  
+  // Calculate all enabled indicators
+  const indicatorData = {};
+  const maxPeriod = Math.max(
+    indicators?.rsi?.enabled ? indicators.rsi.period : 0,
+    indicators?.macd?.enabled ? 26 : 0,
+    indicators?.bollinger?.enabled ? indicators.bollinger.period : 0,
+    ...(indicators?.sma?.enabled ? indicators.sma.periods : [0]),
+    ...(indicators?.ema?.enabled ? indicators.ema.periods : [0])
+  );
+  
+  if (indicators?.rsi?.enabled) {
+    indicatorData.rsi = calculateRSI(candles, indicators.rsi.period);
+  }
+  if (indicators?.macd?.enabled) {
+    indicatorData.macd = calculateMACD(candles);
+  }
+  if (indicators?.bollinger?.enabled) {
+    indicatorData.bollinger = calculateBollingerBands(candles, indicators.bollinger.period, indicators.bollinger.stdDev);
+  }
+  if (indicators?.sma?.enabled) {
+    indicatorData.sma = {};
+    indicators.sma.periods.forEach(period => {
+      indicatorData.sma[period] = calculateSMA(candles, period);
+    });
+  }
+  if (indicators?.ema?.enabled) {
+    indicatorData.ema = {};
+    indicators.ema.periods.forEach(period => {
+      indicatorData.ema[period] = calculateEMA(candles, period);
+    });
+  }
+  
+  // Run backtest
+  for (let i = maxPeriod + 1; i < candles.length; i++) {
+    const price = candles[i].close;
+    
+    // Check entry conditions
+    if (position === 0 && entry_conditions && entry_conditions.length > 0) {
+      const shouldEnter = evaluateConditions(entry_conditions, indicatorData, i, price, candles, indicators);
+      
+      if (shouldEnter) {
+        const quantity = capital / price;
+        const fee = capital * feeRate;
+        capital -= fee;
+        position = quantity;
+        trades.push({
+          type: 'BUY',
+          price: price,
+          quantity: quantity,
+          timestamp: candles[i].timestamp,
+          fee: fee,
+          entryPrice: price
+        });
+      }
+    }
+    // Check exit conditions
+    else if (position > 0 && exit_conditions && exit_conditions.length > 0) {
+      const shouldExit = evaluateConditions(exit_conditions, indicatorData, i, price, candles, indicators);
+      
+      // Also check stop loss / take profit
+      const lastTrade = trades[trades.length - 1];
+      const pctChange = ((price - lastTrade.entryPrice) / lastTrade.entryPrice) * 100;
+      const hitStopLoss = risk_management?.stop_loss && pctChange <= -risk_management.stop_loss;
+      const hitTakeProfit = risk_management?.take_profit && pctChange >= risk_management.take_profit;
+      
+      if (shouldExit || hitStopLoss || hitTakeProfit) {
+        const value = position * price;
+        const fee = value * feeRate;
+        capital = value - fee;
+        const entryValue = lastTrade.quantity * lastTrade.entryPrice;
+        trades.push({
+          type: 'SELL',
+          price: price,
+          quantity: position,
+          timestamp: candles[i].timestamp,
+          fee: fee,
+          pnl: capital - (entryValue - lastTrade.fee)
+        });
+        position = 0;
+      }
+    }
+    
+    const currentValue = capital + (position * price);
+    equity.push({ timestamp: candles[i].timestamp, value: currentValue });
+  }
+  
+  // Close any open position
+  if (position > 0) {
+    const lastPrice = candles[candles.length - 1].close;
+    capital = position * lastPrice * (1 - feeRate);
+    position = 0;
+  }
+  
+  return calculateMetrics(trades, initialCapital, capital, equity);
+}
+
+function evaluateConditions(conditions, indicatorData, index, price, candles, indicators) {
+  if (!conditions || conditions.length === 0) return false;
+  
+  // All conditions must be true (AND logic)
+  return conditions.every(condition => {
+    const { indicator, condition: operator, value } = condition;
+    let indicatorValue;
+    
+    switch(indicator) {
+      case 'RSI':
+        indicatorValue = indicatorData.rsi?.[index];
+        break;
+      case 'MACD':
+        indicatorValue = indicatorData.macd?.line[index];
+        break;
+      case 'Bollinger Bands':
+        // Check if price is below lower band
+        if (operator === 'less than') {
+          return price <= indicatorData.bollinger?.lower[index];
+        } else if (operator === 'greater than') {
+          return price >= indicatorData.bollinger?.upper[index];
+        }
+        return false;
+      case 'SMA':
+        const smaPeriod = indicators?.sma?.periods?.[0] || 20;
+        indicatorValue = indicatorData.sma?.[smaPeriod]?.[index];
+        break;
+      case 'EMA':
+        const emaPeriod = indicators?.ema?.periods?.[0] || 12;
+        indicatorValue = indicatorData.ema?.[emaPeriod]?.[index];
+        break;
+      case 'Price':
+        indicatorValue = price;
+        break;
+      default:
+        return false;
+    }
+    
+    if (indicatorValue === null || indicatorValue === undefined) return false;
+    
+    switch(operator) {
+      case 'greater than':
+        return indicatorValue > value;
+      case 'less than':
+        return indicatorValue < value;
+      case 'equals':
+        return Math.abs(indicatorValue - value) < 0.01;
+      case 'crosses above':
+        const prevValue = index > 0 ? getIndicatorValue(indicator, indicatorData, index - 1, indicators) : null;
+        return prevValue !== null && prevValue <= value && indicatorValue > value;
+      case 'crosses below':
+        const prevVal = index > 0 ? getIndicatorValue(indicator, indicatorData, index - 1, indicators) : null;
+        return prevVal !== null && prevVal >= value && indicatorValue < value;
+      default:
+        return false;
+    }
+  });
+}
+
+function getIndicatorValue(indicator, indicatorData, index, indicators) {
+  switch(indicator) {
+    case 'RSI':
+      return indicatorData.rsi?.[index];
+    case 'MACD':
+      return indicatorData.macd?.line[index];
+    case 'SMA':
+      const smaPeriod = indicators?.sma?.periods?.[0] || 20;
+      return indicatorData.sma?.[smaPeriod]?.[index];
+    case 'EMA':
+      const emaPeriod = indicators?.ema?.periods?.[0] || 12;
+      return indicatorData.ema?.[emaPeriod]?.[index];
+    default:
+      return null;
+  }
 }
 
 function calculateMetrics(trades, initialCapital, finalCapital, equity) {
