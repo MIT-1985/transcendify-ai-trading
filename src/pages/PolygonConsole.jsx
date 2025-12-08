@@ -6,6 +6,9 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import WatchlistPanel from '@/components/trading/WatchlistPanel';
 import PriceAlertsPanel from '@/components/trading/PriceAlertsPanel';
+import OrderManagement from '@/components/trading/OrderManagement';
+import OrderHistory from '@/components/trading/OrderHistory';
+import OrderBook from '@/components/trading/OrderBook';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const CRYPTO_PAIRS = [
@@ -171,8 +174,19 @@ export default function PolygonConsole() {
 
           {/* Sidebar - Takes 1 column */}
           <div className="space-y-4">
+            <OrderManagement symbol={selectedPair} />
             <WatchlistPanel onSymbolSelect={setSelectedPair} />
             <PriceAlertsPanel />
+          </div>
+        </div>
+
+        {/* Trading Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+          <div className="lg:col-span-2">
+            <OrderHistory />
+          </div>
+          <div>
+            <OrderBook symbol={selectedPair} />
           </div>
         </div>
 
