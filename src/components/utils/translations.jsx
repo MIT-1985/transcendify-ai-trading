@@ -4,6 +4,7 @@ export const translations = {
     dashboard: 'Dashboard',
     polygonConsole: 'Polygon Console',
     tradingBots: 'Trading Bots',
+    backtesting: 'Backtesting',
     fuelMiners: 'Fuel Miners',
     deviceMining: 'Device Mining',
     aiAnalysis: 'AI Analysis',

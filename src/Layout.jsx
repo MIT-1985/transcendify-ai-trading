@@ -2,20 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { 
-  LayoutDashboard, 
-  Terminal, 
-  Bot, 
-  Brain, 
-  Settings, 
-  Menu, 
-  X,
-  Zap,
-  ChevronRight,
-  Users,
-  Gift,
-  TrendingUp,
-  Crown
-} from 'lucide-react';
+        LayoutDashboard, 
+        Terminal, 
+        Bot, 
+        Brain, 
+        Settings, 
+        Menu, 
+        X,
+        Zap,
+        ChevronRight,
+        Users,
+        Gift,
+        TrendingUp,
+        Crown,
+        Activity
+      } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useTranslation } from '@/components/utils/translations';
@@ -37,6 +38,7 @@ export default function Layout({ children, currentPageName }) {
     { nameKey: 'portfolio', page: 'Portfolio', icon: TrendingUp },
     { nameKey: 'polygonConsole', page: 'PolygonConsole', icon: Terminal },
     { nameKey: 'tradingBots', page: 'Bots', icon: Bot },
+    { nameKey: 'backtesting', page: 'Backtesting', icon: Activity },
     { nameKey: 'fuelMiners', page: 'Miners', icon: Zap },
     { nameKey: 'deviceMining', page: 'DeviceMining', icon: Zap },
     { nameKey: 'aiAnalysis', page: 'AIAnalysis', icon: Brain },
