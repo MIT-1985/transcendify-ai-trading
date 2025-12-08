@@ -14,6 +14,9 @@ import BotAlertSettings from '@/components/bots/BotAlertSettings';
 import RealTimeMonitor from '@/components/bots/RealTimeMonitor';
 import BotPnLChart from '@/components/bots/BotPnLChart';
 import DetailedTradeHistory from '@/components/bots/DetailedTradeHistory';
+import AIStrategyPromptEditor from '@/components/ai/AIStrategyPromptEditor';
+import StrategyFeedbackPanel from '@/components/ai/StrategyFeedbackPanel';
+import AIOptimizationSuggestions from '@/components/ai/AIOptimizationSuggestions';
 import { createPageUrl } from '../utils';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -24,6 +27,7 @@ export default function BotRunner() {
   const queryClient = useQueryClient();
   const subscriptionId = new URLSearchParams(window.location.search).get('id');
   const [showAlertSettings, setShowAlertSettings] = useState(false);
+  const [showAIPrompt, setShowAIPrompt] = useState(false);
 
   const { data: subscription } = useQuery({
     queryKey: ['subscription', subscriptionId],
@@ -152,6 +156,14 @@ export default function BotRunner() {
               Analytics
             </Button>
             <Button
+              onClick={() => setShowAIPrompt(true)}
+              size="lg"
+              variant="outline"
+              className="border-purple-500 text-purple-400 hover:bg-purple-500/10"
+            >
+              AI Strategy
+            </Button>
+            <Button
               onClick={() => {
                 if (isRunning) {
                   setIsRunning(false);
@@ -213,7 +225,8 @@ export default function BotRunner() {
           <div className="space-y-6">
             <RealTimeMonitor subscription={subscription} trades={trades} isRunning={isRunning} />
             <LivePositions subscription={subscription} trades={trades} />
-            <AILearningPanel subscription={subscription} trades={trades} />
+            <StrategyFeedbackPanel subscription={subscription} />
+            <AIOptimizationSuggestions subscription={subscription} />
           </div>
         </div>
 
@@ -227,6 +240,13 @@ export default function BotRunner() {
           subscription={subscription}
           isOpen={showAlertSettings}
           onClose={() => setShowAlertSettings(false)}
+        />
+
+        {/* AI Strategy Prompt Editor */}
+        <AIStrategyPromptEditor
+          subscription={subscription}
+          isOpen={showAIPrompt}
+          onClose={() => setShowAIPrompt(false)}
         />
       </div>
     </div>
