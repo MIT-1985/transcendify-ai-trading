@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { analyzeStrategy } from './TechnicalAnalysis';
 
 export function useBotEngine(subscription, vipLevel = 'none') {
-  const [isRunning, setIsRunning] = useState(false);
+  const [isRunning, setIsRunning] = useState(true); // Auto-start in test mode
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentProfit, setCurrentProfit] = useState(subscription?.total_profit || 0);
   const queryClient = useQueryClient();
@@ -26,8 +26,8 @@ export function useBotEngine(subscription, vipLevel = 'none') {
     const interval = setInterval(async () => {
       setElapsedSeconds(prev => prev + 1);
 
-      // Trade every 3-8 seconds
-      if (Math.random() > 0.7) {
+      // Trade every 2-4 seconds (high frequency)
+      if (Math.random() > 0.5) {
         const bot = await base44.entities.TradingBot.filter({ id: subscription.bot_id });
         if (!bot[0]) return;
 
