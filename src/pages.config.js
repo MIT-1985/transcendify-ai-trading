@@ -13,6 +13,8 @@ import BotAnalytics from './pages/BotAnalytics';
 import DeviceMining from './pages/DeviceMining';
 import VIPUpgrade from './pages/VIPUpgrade';
 import AIAnalysis from './pages/AIAnalysis';
+import Deposit from './pages/Deposit';
+import CustomStrategies from './pages/CustomStrategies';
 import __Layout from './Layout.jsx';
 
 
@@ -32,6 +34,8 @@ export const PAGES = {
     "DeviceMining": DeviceMining,
     "VIPUpgrade": VIPUpgrade,
     "AIAnalysis": AIAnalysis,
+    "Deposit": Deposit,
+    "CustomStrategies": CustomStrategies,
 }
 
 export const pagesConfig = {
