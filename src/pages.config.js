@@ -11,6 +11,7 @@ import Landing from './pages/Landing';
 import Backtesting from './pages/Backtesting';
 import BotAnalytics from './pages/BotAnalytics';
 import DeviceMining from './pages/DeviceMining';
+import VIPUpgrade from './pages/VIPUpgrade';
 import __Layout from './Layout.jsx';
 
 
@@ -28,6 +29,7 @@ export const PAGES = {
     "Backtesting": Backtesting,
     "BotAnalytics": BotAnalytics,
     "DeviceMining": DeviceMining,
+    "VIPUpgrade": VIPUpgrade,
 }
 
 export const pagesConfig = {
