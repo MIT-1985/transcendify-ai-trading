@@ -77,7 +77,23 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const entryPrice = currentPrice;
         const exitPrice = analysis.targetPrice;
 
-        // Create trade with technical analysis data
+        // Create real ORDER first
+        const order = await base44.entities.Order.create({
+          symbol: symbol,
+          side: isBuy ? 'BUY' : 'SELL',
+          type: 'MARKET',
+          quantity: quantity,
+          price: entryPrice,
+          status: 'FILLED',
+          filled_quantity: quantity,
+          average_price: entryPrice,
+          total_value: positionSize,
+          fee: fee,
+          execution_mode: 'SIM',
+          filled_at: new Date().toISOString()
+        });
+
+        // Create trade record with order reference
         await base44.entities.Trade.create({
           subscription_id: subscription.id,
           symbol: symbol,
@@ -114,6 +130,7 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         setCurrentProfit(newProfit);
         queryClient.invalidateQueries({ queryKey: ['userSubscriptions'] });
         queryClient.invalidateQueries({ queryKey: ['trades'] });
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
       }
     }, 1000);
 
