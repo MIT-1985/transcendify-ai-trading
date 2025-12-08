@@ -3,19 +3,27 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, ArrowLeft, Activity } from 'lucide-react';
+import { Play, Pause, ArrowLeft, Activity, Bell, Power } from 'lucide-react';
 import { useBotEngine } from '@/components/bots/BotEngine';
 import LiveStats from '@/components/bots/LiveStats';
-import TradeHistory from '@/components/bots/TradeHistory';
 import RealTimePriceDisplay from '@/components/bots/RealTimePriceDisplay';
 import LivePositions from '@/components/trading/LivePositions';
 import CandlestickChart from '@/components/trading/CandlestickChart';
 import AILearningPanel from '@/components/bots/AILearningPanel';
+import BotAlertSettings from '@/components/bots/BotAlertSettings';
+import RealTimeMonitor from '@/components/bots/RealTimeMonitor';
+import BotPnLChart from '@/components/bots/BotPnLChart';
+import DetailedTradeHistory from '@/components/bots/DetailedTradeHistory';
 import { createPageUrl } from '../utils';
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 export default function BotRunner() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const subscriptionId = new URLSearchParams(window.location.search).get('id');
+  const [showAlertSettings, setShowAlertSettings] = useState(false);
 
   const { data: subscription } = useQuery({
     queryKey: ['subscription', subscriptionId],
@@ -72,6 +80,20 @@ export default function BotRunner() {
   const vipLevel = wallet?.vip_level || 'none';
   const { isRunning, setIsRunning, elapsedSeconds, currentProfit } = useBotEngine(subscription, vipLevel);
 
+  // Pause/Stop bot mutation
+  const pauseBotMutation = useMutation({
+    mutationFn: async (status) => {
+      await base44.entities.UserSubscription.update(subscription.id, { status });
+    },
+    onSuccess: (_, status) => {
+      queryClient.invalidateQueries({ queryKey: ['subscription', subscriptionId] });
+      toast.success(status === 'paused' ? 'Bot paused' : 'Bot stopped');
+      if (status === 'cancelled') {
+        navigate(createPageUrl('Dashboard'));
+      }
+    }
+  });
+
   if (!subscription || !bot) {
     return (
       <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center">
@@ -112,30 +134,56 @@ export default function BotRunner() {
               <div className="text-sm font-semibold text-white">{trades.length}</div>
             </div>
             <Button
+              onClick={() => setShowAlertSettings(true)}
+              size="lg"
+              variant="outline"
+              className="border-slate-700"
+            >
+              <Bell className="w-5 h-5 mr-2" />
+              Alerts
+            </Button>
+            <Button
               onClick={() => window.location.href = createPageUrl('BotAnalytics') + '?id=' + subscriptionId}
               size="lg"
               variant="outline"
               className="border-blue-500 text-blue-400 hover:bg-blue-500/10"
             >
               <Activity className="w-5 h-5 mr-2" />
-              View Analytics
+              Analytics
             </Button>
             <Button
-              onClick={() => setIsRunning(!isRunning)}
+              onClick={() => {
+                if (isRunning) {
+                  setIsRunning(false);
+                  pauseBotMutation.mutate('paused');
+                } else {
+                  setIsRunning(true);
+                  pauseBotMutation.mutate('active');
+                }
+              }}
               size="lg"
-              className={isRunning ? "bg-red-600 hover:bg-red-500" : "bg-emerald-600 hover:bg-emerald-500"}
+              className={isRunning ? "bg-yellow-600 hover:bg-yellow-500" : "bg-emerald-600 hover:bg-emerald-500"}
             >
               {isRunning ? (
                 <>
                   <Pause className="w-5 h-5 mr-2" />
-                  Stop Bot
+                  Pause
                 </>
               ) : (
                 <>
                   <Play className="w-5 h-5 mr-2" />
-                  Start Bot
+                  Resume
                 </>
               )}
+            </Button>
+            <Button
+              onClick={() => pauseBotMutation.mutate('cancelled')}
+              size="lg"
+              variant="destructive"
+              className="bg-red-600 hover:bg-red-500"
+            >
+              <Power className="w-5 h-5 mr-2" />
+              Stop
             </Button>
           </div>
         </div>
@@ -152,25 +200,34 @@ export default function BotRunner() {
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Chart with trades overlay */}
-          <div className="lg:col-span-2">
+          {/* Charts */}
+          <div className="lg:col-span-2 space-y-6">
             <CandlestickChart 
               symbol={subscription.trading_pairs?.[0] || 'X:BTCUSD'} 
               trades={trades}
             />
+            <BotPnLChart trades={trades} />
           </div>
 
-          {/* Live Positions & AI Learning */}
+          {/* Monitoring & Controls */}
           <div className="space-y-6">
+            <RealTimeMonitor subscription={subscription} trades={trades} isRunning={isRunning} />
             <LivePositions subscription={subscription} trades={trades} />
             <AILearningPanel subscription={subscription} trades={trades} />
           </div>
         </div>
 
-        {/* Trade History */}
+        {/* Detailed Trade History */}
         <div className="mt-6">
-          <TradeHistory trades={trades} />
+          <DetailedTradeHistory trades={trades} />
         </div>
+
+        {/* Alert Settings Modal */}
+        <BotAlertSettings
+          subscription={subscription}
+          isOpen={showAlertSettings}
+          onClose={() => setShowAlertSettings(false)}
+        />
       </div>
     </div>
   );
