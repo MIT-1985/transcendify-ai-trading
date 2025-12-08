@@ -38,6 +38,7 @@ export default function Layout({ children, currentPageName }) {
     { nameKey: 'portfolio', page: 'Portfolio', icon: TrendingUp },
     { nameKey: 'polygonConsole', page: 'PolygonConsole', icon: Terminal },
     { nameKey: 'tradingBots', page: 'Bots', icon: Bot },
+    { nameKey: 'customStrategies', page: 'CustomStrategies', icon: Settings },
     { nameKey: 'backtesting', page: 'Backtesting', icon: Activity },
     { nameKey: 'fuelMiners', page: 'Miners', icon: Zap },
     { nameKey: 'deviceMining', page: 'DeviceMining', icon: Zap },
