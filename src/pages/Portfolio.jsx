@@ -3,10 +3,17 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, Activity, DollarSign } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { TrendingUp, TrendingDown, Activity, DollarSign, PieChart, Shield, Zap, LineChart } from 'lucide-react';
+import AssetAllocation from '@/components/portfolio/AssetAllocation';
+import RiskExposure from '@/components/portfolio/RiskExposure';
+import StrategySimulator from '@/components/portfolio/StrategySimulator';
+import PortfolioForecasting from '@/components/portfolio/PortfolioForecasting';
+import { useTranslation } from '@/components/utils/translations';
 
 export default function Portfolio() {
+  const [language, setLanguage] = useState(() => localStorage.getItem('language') || 'en');
+  const { t } = useTranslation(language);
   const [liveData, setLiveData] = useState([]);
   const [marketData, setMarketData] = useState([
     { symbol: 'BTC/USD', price: 67842.50, change: 2.34, holdings: 0.045, value: 3052.91 },
@@ -16,12 +23,39 @@ export default function Portfolio() {
 
   const { data: trades = [] } = useQuery({
     queryKey: ['trades'],
-    queryFn: () => base44.entities.Trade.list('-timestamp', 50)
+    queryFn: () => base44.entities.Trade.list('-timestamp', 100)
   });
 
   const { data: subscriptions = [] } = useQuery({
     queryKey: ['subscriptions'],
     queryFn: () => base44.entities.UserSubscription.filter({ status: 'active' })
+  });
+
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => base44.auth.me()
+  });
+
+  const { data: wallet } = useQuery({
+    queryKey: ['wallet', user?.email],
+    queryFn: async () => {
+      const wallets = await base44.entities.Wallet.filter({ created_by: user.email });
+      return wallets[0];
+    },
+    enabled: !!user?.email
+  });
+
+  const { data: miners = [] } = useQuery({
+    queryKey: ['userMiners', user?.email],
+    queryFn: async () => {
+      const userMiners = await base44.entities.UserMiner.filter({ created_by: user.email });
+      const minersData = await base44.entities.Miner.list();
+      return userMiners.map(um => {
+        const miner = minersData.find(m => m.id === um.miner_id);
+        return { ...um, ...miner };
+      });
+    },
+    enabled: !!user?.email
   });
 
   // Simulate real-time price updates
@@ -69,8 +103,14 @@ export default function Portfolio() {
     <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Portfolio</h1>
-          <p className="text-slate-400">Real-time portfolio performance and holdings</p>
+          <h1 className="text-3xl font-bold mb-2">{t('portfolio')}</h1>
+          <p className="text-slate-400">
+            {language === 'bg' 
+              ? 'Представяне на портфолиото в реално време и активи'
+              : language === 'de'
+              ? 'Echtzeit-Portfolio-Performance und Bestände'
+              : 'Real-time portfolio performance and holdings'}
+          </p>
         </div>
 
         {/* Stats Cards */}
@@ -79,7 +119,9 @@ export default function Portfolio() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-blue-100 text-sm mb-1">Total Value</div>
+                  <div className="text-blue-100 text-sm mb-1">
+                    {language === 'bg' ? 'Обща Стойност' : language === 'de' ? 'Gesamtwert' : 'Total Value'}
+                  </div>
                   <div className="text-2xl font-bold text-white">${totalValue.toFixed(2)}</div>
                 </div>
                 <DollarSign className="w-8 h-8 text-blue-200" />
@@ -109,7 +151,7 @@ export default function Portfolio() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-slate-400 text-sm mb-1">Total Trades</div>
+                  <div className="text-slate-400 text-sm mb-1">{t('totalTrades')}</div>
                   <div className="text-2xl font-bold text-white">{totalTrades}</div>
                 </div>
                 <Activity className="w-8 h-8 text-slate-600" />
@@ -121,7 +163,7 @@ export default function Portfolio() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-slate-400 text-sm mb-1">Win Rate</div>
+                  <div className="text-slate-400 text-sm mb-1">{t('winRate')}</div>
                   <div className="text-2xl font-bold text-white">{winRate}%</div>
                 </div>
                 <TrendingUp className="w-8 h-8 text-emerald-500" />
@@ -131,16 +173,39 @@ export default function Portfolio() {
         </div>
 
         <Tabs defaultValue="performance" className="w-full">
-          <TabsList className="bg-slate-900/50 border border-slate-800">
-            <TabsTrigger value="performance">Performance</TabsTrigger>
-            <TabsTrigger value="holdings">Holdings</TabsTrigger>
-            <TabsTrigger value="trades">Recent Trades</TabsTrigger>
+          <TabsList className="bg-slate-900/50 border border-slate-800 grid grid-cols-2 lg:grid-cols-6 w-full">
+            <TabsTrigger value="performance">
+              <LineChart className="w-4 h-4 mr-2" />
+              {language === 'bg' ? 'Представяне' : language === 'de' ? 'Leistung' : 'Performance'}
+            </TabsTrigger>
+            <TabsTrigger value="allocation">
+              <PieChart className="w-4 h-4 mr-2" />
+              {language === 'bg' ? 'Активи' : language === 'de' ? 'Allokation' : 'Allocation'}
+            </TabsTrigger>
+            <TabsTrigger value="risk">
+              <Shield className="w-4 h-4 mr-2" />
+              {language === 'bg' ? 'Риск' : language === 'de' ? 'Risiko' : 'Risk'}
+            </TabsTrigger>
+            <TabsTrigger value="simulator">
+              <Zap className="w-4 h-4 mr-2" />
+              {language === 'bg' ? 'Симулатор' : language === 'de' ? 'Simulator' : 'Simulator'}
+            </TabsTrigger>
+            <TabsTrigger value="forecast">
+              <TrendingUp className="w-4 h-4 mr-2" />
+              {language === 'bg' ? 'Прогноза' : language === 'de' ? 'Prognose' : 'Forecast'}
+            </TabsTrigger>
+            <TabsTrigger value="trades">
+              <Activity className="w-4 h-4 mr-2" />
+              {language === 'bg' ? 'Сделки' : language === 'de' ? 'Trades' : 'Trades'}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="performance">
             <Card className="bg-slate-900/50 border-slate-800">
               <CardHeader>
-                <CardTitle className="text-white">Portfolio Performance</CardTitle>
+                <CardTitle className="text-white">
+                  {language === 'bg' ? 'Представяне на Портфолио' : language === 'de' ? 'Portfolio-Leistung' : 'Portfolio Performance'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {liveData.length > 0 ? (
@@ -170,48 +235,53 @@ export default function Portfolio() {
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-[400px] flex items-center justify-center text-slate-500">
-                    No trading data available yet. Start trading to see your performance.
+                    {language === 'bg' 
+                      ? 'Все още няма данни за търговия. Започнете търговия, за да видите представянето си.'
+                      : language === 'de'
+                      ? 'Noch keine Handelsdaten verfügbar. Beginnen Sie mit dem Handel, um Ihre Leistung zu sehen.'
+                      : 'No trading data available yet. Start trading to see your performance.'}
                   </div>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="holdings">
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardHeader>
-                <CardTitle className="text-white">Current Holdings</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {marketData.map((asset) => (
-                    <div key={asset.symbol} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg">
-                      <div>
-                        <div className="font-semibold text-white">{asset.symbol}</div>
-                        <div className="text-sm text-slate-400">
-                          {asset.holdings.toFixed(4)} × ${asset.price.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-white">${asset.value.toFixed(2)}</div>
-                        <div className={`text-sm flex items-center gap-1 justify-end ${
-                          asset.change >= 0 ? 'text-emerald-400' : 'text-red-400'
-                        }`}>
-                          {asset.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                          {asset.change >= 0 ? '+' : ''}{asset.change.toFixed(2)}%
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="allocation">
+            <AssetAllocation 
+              assets={marketData} 
+              miners={miners}
+              wallet={wallet}
+              language={language}
+            />
+          </TabsContent>
+
+          <TabsContent value="risk">
+            <RiskExposure 
+              subscriptions={subscriptions}
+              trades={trades}
+              language={language}
+            />
+          </TabsContent>
+
+          <TabsContent value="simulator">
+            <StrategySimulator language={language} />
+          </TabsContent>
+
+          <TabsContent value="forecast">
+            <PortfolioForecasting 
+              trades={trades}
+              subscriptions={subscriptions}
+              currentValue={totalValue}
+              language={language}
+            />
           </TabsContent>
 
           <TabsContent value="trades">
             <Card className="bg-slate-900/50 border-slate-800">
               <CardHeader>
-                <CardTitle className="text-white">Recent Trades</CardTitle>
+                <CardTitle className="text-white">
+                  {language === 'bg' ? 'Скорошни Сделки' : language === 'de' ? 'Letzte Trades' : 'Recent Trades'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 max-h-[400px] overflow-y-auto">
