@@ -38,7 +38,7 @@ export default function BotRunner() {
     queryKey: ['trades', subscriptionId],
     queryFn: () => base44.entities.Trade.filter({ subscription_id: subscriptionId }),
     enabled: !!subscriptionId,
-    refetchInterval: 2000
+    refetchInterval: 1000 // Refresh every second
   });
 
   const { data: user } = useQuery({
@@ -101,23 +101,33 @@ export default function BotRunner() {
               </div>
             </div>
           </div>
-          <Button
-            onClick={() => setIsRunning(!isRunning)}
-            size="lg"
-            className={isRunning ? "bg-red-600 hover:bg-red-500" : "bg-emerald-600 hover:bg-emerald-500"}
-          >
-            {isRunning ? (
-              <>
-                <Pause className="w-5 h-5 mr-2" />
-                Stop Bot
-              </>
-            ) : (
-              <>
-                <Play className="w-5 h-5 mr-2" />
-                Start Bot
-              </>
-            )}
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-700">
+              <div className="text-xs text-slate-400">Mode</div>
+              <div className="text-sm font-semibold text-emerald-400">TEST • Live Data</div>
+            </div>
+            <div className="bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-700">
+              <div className="text-xs text-slate-400">Total Trades</div>
+              <div className="text-sm font-semibold text-white">{trades.length}</div>
+            </div>
+            <Button
+              onClick={() => setIsRunning(!isRunning)}
+              size="lg"
+              className={isRunning ? "bg-red-600 hover:bg-red-500" : "bg-emerald-600 hover:bg-emerald-500"}
+            >
+              {isRunning ? (
+                <>
+                  <Pause className="w-5 h-5 mr-2" />
+                  Stop Bot
+                </>
+              ) : (
+                <>
+                  <Play className="w-5 h-5 mr-2" />
+                  Start Bot
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Live Stats */}

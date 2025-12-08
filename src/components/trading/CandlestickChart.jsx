@@ -88,33 +88,40 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
         </div>
         
         {/* Trade markers overlay */}
-        {recentTrades.length > 0 && (
-          <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-sm rounded-lg p-3 border border-slate-700">
-            <div className="text-xs text-slate-400 mb-2">Recent Bot Trades</div>
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {recentTrades.map((trade, idx) => (
-                <div
-                  key={idx}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs whitespace-nowrap ${
-                    trade.side === 'BUY' 
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                  }`}
-                >
-                  {trade.side === 'BUY' ? (
-                    <ArrowUpCircle className="w-3 h-3" />
-                  ) : (
-                    <ArrowDownCircle className="w-3 h-3" />
-                  )}
-                  <span>${trade.entry_price?.toFixed(2)}</span>
-                  <span className={trade.profit_loss >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                    {trade.profit_loss >= 0 ? '+' : ''}${trade.profit_loss?.toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                {recentTrades.length > 0 && (
+                  <div className="absolute bottom-4 left-4 right-4 bg-slate-900/95 backdrop-blur-sm rounded-lg p-3 border border-slate-700 shadow-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs text-slate-400">Live Bot Trades</div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                        <span className="text-xs text-emerald-400 font-semibold">ACTIVE</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                      {recentTrades.map((trade, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap font-medium transition-all hover:scale-105 ${
+                            trade.side === 'BUY' 
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : 'bg-red-500/20 text-red-300 border border-red-500/40'
+                          }`}
+                        >
+                          {trade.side === 'BUY' ? (
+                            <ArrowUpCircle className="w-4 h-4" />
+                          ) : (
+                            <ArrowDownCircle className="w-4 h-4" />
+                          )}
+                          <span className="text-white font-bold">${trade.entry_price?.toFixed(2)}</span>
+                          <span className="text-slate-400">→</span>
+                          <span className={trade.profit_loss >= 0 ? 'text-emerald-300 font-bold' : 'text-red-300 font-bold'}>
+                            {trade.profit_loss >= 0 ? '+' : ''}${Math.abs(trade.profit_loss)?.toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
       </CardContent>
     </Card>
   );
