@@ -27,12 +27,15 @@ export default function Portfolio() {
   // Simulate real-time price updates
   useEffect(() => {
     const interval = setInterval(() => {
-      setMarketData(prev => prev.map(asset => ({
-        ...asset,
-        price: asset.price * (1 + (Math.random() - 0.5) * 0.002),
-        change: asset.change + (Math.random() - 0.5) * 0.2,
-        value: asset.holdings * asset.price * (1 + (Math.random() - 0.5) * 0.002)
-      })));
+      setMarketData(prev => prev.map(asset => {
+        const newPrice = asset.price * (1 + (Math.random() - 0.5) * 0.002);
+        return {
+          ...asset,
+          price: newPrice,
+          change: asset.change + (Math.random() - 0.5) * 0.2,
+          value: asset.holdings * newPrice
+        };
+      }));
     }, 2000);
     return () => clearInterval(interval);
   }, []);
