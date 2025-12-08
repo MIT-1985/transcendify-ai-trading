@@ -16,6 +16,7 @@ import AIAnalysis from './pages/AIAnalysis';
 import Deposit from './pages/Deposit';
 import CustomStrategies from './pages/CustomStrategies';
 import BotWizard from './pages/BotWizard';
+import ConstantsLibrary from './pages/ConstantsLibrary';
 import __Layout from './Layout.jsx';
 
 
@@ -38,6 +39,7 @@ export const PAGES = {
     "Deposit": Deposit,
     "CustomStrategies": CustomStrategies,
     "BotWizard": BotWizard,
+    "ConstantsLibrary": ConstantsLibrary,
 }
 
 export const pagesConfig = {

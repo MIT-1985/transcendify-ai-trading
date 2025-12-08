@@ -15,7 +15,8 @@ import {
         Gift,
         TrendingUp,
         Crown,
-        Activity
+        Activity,
+        Database
       } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -40,6 +41,8 @@ export default function Layout({ children, currentPageName }) {
     { nameKey: 'tradingBots', page: 'Bots', icon: Bot },
     { nameKey: 'customStrategies', page: 'CustomStrategies', icon: Settings },
     { nameKey: 'backtesting', page: 'Backtesting', icon: Activity },
+    { nameKey: 'constantsLibrary', page: 'ConstantsLibrary', icon: Database },
+    { nameKey: 'botWizard', page: 'BotWizard', icon: Brain },
     { nameKey: 'fuelMiners', page: 'Miners', icon: Zap },
     { nameKey: 'deviceMining', page: 'DeviceMining', icon: Zap },
     { nameKey: 'aiAnalysis', page: 'AIAnalysis', icon: Brain },
