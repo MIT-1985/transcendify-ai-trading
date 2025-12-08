@@ -93,12 +93,7 @@ export default function PolygonConsole() {
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4">
       <div className="max-w-[1800px] mx-auto">
-        {/* Debug Info */}
-        {currentPrice === 0 && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4">
-            <div className="text-amber-400 text-sm">⚠️ Loading market data...</div>
-          </div>
-        )}
+
         
         {/* Top Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
