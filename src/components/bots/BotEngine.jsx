@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
 import { analyzeStrategy } from './TechnicalAnalysis';
 import { AILearningEngine } from './AILearningEngine';
+import { ConstantsService } from './ConstantsService';
 
 export function useBotEngine(subscription, vipLevel = 'none') {
   const [isRunning, setIsRunning] = useState(true); // Auto-start in test mode
@@ -24,11 +25,19 @@ export function useBotEngine(subscription, vipLevel = 'none') {
   useEffect(() => {
     if (!subscription || subscription.status !== 'active' || !isRunning) return;
 
-    // Initialize AI learning engine
+    // Initialize AI learning engine and TROK constants
     let learningEngine = null;
+    let trokConstants = [];
     const initLearning = async () => {
       const trades = await base44.entities.Trade.filter({ subscription_id: subscription.id });
       learningEngine = new AILearningEngine(subscription, trades);
+      
+      // Load TROK constants for strategy optimization
+      const bot = await base44.entities.TradingBot.filter({ id: subscription.bot_id });
+      if (bot[0]) {
+        trokConstants = await ConstantsService.getOptimizationConstants(bot[0].strategy);
+        console.log(`Loaded ${trokConstants.length} TROK constants for optimization`);
+      }
       
       // Run AI learning every 50 trades
       if (trades.length > 0 && trades.length % 50 === 0) {
@@ -94,9 +103,20 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const vipBoost = getVIPBoost(vipLevel);
         if (profitPct > 0) profitPct *= (1 + vipBoost);
 
-        // Get AI-adjusted parameters if available
+        // Get AI-adjusted parameters with TROK optimization
         let stopLoss = subscription.stop_loss || 5;
         let takeProfit = subscription.take_profit || 10;
+
+        // Apply TROK constant optimization if available
+        if (trokConstants.length > 0) {
+          const optimizedParams = ConstantsService.calculateOptimalParameters(trokConstants, {
+            stopLoss,
+            takeProfit,
+            positionSize: subscription.position_size || 0.01
+          });
+          stopLoss = optimizedParams.stopLoss;
+          takeProfit = optimizedParams.takeProfit;
+        }
         
         // Check if learning objectives are enabled
         if (learningEngine && subscription.learning_objectives) {

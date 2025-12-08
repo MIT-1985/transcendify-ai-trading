@@ -82,6 +82,28 @@ async function executeTask(base44, task) {
     throw new Error('Agent not found or inactive');
   }
 
+  // Load relevant TROK constants for the agent's domain
+  let relevantConstants = [];
+  try {
+    const domainMap = {
+      'data_analysis': 'Signal Processing',
+      'strategy_optimization': 'Artificial Intelligence',
+      'news_sentiment': 'Information Theory',
+      'risk_assessment': 'Economics',
+      'execution': 'DimGPT Grid'
+    };
+    
+    const domain = domainMap[agent.type];
+    if (domain) {
+      const constants = await base44.entities.GlobalIntelligenceLaw.filter({ domain });
+      relevantConstants = constants
+        .filter(c => (c.kpi_value || 0) >= 0.85 && c.use_cases_notes?.includes('AI optimization'))
+        .slice(0, 5);
+    }
+  } catch (e) {
+    console.log('Could not load constants:', e.message);
+  }
+
   // Create task record
   const agentTask = await base44.entities.AgentTask.create({
     agent_id,
@@ -99,13 +121,21 @@ async function executeTask(base44, task) {
       last_active: new Date().toISOString()
     });
 
-    // Execute task using AI
+    // Execute task using AI with TROK constants context
+    const constantsContext = relevantConstants.length > 0 ? `
+
+TROK Constants (Theory of Relative Optimizing Constants):
+${relevantConstants.map(c => `- ${c.law_principle}: ${c.formula_statement} (KPI: ${c.kpi_value?.toFixed(3)}, Use: ${c.use_cases_notes})`).join('\n')}
+
+Use these constants to inform your analysis and optimize recommendations.` : '';
+
     const prompt = `${AGENT_PROMPTS[agent.type]}
+${constantsContext}
 
 Task: ${task_type}
 Input: ${JSON.stringify(input_data, null, 2)}
 
-Analyze and provide your response in JSON format.`;
+Analyze using TROK constants and provide your response in JSON format.`;
 
     const response = await base44.integrations.Core.InvokeLLM({
       prompt,

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Wand2, Download, CheckCircle, AlertCircle, Copy, Play } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ConstantRecommendations from '@/components/wizard/ConstantRecommendations';
 
 export default function BotWizard() {
   const [step, setStep] = useState(1);
@@ -128,11 +129,13 @@ export default function BotWizard() {
 
         {/* Step 2: Parameters */}
         {step === 2 && (
-          <Card className="bg-slate-900 border-slate-800">
-            <CardHeader>
-              <CardTitle>Configure Parameters</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-6">
+            <div className="col-span-2">
+              <Card className="bg-slate-900 border-slate-800">
+                <CardHeader>
+                  <CardTitle>Configure Parameters</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Trading Pair</Label>
@@ -231,6 +234,18 @@ export default function BotWizard() {
               </div>
             </CardContent>
           </Card>
+        </div>
+        <div>
+          <ConstantRecommendations 
+            strategy={config.strategy}
+            currentParams={{
+              stopLoss: config.stopLoss,
+              takeProfit: config.takeProfit,
+              positionSize: config.positionSize
+            }}
+          />
+        </div>
+      </div>
         )}
 
         {/* Step 3: Review */}
