@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Activity, TrendingUp, TrendingDown } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
 export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
   const [currentPrice, setCurrentPrice] = useState(0);
   const [priceChange, setPriceChange] = useState(0);
   const [loading, setLoading] = useState(true);
+  const chartContainerRef = useRef(null);
 
   // Convert X:BTCUSD to BTCUSD for TradingView
   const tvSymbol = symbol.replace('X:', '').replace('USD', 'USD');
@@ -36,6 +37,9 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
     return () => clearInterval(interval);
   }, [symbol]);
 
+  // Recent trades overlay (last 20 trades)
+  const recentTrades = trades.slice(-20);
+
   return (
     <Card className="bg-slate-900/50 border-slate-800">
       <CardHeader>
@@ -57,16 +61,60 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
               </div>
             </div>
           </div>
+          {trades.length > 0 && (
+            <div className="text-right">
+              <div className="text-xs text-slate-500">Trade Markers</div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="flex items-center gap-1 text-emerald-400">
+                  <ArrowUpCircle className="w-3 h-3" />
+                  Buy
+                </span>
+                <span className="flex items-center gap-1 text-red-400">
+                  <ArrowDownCircle className="w-3 h-3" />
+                  Sell
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </CardHeader>
-      <CardContent className="p-0">
-        <div className="w-full h-[500px]">
+      <CardContent className="p-0 relative">
+        <div ref={chartContainerRef} className="w-full h-[500px]">
           <iframe
             src={`https://www.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=CRYPTO:${tvSymbol}&interval=60&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=0A0A0F&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&hideideas=1&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=en&utm_source=&utm_medium=widget_new&utm_campaign=chart&utm_term=CRYPTO:${tvSymbol}`}
             style={{ width: '100%', height: '100%', border: 'none' }}
             title="TradingView Chart"
           />
         </div>
+        
+        {/* Trade markers overlay */}
+        {recentTrades.length > 0 && (
+          <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-sm rounded-lg p-3 border border-slate-700">
+            <div className="text-xs text-slate-400 mb-2">Recent Bot Trades</div>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {recentTrades.map((trade, idx) => (
+                <div
+                  key={idx}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs whitespace-nowrap ${
+                    trade.side === 'BUY' 
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  }`}
+                >
+                  {trade.side === 'BUY' ? (
+                    <ArrowUpCircle className="w-3 h-3" />
+                  ) : (
+                    <ArrowDownCircle className="w-3 h-3" />
+                  )}
+                  <span>${trade.entry_price?.toFixed(2)}</span>
+                  <span className={trade.profit_loss >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                    {trade.profit_loss >= 0 ? '+' : ''}${trade.profit_loss?.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
