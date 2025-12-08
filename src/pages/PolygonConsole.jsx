@@ -36,6 +36,7 @@ export default function PolygonConsole() {
   const [currentPrice, setCurrentPrice] = useState(0);
   const [priceChange, setPriceChange] = useState(0);
   const [isChartLoading, setIsChartLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchPrice = async () => {
@@ -52,6 +53,7 @@ export default function PolygonConsole() {
         }
       } catch (error) {
         console.error('Error fetching price:', error);
+        setError('Failed to load market data');
       }
     };
 
@@ -59,6 +61,23 @@ export default function PolygonConsole() {
     const interval = setInterval(fetchPrice, 5000);
     return () => clearInterval(interval);
   }, [selectedPair]);
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0F] text-white p-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-400 text-xl mb-2">⚠️ Error Loading Page</div>
+          <div className="text-slate-400">{error}</div>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-blue-600 rounded-lg"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const tvSymbol = selectedPair.replace('X:', '').replace('USD', 'USD');
   const tvInterval = timeframe.label === '1m' ? '1' : timeframe.label === '5m' ? '5' : timeframe.label === '15m' ? '15' : timeframe.label === '30m' ? '30' : timeframe.label === '1h' ? '60' : timeframe.label === '6h' ? '360' : 'D';
