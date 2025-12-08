@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
         const strategy = bot.strategy;
         const capital = subscription.capital_allocated || 1000;
         
-        // Fetch current market price
+        // Fetch current market price and candles
         const polygonKey = Deno.env.get('POLYGON_API_KEY');
         const priceResponse = await fetch(
           `https://api.polygon.io/v2/last/trade/${symbol}?apiKey=${polygonKey}`
@@ -45,9 +45,86 @@ Deno.serve(async (req) => {
         const priceData = await priceResponse.json();
         const currentPrice = priceData.results?.p || 50000;
         
-        // Determine trade
-        const isBuy = Math.random() > 0.5;
-        const isWin = Math.random() > 0.35;
+        // Get historical candles for technical analysis
+        const toDate = new Date();
+        const fromDate = new Date(toDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const candlesResponse = await fetch(
+          `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/1/hour/${fromDate.toISOString().split('T')[0]}/${toDate.toISOString().split('T')[0]}?adjusted=true&sort=asc&apiKey=${polygonKey}`
+        );
+        const candlesData = await candlesResponse.json();
+        const candles = candlesData.results || [];
+        
+        // Technical analysis
+        let technicalSignal = 'HOLD';
+        let confidence = 0.5;
+        let stopLossPrice = currentPrice * 0.97;
+        let takeProfitPrice = currentPrice * 1.03;
+        
+        if (candles.length >= 50) {
+          const prices = candles.map(c => c.c);
+          
+          // Calculate RSI
+          const rsiValues = [];
+          for (let i = 14; i < prices.length; i++) {
+            const gains = [];
+            const losses = [];
+            for (let j = i - 14; j < i; j++) {
+              const change = prices[j + 1] - prices[j];
+              if (change > 0) gains.push(change);
+              else losses.push(Math.abs(change));
+            }
+            const avgGain = gains.reduce((a, b) => a + b, 0) / 14;
+            const avgLoss = losses.reduce((a, b) => a + b, 0) / 14;
+            const rs = avgGain / (avgLoss || 1);
+            const rsi = 100 - (100 / (1 + rs));
+            rsiValues.push(rsi);
+          }
+          const rsi = rsiValues[rsiValues.length - 1] || 50;
+          
+          // Calculate MACD
+          const ema12 = prices.map((_, i) => {
+            if (i < 12) return prices[i];
+            const slice = prices.slice(Math.max(0, i - 12), i + 1);
+            return slice.reduce((a, b, idx) => a + b * (2 / (12 + 1)) ** (slice.length - idx - 1), 0);
+          });
+          const ema26 = prices.map((_, i) => {
+            if (i < 26) return prices[i];
+            const slice = prices.slice(Math.max(0, i - 26), i + 1);
+            return slice.reduce((a, b, idx) => a + b * (2 / (26 + 1)) ** (slice.length - idx - 1), 0);
+          });
+          const macd = ema12[ema12.length - 1] - ema26[ema26.length - 1];
+          
+          // Bollinger Bands
+          const sma20 = prices.slice(-20).reduce((a, b) => a + b, 0) / 20;
+          const variance = prices.slice(-20).reduce((a, b) => a + Math.pow(b - sma20, 2), 0) / 20;
+          const std = Math.sqrt(variance);
+          const bbUpper = sma20 + (2 * std);
+          const bbLower = sma20 - (2 * std);
+          const bbPercentB = (currentPrice - bbLower) / (bbUpper - bbLower);
+          
+          // Combined signal
+          const buyScore = (rsi < 30 ? 1 : 0) + (macd > 0 ? 1 : 0) + (bbPercentB < 0.2 ? 1 : 0);
+          const sellScore = (rsi > 70 ? 1 : 0) + (macd < 0 ? 1 : 0) + (bbPercentB > 0.8 ? 1 : 0);
+          
+          if (buyScore >= 2) {
+            technicalSignal = 'BUY';
+            confidence = 0.7 + (buyScore * 0.1);
+            stopLossPrice = currentPrice * (1 - (subscription.stop_loss || 5) / 100);
+            takeProfitPrice = currentPrice * (1 + (subscription.take_profit || 10) / 100);
+          } else if (sellScore >= 2) {
+            technicalSignal = 'SELL';
+            confidence = 0.7 + (sellScore * 0.1);
+            stopLossPrice = currentPrice * (1 + (subscription.stop_loss || 5) / 100);
+            takeProfitPrice = currentPrice * (1 - (subscription.take_profit || 10) / 100);
+          }
+        }
+        
+        // Determine trade based on technical analysis
+        const shouldTrade = technicalSignal !== 'HOLD' && Math.random() < confidence;
+        if (!shouldTrade) continue;
+        
+        const isBuy = technicalSignal === 'BUY';
+        const isWin = Math.random() < confidence;
         
         let profitPct = 0;
         switch(strategy) {
@@ -60,6 +137,16 @@ Deno.serve(async (req) => {
         }
         
         profitPct *= (1 + vipBoost);
+        
+        // Apply stop-loss and take-profit
+        const stopLossPct = (subscription.stop_loss || 5);
+        const takeProfitPct = (subscription.take_profit || 10);
+        
+        if (profitPct < 0 && Math.abs(profitPct) > stopLossPct) {
+          profitPct = -stopLossPct; // Hit stop-loss
+        } else if (profitPct > 0 && profitPct > takeProfitPct) {
+          profitPct = takeProfitPct; // Hit take-profit
+        }
         
         const positionSize = Math.min(capital, capital * 0.25);
         const quantity = Number((positionSize / currentPrice).toFixed(8));
@@ -104,7 +191,7 @@ Deno.serve(async (req) => {
           entry_price: entryPrice,
           exit_price: exitPrice,
           execution_mode: 'SIM',
-          strategy_used: strategy,
+          strategy_used: `${strategy} (RSI:${rsiValues[rsiValues.length - 1]?.toFixed(0) || 'N/A'}, MACD:${macd?.toFixed(2) || 'N/A'}, Conf:${(confidence * 100).toFixed(0)}%)`,
           timestamp: new Date().toISOString(),
           created_by: subscription.created_by
         });
