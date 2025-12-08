@@ -191,82 +191,70 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
           <ComposedChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+            <defs>
+              <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4} />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05} />
+              </linearGradient>
+            </defs>
+
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+
             <XAxis 
               dataKey="time" 
-              stroke="#64748b" 
-              tick={{ fontSize: 10 }}
+              stroke="#475569" 
+              tick={{ fontSize: 10, fill: '#64748b' }}
               interval={Math.floor(chartData.length / 10)}
+              axisLine={{ stroke: '#1e293b' }}
             />
+
             <YAxis 
+              yAxisId="price"
               domain={['auto', 'auto']} 
-              stroke="#64748b"
-              tick={{ fontSize: 10 }}
+              stroke="#475569"
+              tick={{ fontSize: 10, fill: '#64748b' }}
+              axisLine={{ stroke: '#1e293b' }}
+              orientation="right"
             />
+
             <Tooltip content={<CustomTooltip />} />
-            
-            {/* Candlesticks */}
+
+            {/* Candlestick wicks */}
             <Bar 
-              dataKey="high"
-              shape={(props) => {
-                const { x, y, width, height, payload, yAxis } = props;
-                if (!payload || !payload.high || !yAxis) return null;
-                
-                const chartHeight = 400;
-                const priceRange = yAxis.domain[1] - yAxis.domain[0];
-                const pixelsPerUnit = chartHeight / priceRange;
-                
-                const highY = chartHeight - ((payload.high - yAxis.domain[0]) * pixelsPerUnit) + 10;
-                const lowY = chartHeight - ((payload.low - yAxis.domain[0]) * pixelsPerUnit) + 10;
-                const openY = chartHeight - ((payload.open - yAxis.domain[0]) * pixelsPerUnit) + 10;
-                const closeY = chartHeight - ((payload.close - yAxis.domain[0]) * pixelsPerUnit) + 10;
-                
-                const centerX = x + width / 2;
-                const bodyWidth = Math.max(8, Math.min(14, 700 / chartData.length));
-                const bodyX = centerX - bodyWidth / 2;
-                const bodyTop = Math.min(openY, closeY);
-                const bodyHeight = Math.max(Math.abs(closeY - openY), 2);
-                
-                const color = payload.isGreen ? '#10b981' : '#ef4444';
-                const darkColor = payload.isGreen ? '#059669' : '#dc2626';
-                
-                return (
-                  <g>
-                    {/* Wick */}
-                    <line
-                      x1={centerX}
-                      y1={highY}
-                      x2={centerX}
-                      y2={lowY}
-                      stroke={color}
-                      strokeWidth={2}
-                    />
-                    {/* Body */}
-                    <rect
-                      x={bodyX}
-                      y={bodyTop}
-                      width={bodyWidth}
-                      height={bodyHeight}
-                      fill={color}
-                      stroke={darkColor}
-                      strokeWidth={1.5}
-                    />
-                  </g>
-                );
-              }}
+              yAxisId="price"
+              dataKey={entry => [entry.low, entry.high]}
+              barSize={1}
             >
               {chartData.map((entry, index) => (
-                <Cell key={`candle-${index}`} />
+                <Cell 
+                  key={`wick-${index}`}
+                  fill={entry.isGreen ? '#10b981' : '#ef4444'}
+                />
               ))}
             </Bar>
-            
+
+            {/* Candlestick bodies */}
+            <Bar 
+              yAxisId="price"
+              dataKey={entry => [Math.min(entry.open, entry.close), Math.max(entry.open, entry.close)]}
+              barSize={8}
+            >
+              {chartData.map((entry, index) => (
+                <Cell 
+                  key={`body-${index}`}
+                  fill={entry.isGreen ? '#10b981' : '#ef4444'}
+                />
+              ))}
+            </Bar>
+
             {/* SMA Line */}
             <Line 
+              yAxisId="price"
               type="monotone" 
               data={chartData.map((d, i) => ({ ...d, sma: sma20[i] }))}
               dataKey="sma" 
               stroke="#3b82f6" 
-              strokeWidth={2}
+              strokeWidth={1.5}
               dot={false}
               connectNulls
             />
@@ -274,32 +262,32 @@ export default function CandlestickChart({ symbol = 'X:BTCUSD', trades = [] }) {
             {/* Trade Markers */}
             {tradeMarkers.length > 0 && (
               <Scatter 
+                yAxisId="price"
                 data={tradeMarkers} 
                 dataKey="price"
                 shape={(props) => {
                   const { cx, cy, payload } = props;
                   const isBuy = payload.side === 'BUY';
-                  const isProfit = payload.profit >= 0;
                   return (
                     <g>
                       <circle 
                         cx={cx} 
                         cy={cy} 
-                        r={8} 
+                        r={6} 
                         fill={isBuy ? '#10b981' : '#ef4444'}
-                        opacity={0.8}
+                        opacity={0.9}
                       />
                       {isBuy ? (
                         <path 
-                          d={`M ${cx} ${cy - 3} L ${cx} ${cy + 3} M ${cx - 3} ${cy} L ${cx + 3} ${cy}`} 
+                          d={`M ${cx} ${cy - 2} L ${cx} ${cy + 2} M ${cx - 2} ${cy} L ${cx + 2} ${cy}`} 
                           stroke="white" 
-                          strokeWidth={2}
+                          strokeWidth={1.5}
                         />
                       ) : (
                         <path 
-                          d={`M ${cx - 3} ${cy} L ${cx + 3} ${cy}`} 
+                          d={`M ${cx - 2} ${cy} L ${cx + 2} ${cy}`} 
                           stroke="white" 
-                          strokeWidth={2}
+                          strokeWidth={1.5}
                         />
                       )}
                     </g>
