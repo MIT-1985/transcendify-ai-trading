@@ -81,7 +81,14 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         else if (profitPct > 0 && profitPct > takeProfit) profitPct = takeProfit;
 
         const positionSize = Math.min(capital, (capital * 0.25));
-        const quantity = positionSize / currentPrice;
+        const quantity = Number((positionSize / currentPrice).toFixed(8));
+        
+        // Validate quantity
+        if (!quantity || isNaN(quantity) || quantity <= 0) {
+          console.log('Invalid quantity, skipping trade');
+          return;
+        }
+        
         let profit = (positionSize * profitPct) / 100;
         
         const baseFee = positionSize * 0.001;
@@ -89,21 +96,21 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const fee = baseFee * (1 - feeDiscount);
         profit -= fee;
 
-        const entryPrice = currentPrice * (1 + (Math.random() - 0.5) * 0.001);
-        const exitPrice = entryPrice * (1 + profitPct / 100);
+        const entryPrice = Number((currentPrice * (1 + (Math.random() - 0.5) * 0.001)).toFixed(2));
+        const exitPrice = Number((entryPrice * (1 + profitPct / 100)).toFixed(2));
 
         // Create real ORDER first
         const order = await base44.entities.Order.create({
           symbol: symbol,
           side: isBuy ? 'BUY' : 'SELL',
           type: 'MARKET',
-          quantity: quantity,
-          price: entryPrice,
+          quantity: Number(quantity.toFixed(8)),
+          price: Number(entryPrice.toFixed(2)),
           status: 'FILLED',
-          filled_quantity: quantity,
-          average_price: entryPrice,
-          total_value: positionSize,
-          fee: fee,
+          filled_quantity: Number(quantity.toFixed(8)),
+          average_price: Number(entryPrice.toFixed(2)),
+          total_value: Number(positionSize.toFixed(2)),
+          fee: Number(fee.toFixed(2)),
           execution_mode: 'SIM',
           filled_at: new Date().toISOString()
         });
@@ -113,13 +120,13 @@ export function useBotEngine(subscription, vipLevel = 'none') {
           subscription_id: subscription.id,
           symbol: symbol,
           side: isBuy ? 'BUY' : 'SELL',
-          quantity: quantity,
-          price: entryPrice,
-          total_value: positionSize,
-          fee: fee,
-          profit_loss: profit,
-          entry_price: entryPrice,
-          exit_price: exitPrice,
+          quantity: Number(quantity.toFixed(8)),
+          price: Number(entryPrice.toFixed(2)),
+          total_value: Number(positionSize.toFixed(2)),
+          fee: Number(fee.toFixed(2)),
+          profit_loss: Number(profit.toFixed(2)),
+          entry_price: Number(entryPrice.toFixed(2)),
+          exit_price: Number(exitPrice.toFixed(2)),
           execution_mode: 'SIM',
           strategy_used: `${strategy} (RSI:${analysis.indicators.rsi}, Conf:${(analysis.confidence * 100).toFixed(0)}%)`,
           timestamp: new Date().toISOString()
