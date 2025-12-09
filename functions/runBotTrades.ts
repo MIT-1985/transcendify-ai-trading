@@ -124,9 +124,8 @@ Deno.serve(async (req) => {
           }
         }
         
-        // Determine trade based on technical analysis
-        const shouldTrade = technicalSignal !== 'HOLD' ? Math.random() < confidence : Math.random() > 0.4;
-        if (!shouldTrade) continue;
+        // Always trade - bots must be active constantly
+        const shouldTrade = true;
         
         const isBuy = technicalSignal === 'BUY';
         const isWin = Math.random() < confidence;

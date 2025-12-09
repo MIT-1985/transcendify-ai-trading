@@ -53,8 +53,8 @@ export function useBotEngine(subscription, vipLevel = 'none') {
     const interval = setInterval(async () => {
       setElapsedSeconds(prev => prev + 1);
 
-      // Trade every 5-10 seconds to avoid rate limits
-      if (Math.random() > 0.7) {
+      // Trade constantly - every cycle has 90% chance to trade
+      if (Math.random() > 0.1) {
         const bot = await base44.entities.TradingBot.filter({ id: subscription.bot_id });
         if (!bot[0]) return;
 
@@ -66,20 +66,40 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const symbol = tradingPairs[Math.floor(Math.random() * tradingPairs.length)];
         {
         
-        // Analyze market using technical indicators
+        // Get AI-driven strategy from prompt if configured
+        let aiDecision = null;
+        if (subscription.ai_enabled && subscription.ai_prompt) {
+          try {
+            const recentTrades = await base44.entities.Trade.filter(
+              { subscription_id: subscription.id },
+              '-created_date',
+              5
+            );
+            const aiResponse = await base44.integrations.Core.InvokeLLM({
+              prompt: `${subscription.ai_prompt}\n\nCurrent Symbol: ${symbol}\nRecent Performance: ${recentTrades.map(t => `${t.side} ${t.profit_loss > 0 ? 'WIN' : 'LOSS'} $${t.profit_loss.toFixed(2)}`).join(', ')}\n\nShould I BUY, SELL, or HOLD? Reply with just one word.`,
+              add_context_from_internet: true
+            });
+            aiDecision = aiResponse.trim().toUpperCase();
+          } catch (e) {
+            console.log('AI decision failed, using technical analysis');
+          }
+        }
+        
+        // Analyze market using technical indicators + Polygon data
         const analysis = await analyzeStrategy(symbol, strategy);
         
-        // Trade based on analysis or random for high frequency
-        const shouldTrade = analysis.signal !== 'HOLD' || Math.random() > 0.3;
+        // Combine AI decision with technical analysis for better reactions
+        const finalSignal = aiDecision || analysis.signal;
+        const shouldTrade = finalSignal !== 'HOLD' || Math.random() > 0.2;
         
         const capital = subscription.capital_allocated || 1000;
         const currentPrice = analysis.currentPrice;
         
-        // Determine trade direction
+        // Determine trade direction from AI or technical analysis
         let isBuy;
-        if (analysis.signal === 'BUY') isBuy = true;
-        else if (analysis.signal === 'SELL') isBuy = false;
-        else isBuy = Math.random() > 0.5; // Random for HOLD signal
+        if (aiDecision === 'BUY' || analysis.signal === 'BUY') isBuy = true;
+        else if (aiDecision === 'SELL' || analysis.signal === 'SELL') isBuy = false;
+        else isBuy = Math.random() > 0.5;
         
         // Calculate profit based on technical analysis confidence and target
         const targetReached = Math.random() < (analysis.confidence || 0.6);
@@ -200,9 +220,9 @@ export function useBotEngine(subscription, vipLevel = 'none') {
           entry_price: Number(entryPrice.toFixed(2)),
           exit_price: Number(exitPrice.toFixed(2)),
           execution_mode: 'SIM',
-          strategy_used: `${strategy} (RSI:${analysis.indicators.rsi}, Conf:${(analysis.confidence * 100).toFixed(0)}%)`,
+          strategy_used: `${strategy} (${aiDecision ? 'AI:' + aiDecision : 'TA'} RSI:${analysis.indicators.rsi}, Conf:${(analysis.confidence * 100).toFixed(0)}%)`,
           timestamp: new Date().toISOString()
-        });
+          });
 
         const newProfit = currentProfit + profit;
         
@@ -227,7 +247,7 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         }
       }
-    }, 3000);
+    }, 2000); // Fast execution every 2 seconds
 
     return () => clearInterval(interval);
   }, [subscription, isRunning, currentProfit, queryClient, vipLevel]);
