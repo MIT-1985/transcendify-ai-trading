@@ -6,15 +6,20 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shield, TrendingUp, Grid3x3, DollarSign, Zap, Settings } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Shield, TrendingUp, Grid3x3, DollarSign, Zap, Settings, Clock, Activity, AlertTriangle, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import AIOptimizer from './AIOptimizer';
 
 export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
   const [config, setConfig] = useState({
     capital_allocated: bot?.min_capital || 1000,
+    risk_profile: 'moderate',
+    custom_strategy_enabled: false,
+    strategy_rules: [],
     stop_loss: bot?.default_stop_loss || 5,
     take_profit: bot?.default_take_profit || 10,
     grid_levels: bot?.grid_levels || 10,
@@ -25,11 +30,69 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
     momentum_threshold: bot?.momentum_threshold || 2,
     max_position_size: 25,
     trailing_stop: false,
+    trade_frequency: 'medium',
+    max_trades_per_hour: 10,
+    min_trade_interval: 2,
     trading_pairs: ['X:BTCUSD', 'X:ETHUSD', 'X:SOLUSD', 'X:XRPUSD', 'X:ADAUSD']
   });
 
   const [availableTickers, setAvailableTickers] = useState([]);
   const [loadingTickers, setLoadingTickers] = useState(false);
+
+  const { data: riskProfiles = [] } = useQuery({
+    queryKey: ['riskProfiles'],
+    queryFn: () => base44.entities.RiskProfile.list('-created_date')
+  });
+
+  const riskProfilePresets = {
+    conservative: {
+      stop_loss: 2,
+      take_profit: 5,
+      max_position_size: 10,
+      max_trades_per_hour: 3,
+      min_trade_interval: 10,
+      description: 'Lower risk, smaller profits, more stable'
+    },
+    moderate: {
+      stop_loss: 5,
+      take_profit: 10,
+      max_position_size: 25,
+      max_trades_per_hour: 10,
+      min_trade_interval: 2,
+      description: 'Balanced risk/reward ratio'
+    },
+    aggressive: {
+      stop_loss: 10,
+      take_profit: 20,
+      max_position_size: 50,
+      max_trades_per_hour: 30,
+      min_trade_interval: 1,
+      description: 'Higher risk, higher potential returns'
+    },
+    ultra: {
+      stop_loss: 15,
+      take_profit: 30,
+      max_position_size: 75,
+      max_trades_per_hour: 60,
+      min_trade_interval: 0.5,
+      description: 'Maximum risk, maximum potential'
+    }
+  };
+
+  const applyRiskProfile = (profile) => {
+    const preset = riskProfilePresets[profile];
+    if (preset) {
+      setConfig({
+        ...config,
+        risk_profile: profile,
+        stop_loss: preset.stop_loss,
+        take_profit: preset.take_profit,
+        max_position_size: preset.max_position_size,
+        max_trades_per_hour: preset.max_trades_per_hour,
+        min_trade_interval: preset.min_trade_interval
+      });
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -79,13 +142,80 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="capital" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-slate-800">
+        <Tabs defaultValue="risk" className="w-full">
+          <TabsList className="grid w-full grid-cols-5 bg-slate-800">
+            <TabsTrigger value="risk">Risk Profile</TabsTrigger>
             <TabsTrigger value="capital">Capital</TabsTrigger>
-            <TabsTrigger value="risk">Risk Management</TabsTrigger>
+            <TabsTrigger value="advanced">Advanced Risk</TabsTrigger>
             <TabsTrigger value="strategy">Strategy</TabsTrigger>
-            <TabsTrigger value="ai">AI Optimizer</TabsTrigger>
+            <TabsTrigger value="frequency">Frequency</TabsTrigger>
           </TabsList>
+
+          {/* Risk Profile Tab */}
+          <TabsContent value="risk" className="space-y-4 mt-4">
+            <div className="bg-slate-800/50 rounded-lg p-4 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-5 h-5 text-blue-400" />
+                <h3 className="font-semibold">Risk Profile Presets</h3>
+              </div>
+              <p className="text-sm text-slate-400">
+                Choose a risk profile that matches your trading style
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                {Object.entries(riskProfilePresets).map(([key, preset]) => (
+                  <button
+                    key={key}
+                    onClick={() => applyRiskProfile(key)}
+                    className={cn(
+                      "p-4 rounded-lg border-2 transition-all text-left",
+                      config.risk_profile === key
+                        ? "border-blue-500 bg-blue-500/10"
+                        : "border-slate-700 bg-slate-700/30 hover:border-slate-600"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold capitalize">{key}</span>
+                      {config.risk_profile === key && (
+                        <Shield className="w-4 h-4 text-blue-400" />
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">{preset.description}</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-slate-500">SL:</span>
+                        <span className="text-red-400 ml-1">{preset.stop_loss}%</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">TP:</span>
+                        <span className="text-emerald-400 ml-1">{preset.take_profit}%</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Pos:</span>
+                        <span className="text-blue-400 ml-1">{preset.max_position_size}%</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Freq:</span>
+                        <span className="text-purple-400 ml-1">{preset.max_trades_per_hour}/h</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5" />
+                  <div className="text-sm text-amber-300">
+                    <div className="font-semibold mb-1">Current Profile: {config.risk_profile}</div>
+                    <div className="text-xs text-amber-400/80">
+                      {riskProfilePresets[config.risk_profile]?.description}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
 
           {/* Capital Tab */}
           <TabsContent value="capital" className="space-y-4 mt-4">
@@ -134,28 +264,30 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
               </div>
 
               <div>
-                <Label className="text-slate-300 mb-2">Max Position Size (% of Capital)</Label>
-                <Input
-                  type="number"
-                  value={config.max_position_size}
-                  onChange={(e) => setConfig({ ...config, max_position_size: parseFloat(e.target.value) })}
-                  min={1}
+                <Label className="text-slate-300 mb-2">Capital Allocation per Trade: {config.max_position_size}%</Label>
+                <Slider
+                  value={[config.max_position_size]}
+                  onValueChange={([value]) => setConfig({ ...config, max_position_size: value })}
+                  min={5}
                   max={100}
-                  className="bg-slate-700 border-slate-600 text-white"
+                  step={5}
+                  className="mt-2"
                 />
-                <p className="text-xs text-slate-500 mt-1">
-                  Maximum ${((config.capital_allocated * config.max_position_size) / 100).toFixed(2)} per trade
-                </p>
+                <div className="flex justify-between text-xs text-slate-400 mt-1">
+                  <span>Conservative (5%)</span>
+                  <span>${((config.capital_allocated * config.max_position_size) / 100).toFixed(2)} per trade</span>
+                  <span>Aggressive (100%)</span>
+                </div>
               </div>
             </div>
           </TabsContent>
 
-          {/* Risk Management Tab */}
-          <TabsContent value="risk" className="space-y-4 mt-4">
+          {/* Advanced Risk Tab */}
+          <TabsContent value="advanced" className="space-y-4 mt-4">
             <div className="bg-slate-800/50 rounded-lg p-4 space-y-4">
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="w-5 h-5 text-red-400" />
-                <h3 className="font-semibold">Stop Loss & Take Profit</h3>
+                <h3 className="font-semibold">Advanced Risk Settings</h3>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -190,6 +322,21 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
                     Target: ${((config.capital_allocated * config.take_profit) / 100).toFixed(2)}
                   </p>
                 </div>
+              </div>
+
+              <div>
+                <Label className="text-slate-300 mb-2">Max Position Size: {config.max_position_size}%</Label>
+                <Slider
+                  value={[config.max_position_size]}
+                  onValueChange={([value]) => setConfig({ ...config, max_position_size: value })}
+                  min={5}
+                  max={100}
+                  step={5}
+                  className="mt-2"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Max ${((config.capital_allocated * config.max_position_size) / 100).toFixed(2)} per trade
+                </p>
               </div>
 
               <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
@@ -337,25 +484,82 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
             </div>
           </TabsContent>
 
-          {/* AI Optimizer Tab */}
-          <TabsContent value="ai" className="space-y-4 mt-4">
-            <AIOptimizer
-              bot={bot}
-              currentConfig={config}
-              onApplyRecommendations={(recommendations) => {
-                setConfig({
-                  ...config,
-                  stop_loss: recommendations.stop_loss || config.stop_loss,
-                  take_profit: recommendations.take_profit || config.take_profit,
-                  grid_levels: recommendations.grid_levels || config.grid_levels,
-                  grid_spacing: recommendations.grid_spacing || config.grid_spacing,
-                  dca_interval: recommendations.dca_interval || config.dca_interval,
-                  dca_amount: recommendations.dca_amount || config.dca_amount,
-                  momentum_period: recommendations.momentum_period || config.momentum_period,
-                  momentum_threshold: recommendations.momentum_threshold || config.momentum_threshold
-                });
-              }}
-            />
+          {/* Trade Frequency Tab */}
+          <TabsContent value="frequency" className="space-y-4 mt-4">
+            <div className="bg-slate-800/50 rounded-lg p-4 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-5 h-5 text-purple-400" />
+                <h3 className="font-semibold">Trade Frequency & Timing</h3>
+              </div>
+
+              <div>
+                <Label className="text-slate-300 mb-2">Max Trades per Hour: {config.max_trades_per_hour}</Label>
+                <Slider
+                  value={[config.max_trades_per_hour]}
+                  onValueChange={([value]) => setConfig({ ...config, max_trades_per_hour: value })}
+                  min={1}
+                  max={60}
+                  step={1}
+                  className="mt-2"
+                />
+                <div className="flex justify-between text-xs text-slate-400 mt-1">
+                  <span>Slow (1/hour)</span>
+                  <span>Fast (60/hour)</span>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-slate-300 mb-2">Min Interval Between Trades: {config.min_trade_interval}s</Label>
+                <Slider
+                  value={[config.min_trade_interval]}
+                  onValueChange={([value]) => setConfig({ ...config, min_trade_interval: value })}
+                  min={0.5}
+                  max={60}
+                  step={0.5}
+                  className="mt-2"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Prevents overtrading by enforcing minimum wait time
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={() => setConfig({ ...config, max_trades_per_hour: 3, min_trade_interval: 10 })}
+                  className="p-3 rounded-lg border border-slate-700 bg-slate-700/30 hover:border-blue-500 transition-all"
+                >
+                  <Activity className="w-5 h-5 text-green-400 mx-auto mb-1" />
+                  <div className="text-xs font-semibold">Slow</div>
+                  <div className="text-xs text-slate-500">~3/hour</div>
+                </button>
+                <button
+                  onClick={() => setConfig({ ...config, max_trades_per_hour: 10, min_trade_interval: 2 })}
+                  className="p-3 rounded-lg border border-slate-700 bg-slate-700/30 hover:border-blue-500 transition-all"
+                >
+                  <Activity className="w-5 h-5 text-blue-400 mx-auto mb-1" />
+                  <div className="text-xs font-semibold">Medium</div>
+                  <div className="text-xs text-slate-500">~10/hour</div>
+                </button>
+                <button
+                  onClick={() => setConfig({ ...config, max_trades_per_hour: 30, min_trade_interval: 1 })}
+                  className="p-3 rounded-lg border border-slate-700 bg-slate-700/30 hover:border-blue-500 transition-all"
+                >
+                  <Activity className="w-5 h-5 text-red-400 mx-auto mb-1" />
+                  <div className="text-xs font-semibold">Fast</div>
+                  <div className="text-xs text-slate-500">~30/hour</div>
+                </button>
+              </div>
+
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+                <div className="text-sm text-purple-300">
+                  <div className="font-semibold mb-1">Estimated Daily Trades</div>
+                  <div className="text-2xl">{(config.max_trades_per_hour * 24).toLocaleString()}</div>
+                  <div className="text-xs text-purple-400/80 mt-1">
+                    Based on max frequency • Actual may be lower
+                  </div>
+                </div>
+              </div>
+            </div>
           </TabsContent>
           </Tabs>
 
