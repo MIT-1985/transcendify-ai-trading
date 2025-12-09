@@ -52,7 +52,7 @@ export default function BotRunner() {
     queryKey: ['trades', subscriptionId],
     queryFn: () => base44.entities.Trade.filter({ subscription_id: subscriptionId }),
     enabled: !!subscriptionId,
-    refetchInterval: 1000 // Refresh every second
+    refetchInterval: 5000 // Refresh every 5 seconds to reduce load
   });
 
   const { data: user } = useQuery({

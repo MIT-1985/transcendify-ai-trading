@@ -59,9 +59,9 @@ export function useBotEngine(subscription, vipLevel = 'none') {
     const interval = setInterval(async () => {
       setElapsedSeconds(prev => prev + 1);
 
-      // Rate limiting - only trade every 5 seconds minimum
+      // Rate limiting - only trade every 10 seconds minimum
       const now = Date.now();
-      if (now - lastTradeTime < 5000) {
+      if (now - lastTradeTime < 10000) {
         return;
       }
 
@@ -156,13 +156,13 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         }, 3000);
       } catch (error) {
         if (error.message.includes('Rate limit')) {
-          console.log(`[BOT ${subscription.id}] Rate limited, waiting...`);
-          setLastTradeTime(now + 10000); // Wait extra 10s
+          console.log(`[BOT ${subscription.id}] Rate limited, waiting 30s...`);
+          setLastTradeTime(now + 30000); // Wait 30s on rate limit
         } else {
           console.error(`[BOT ${subscription.id}] ERROR:`, error.message);
         }
       }
-    }, 2000);
+    }, 15000); // Check every 15 seconds
 
     return () => clearInterval(interval);
   }, [subscription, isRunning, currentProfit, queryClient, vipLevel]);

@@ -34,22 +34,8 @@ export default function Dashboard() {
     queryFn: () => base44.entities.TradingBot.list()
   });
 
-  // Auto-run bot trades in background
-  useEffect(() => {
-    const runBotTrades = async () => {
-      try {
-        await base44.functions.invoke('runBotTrades');
-      } catch (error) {
-        console.error('Bot trade error:', error);
-      }
-    };
-    
-    // Run every 10 seconds to avoid rate limits
-    runBotTrades();
-    const botInterval = setInterval(runBotTrades, 10000);
-    
-    return () => clearInterval(botInterval);
-  }, []);
+  // Bots run automatically via BotEngine in BotRunner page
+  // No need to call them from Dashboard
 
   // Fetch real-time prices
   useEffect(() => {
