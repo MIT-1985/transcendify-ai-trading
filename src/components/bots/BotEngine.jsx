@@ -74,8 +74,17 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const symbol = tradingPairs[Math.floor(Math.random() * tradingPairs.length)];
         const capital = subscription.capital_allocated || 100;
         
-        // Use static price to avoid API rate limits
-        const currentPrice = 90000;
+        // Get real price from Polygon
+        let currentPrice = 90000;
+        try {
+          const priceData = await base44.functions.invoke('polygonMarketData', {
+            action: 'ticker',
+            symbol: symbol
+          });
+          currentPrice = priceData.data?.data?.results?.[0]?.c || 90000;
+        } catch (e) {
+          console.log(`[BOT ${subscription.id}] Using fallback price`);
+        }
         const isBuy = Math.random() > 0.5;
         const isWin = Math.random() > 0.3;
         
