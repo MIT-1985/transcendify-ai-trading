@@ -124,8 +124,10 @@ Deno.serve(async (req) => {
           }
         }
         
-        // Always trade - bots must be active constantly
+        // ALWAYS trade - no conditions, constant activity
         const shouldTrade = true;
+        
+        console.log(`[FUNCTION] Processing bot ${subscription.id} - Symbol: ${symbol}`);
         
         const isBuy = technicalSignal === 'BUY';
         const isWin = Math.random() < confidence;

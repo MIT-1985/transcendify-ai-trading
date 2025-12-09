@@ -6,7 +6,7 @@ import { AILearningEngine } from './AILearningEngine';
 import { ConstantsService } from './ConstantsService';
 
 export function useBotEngine(subscription, vipLevel = 'none') {
-  const [isRunning, setIsRunning] = useState(true); // Auto-start in test mode
+  const [isRunning, setIsRunning] = useState(subscription?.status === 'active'); // Start if active
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentProfit, setCurrentProfit] = useState(subscription?.total_profit || 0);
   const queryClient = useQueryClient();
@@ -23,7 +23,12 @@ export function useBotEngine(subscription, vipLevel = 'none') {
   };
 
   useEffect(() => {
-    if (!subscription || subscription.status !== 'active' || !isRunning) return;
+    if (!subscription || subscription.status !== 'active') return;
+    
+    // Force start if not running
+    if (!isRunning) {
+      setIsRunning(true);
+    }
 
     // Initialize AI learning engine and TROK constants
     let learningEngine = null;
@@ -53,8 +58,8 @@ export function useBotEngine(subscription, vipLevel = 'none') {
     const interval = setInterval(async () => {
       setElapsedSeconds(prev => prev + 1);
 
-      // Trade constantly - every cycle has 90% chance to trade
-      if (Math.random() > 0.1) {
+      // Trade constantly - ALWAYS trade every cycle
+      if (true) {
         const bot = await base44.entities.TradingBot.filter({ id: subscription.bot_id });
         if (!bot[0]) return;
 
@@ -88,11 +93,12 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         // Analyze market using technical indicators + Polygon data
         const analysis = await analyzeStrategy(symbol, strategy);
         
-        // Combine AI decision with technical analysis for better reactions
-        const finalSignal = aiDecision || analysis.signal;
-        const shouldTrade = finalSignal !== 'HOLD' || Math.random() > 0.2;
+        // ALWAYS execute trades - bots must be active
+        const shouldTrade = true;
         
         const capital = subscription.capital_allocated || 1000;
+        
+        console.log(`[BOT ${subscription.id}] Trading ${symbol} - Capital: $${capital}, Active: ${isRunning}`);
         const currentPrice = analysis.currentPrice;
         
         // Determine trade direction from AI or technical analysis
@@ -242,12 +248,14 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         });
 
         setCurrentProfit(newProfit);
+        console.log(`[BOT ${subscription.id}] Trade executed: ${isBuy ? 'BUY' : 'SELL'} ${symbol} - Profit: $${profit.toFixed(2)}`);
+
         queryClient.invalidateQueries({ queryKey: ['userSubscriptions'] });
         queryClient.invalidateQueries({ queryKey: ['trades'] });
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         }
-      }
-    }, 2000); // Fast execution every 2 seconds
+        }
+        }, 1500); // Ultra-fast execution every 1.5 seconds
 
     return () => clearInterval(interval);
   }, [subscription, isRunning, currentProfit, queryClient, vipLevel]);

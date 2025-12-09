@@ -44,8 +44,11 @@ export default function Dashboard() {
       }
     };
     
+    // Immediate first run
     runBotTrades();
-    const botInterval = setInterval(runBotTrades, 3000); // Run every 3 seconds
+
+    // Then run every 2 seconds for all bots
+    const botInterval = setInterval(runBotTrades, 2000);
     
     return () => clearInterval(botInterval);
   }, []);
