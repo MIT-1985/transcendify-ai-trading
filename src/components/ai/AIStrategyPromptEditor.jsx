@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Save, RotateCw, Lightbulb } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sparkles, Save, RotateCw, Lightbulb, Library } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { createPageUrl } from '../../utils';
 
 const PROMPT_TEMPLATES = {
   conservative: "Analyze {symbol} with focus on risk minimization. Use technical indicators to identify low-risk entry points. Prioritize capital preservation over aggressive gains. Set tight stop losses and take profits at 5-8% gains.",
@@ -23,6 +25,13 @@ export default function AIStrategyPromptEditor({ subscription, isOpen, onClose }
     subscription?.ai_prompt || PROMPT_TEMPLATES.conservative
   );
   const [selectedTemplate, setSelectedTemplate] = useState('conservative');
+  const [selectedLibraryPrompt, setSelectedLibraryPrompt] = useState('');
+
+  const { data: savedPrompts = [] } = useQuery({
+    queryKey: ['prompts'],
+    queryFn: () => base44.entities.AIPrompt.list('-times_used'),
+    enabled: isOpen
+  });
 
   const updatePromptMutation = useMutation({
     mutationFn: async () => {
@@ -77,6 +86,24 @@ export default function AIStrategyPromptEditor({ subscription, isOpen, onClose }
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Quick Link to Library */}
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-semibold text-blue-400 mb-1">Need inspiration?</div>
+                <div className="text-sm text-slate-300">Browse our Prompt Library for pre-built strategies</div>
+              </div>
+              <Button
+                onClick={() => window.location.href = createPageUrl('PromptLibrary')}
+                variant="outline"
+                className="border-blue-500 text-blue-400"
+              >
+                <Library className="w-4 h-4 mr-2" />
+                Open Library
+              </Button>
+            </div>
+          </div>
+
           {/* Info */}
           <div className="bg-blue-900/20 border border-blue-900 rounded-lg p-4">
             <div className="flex items-start gap-3">
@@ -89,9 +116,38 @@ export default function AIStrategyPromptEditor({ subscription, isOpen, onClose }
             </div>
           </div>
 
+          {/* Load from Library */}
+          {savedPrompts.length > 0 && (
+            <div>
+              <Label className="mb-3 block">Load from Your Library</Label>
+              <Select 
+                value={selectedLibraryPrompt} 
+                onValueChange={(value) => {
+                  setSelectedLibraryPrompt(value);
+                  const prompt = savedPrompts.find(p => p.id === value);
+                  if (prompt) {
+                    setCustomPrompt(prompt.prompt_text);
+                    toast.success('Prompt loaded from library');
+                  }
+                }}
+              >
+                <SelectTrigger className="bg-slate-800 border-slate-700">
+                  <SelectValue placeholder="Select a saved prompt..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {savedPrompts.map(prompt => (
+                    <SelectItem key={prompt.id} value={prompt.id}>
+                      {prompt.name} (v{prompt.version || 1}) - {prompt.category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Templates */}
           <div>
-            <Label className="mb-3 block">Quick Templates</Label>
+            <Label className="mb-3 block">Or Use Quick Templates</Label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {Object.keys(PROMPT_TEMPLATES).map((template) => (
                 <Button
