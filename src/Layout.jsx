@@ -45,6 +45,7 @@ export default function Layout({ children, currentPageName }) {
     { nameKey: 'customStrategies', page: 'CustomStrategies', icon: Settings },
     { nameKey: 'backtesting', page: 'Backtesting', icon: Activity },
     { nameKey: 'constantsLibrary', page: 'ConstantsLibrary', icon: Database },
+    { nameKey: 'promptLibrary', page: 'PromptLibrary', icon: Brain },
     { nameKey: 'botWizard', page: 'BotWizard', icon: Brain },
     { nameKey: 'agentOrchestrator', page: 'AgentOrchestrator', icon: Network },
     { nameKey: 'riskProfiles', page: 'RiskProfiles', icon: Shield },

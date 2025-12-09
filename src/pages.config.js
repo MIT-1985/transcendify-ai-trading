@@ -20,6 +20,7 @@ import ConstantsLibrary from './pages/ConstantsLibrary';
 import AgentOrchestrator from './pages/AgentOrchestrator';
 import RiskProfiles from './pages/RiskProfiles';
 import BotDashboard from './pages/BotDashboard';
+import PromptLibrary from './pages/PromptLibrary';
 import __Layout from './Layout.jsx';
 
 
@@ -46,6 +47,7 @@ export const PAGES = {
     "AgentOrchestrator": AgentOrchestrator,
     "RiskProfiles": RiskProfiles,
     "BotDashboard": BotDashboard,
+    "PromptLibrary": PromptLibrary,
 }
 
 export const pagesConfig = {
