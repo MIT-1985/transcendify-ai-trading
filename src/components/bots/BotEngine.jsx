@@ -6,9 +6,10 @@ import { AILearningEngine } from './AILearningEngine';
 import { ConstantsService } from './ConstantsService';
 
 export function useBotEngine(subscription, vipLevel = 'none') {
-  const [isRunning, setIsRunning] = useState(subscription?.status === 'active'); // Start if active
+  const [isRunning, setIsRunning] = useState(subscription?.status === 'active');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentProfit, setCurrentProfit] = useState(subscription?.total_profit || 0);
+  const [lastTradeTime, setLastTradeTime] = useState(0);
   const queryClient = useQueryClient();
 
   // VIP multipliers
@@ -58,31 +59,23 @@ export function useBotEngine(subscription, vipLevel = 'none') {
     const interval = setInterval(async () => {
       setElapsedSeconds(prev => prev + 1);
 
+      // Rate limiting - only trade every 5 seconds minimum
+      const now = Date.now();
+      if (now - lastTradeTime < 5000) {
+        return;
+      }
+
       try {
         const bot = await base44.entities.TradingBot.filter({ id: subscription.bot_id });
-        if (!bot[0]) {
-          console.error('[BOT ENGINE] Bot not found:', subscription.bot_id);
-          return;
-        }
+        if (!bot[0]) return;
 
         const tradingPairs = subscription.trading_pairs || ['X:BTCUSD'];
         const strategy = bot[0].strategy;
         const symbol = tradingPairs[Math.floor(Math.random() * tradingPairs.length)];
         const capital = subscription.capital_allocated || 100;
         
-        console.log(`[BOT ${subscription.id}] Trade cycle - ${symbol} ${strategy}`);
-        
-        // Get current price
-        let currentPrice = 45000;
-        try {
-          const priceData = await base44.functions.invoke('polygonMarketData', {
-            action: 'ticker',
-            symbol: symbol
-          });
-          currentPrice = priceData.data?.data?.results?.[0]?.c || currentPrice;
-        } catch (e) {
-          console.log('[BOT] Using default price');
-        }
+        // Use static price to avoid API rate limits
+        const currentPrice = 90000;
         const isBuy = Math.random() > 0.5;
         const isWin = Math.random() > 0.3;
         
@@ -114,7 +107,8 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const entryPrice = Number((currentPrice * (1 + (Math.random() - 0.5) * 0.001)).toFixed(2));
         const exitPrice = Number((entryPrice * (1 + profitPct / 100)).toFixed(2));
 
-        console.log(`[BOT ${subscription.id}] Creating trade - ${isBuy ? 'BUY' : 'SELL'} ${quantity.toFixed(8)} @ $${entryPrice}`);
+        setLastTradeTime(now);
+        console.log(`[BOT ${subscription.id}] Trade ${isBuy ? 'BUY' : 'SELL'} $${profit.toFixed(2)}`);
 
         await base44.entities.Order.create({
           symbol,
@@ -147,8 +141,6 @@ export function useBotEngine(subscription, vipLevel = 'none') {
           timestamp: new Date().toISOString()
         });
         
-        console.log(`[BOT ${subscription.id}] ✓ Trade done - P/L: $${profit.toFixed(2)}`);
-
         const newProfit = currentProfit + profit;
         await base44.entities.UserSubscription.update(subscription.id, {
           total_profit: newProfit,
@@ -156,11 +148,19 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         });
 
         setCurrentProfit(newProfit);
-        queryClient.invalidateQueries({ queryKey: ['userSubscriptions'] });
-        queryClient.invalidateQueries({ queryKey: ['trades'] });
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        
+        // Batch invalidate after 3 seconds to reduce queries
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['userSubscriptions'] });
+          queryClient.invalidateQueries({ queryKey: ['trades'] });
+        }, 3000);
       } catch (error) {
-        console.error(`[BOT ${subscription.id}] ERROR:`, error.message);
+        if (error.message.includes('Rate limit')) {
+          console.log(`[BOT ${subscription.id}] Rate limited, waiting...`);
+          setLastTradeTime(now + 10000); // Wait extra 10s
+        } else {
+          console.error(`[BOT ${subscription.id}] ERROR:`, error.message);
+        }
       }
     }, 2000);
 

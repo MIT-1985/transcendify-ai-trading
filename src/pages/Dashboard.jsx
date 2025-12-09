@@ -44,11 +44,9 @@ export default function Dashboard() {
       }
     };
     
-    // Immediate first run
+    // Run every 10 seconds to avoid rate limits
     runBotTrades();
-
-    // Then run every 2 seconds for all bots
-    const botInterval = setInterval(runBotTrades, 2000);
+    const botInterval = setInterval(runBotTrades, 10000);
     
     return () => clearInterval(botInterval);
   }, []);
