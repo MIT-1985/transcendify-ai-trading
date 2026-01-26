@@ -85,33 +85,37 @@ export default function Dashboard() {
   }, [totalProfit]);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
+    <div className="min-h-screen bg-[#0A0A0F] text-white p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex flex-col sm:flex-row items-start justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-            <p className="text-slate-400">Monitor your trading bots and market performance</p>
-            <div className="mt-3 flex items-center gap-2">
-              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-              <span className="text-emerald-400 text-sm font-semibold">Bots Running Live</span>
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2">Dashboard</h1>
+            <p className="text-slate-400 text-sm sm:text-base">Monitor your trading bots and market performance</p>
+            {activeBots > 0 && (
+              <div className="mt-3 flex items-center gap-2">
+                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                <span className="text-emerald-400 text-xs sm:text-sm font-semibold">Bots Running Live</span>
+              </div>
+            )}
           </div>
-          <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 border border-slate-700 rounded-xl p-5 min-w-[200px]">
-            <div className="text-xs text-slate-400 mb-1">Total Unrealised P&L</div>
-            <div className={`text-3xl font-bold ${unrealisedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+          <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 border border-slate-700 rounded-xl p-4 sm:p-5 w-full sm:min-w-[200px] sm:w-auto">
+            <div className="text-xs text-slate-400 mb-1">Total P&L</div>
+            <div className={`text-2xl sm:text-3xl font-bold ${unrealisedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
               {unrealisedPnL >= 0 ? '+' : ''}${unrealisedPnL.toFixed(2)}
             </div>
           </div>
         </div>
 
         {/* Real-Time Earnings */}
-        <div className="mb-8">
-          <RealTimeEarnings subscriptions={subscriptions} />
-        </div>
+        {activeBots > 0 && (
+          <div className="mb-6 sm:mb-8">
+            <RealTimeEarnings subscriptions={subscriptions} />
+          </div>
+        )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatsCard
             title="Active Bots"
             value={activeBots}
@@ -120,21 +124,24 @@ export default function Dashboard() {
           />
           <StatsCard
             title="Total Profit"
-            value={`$${totalProfit.toLocaleString()}`}
-            subtitle="+12.5% this month"
+            value={`$${totalProfit.toFixed(2)}`}
+            subtitle={totalProfit >= 0 ? 'Profit' : 'Loss'}
             icon={DollarSign}
-            trend="up"
+            trend={totalProfit >= 0 ? 'up' : 'down'}
           />
           <StatsCard
             title="Total Trades"
             value={totalTrades.toLocaleString()}
-            subtitle="Last 30 days"
+            subtitle="All time"
             icon={Activity}
           />
           <StatsCard
             title="Win Rate"
-            value="68.4%"
-            subtitle="+2.3% vs last month"
+            value={totalTrades > 0 ? `${((subscriptions.reduce((sum, s) => {
+              const profit = s.total_profit || 0;
+              return profit > 0 ? sum + 1 : sum;
+            }, 0) / subscriptions.length) * 100).toFixed(1)}%` : '0%'}
+            subtitle="Bot performance"
             icon={TrendingUp}
             trend="up"
           />
@@ -150,7 +157,7 @@ export default function Dashboard() {
               Live
             </span>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {prices.map((p, idx) => (
               <PriceCard
                 key={idx}

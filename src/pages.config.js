@@ -1,53 +1,55 @@
-import Dashboard from './pages/Dashboard';
-import PolygonConsole from './pages/PolygonConsole';
-import Bots from './pages/Bots';
-import Wallet from './pages/Wallet';
-import Referrals from './pages/Referrals';
-import Miners from './pages/Miners';
-import BotRunner from './pages/BotRunner';
-import Profile from './pages/Profile';
-import Portfolio from './pages/Portfolio';
-import Landing from './pages/Landing';
+import AIAnalysis from './pages/AIAnalysis';
+import AgentOrchestrator from './pages/AgentOrchestrator';
 import Backtesting from './pages/Backtesting';
 import BotAnalytics from './pages/BotAnalytics';
-import DeviceMining from './pages/DeviceMining';
-import VIPUpgrade from './pages/VIPUpgrade';
-import AIAnalysis from './pages/AIAnalysis';
-import Deposit from './pages/Deposit';
-import CustomStrategies from './pages/CustomStrategies';
-import BotWizard from './pages/BotWizard';
-import ConstantsLibrary from './pages/ConstantsLibrary';
-import AgentOrchestrator from './pages/AgentOrchestrator';
-import RiskProfiles from './pages/RiskProfiles';
 import BotDashboard from './pages/BotDashboard';
+import BotRunner from './pages/BotRunner';
+import BotWizard from './pages/BotWizard';
+import Bots from './pages/Bots';
+import ConstantsLibrary from './pages/ConstantsLibrary';
+import CustomStrategies from './pages/CustomStrategies';
+import Dashboard from './pages/Dashboard';
+import Deposit from './pages/Deposit';
+import DeviceMining from './pages/DeviceMining';
+import Home from './pages/Home';
+import Landing from './pages/Landing';
+import Miners from './pages/Miners';
+import PolygonConsole from './pages/PolygonConsole';
+import Portfolio from './pages/Portfolio';
+import Profile from './pages/Profile';
 import PromptLibrary from './pages/PromptLibrary';
+import Referrals from './pages/Referrals';
+import RiskProfiles from './pages/RiskProfiles';
+import VIPUpgrade from './pages/VIPUpgrade';
+import Wallet from './pages/Wallet';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "Dashboard": Dashboard,
-    "PolygonConsole": PolygonConsole,
-    "Bots": Bots,
-    "Wallet": Wallet,
-    "Referrals": Referrals,
-    "Miners": Miners,
-    "BotRunner": BotRunner,
-    "Profile": Profile,
-    "Portfolio": Portfolio,
-    "Landing": Landing,
+    "AIAnalysis": AIAnalysis,
+    "AgentOrchestrator": AgentOrchestrator,
     "Backtesting": Backtesting,
     "BotAnalytics": BotAnalytics,
-    "DeviceMining": DeviceMining,
-    "VIPUpgrade": VIPUpgrade,
-    "AIAnalysis": AIAnalysis,
-    "Deposit": Deposit,
-    "CustomStrategies": CustomStrategies,
-    "BotWizard": BotWizard,
-    "ConstantsLibrary": ConstantsLibrary,
-    "AgentOrchestrator": AgentOrchestrator,
-    "RiskProfiles": RiskProfiles,
     "BotDashboard": BotDashboard,
+    "BotRunner": BotRunner,
+    "BotWizard": BotWizard,
+    "Bots": Bots,
+    "ConstantsLibrary": ConstantsLibrary,
+    "CustomStrategies": CustomStrategies,
+    "Dashboard": Dashboard,
+    "Deposit": Deposit,
+    "DeviceMining": DeviceMining,
+    "Home": Home,
+    "Landing": Landing,
+    "Miners": Miners,
+    "PolygonConsole": PolygonConsole,
+    "Portfolio": Portfolio,
+    "Profile": Profile,
     "PromptLibrary": PromptLibrary,
+    "Referrals": Referrals,
+    "RiskProfiles": RiskProfiles,
+    "VIPUpgrade": VIPUpgrade,
+    "Wallet": Wallet,
 }
 
 export const pagesConfig = {

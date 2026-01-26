@@ -95,7 +95,7 @@ export default function Layout({ children, currentPageName }) {
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-1">
+        <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
           {navItems.map((item) => {
             const isActive = currentPageName === item.page;
             const Icon = item.icon;
@@ -112,10 +112,10 @@ export default function Layout({ children, currentPageName }) {
                     : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
                 )}
               >
-                <Icon className="w-5 h-5" />
-                <span className="font-medium">{t(item.nameKey)}</span>
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                <span className="font-medium text-sm">{t(item.nameKey)}</span>
                 {isActive && (
-                  <ChevronRight className="w-4 h-4 ml-auto" />
+                  <ChevronRight className="w-4 h-4 ml-auto flex-shrink-0" />
                 )}
               </Link>
             );
