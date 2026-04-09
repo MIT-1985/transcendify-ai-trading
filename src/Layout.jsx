@@ -18,7 +18,8 @@ import {
         Activity,
         Database,
         Network,
-        Shield
+        Shield,
+        Link2
       } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -52,6 +53,7 @@ export default function Layout({ children, currentPageName }) {
     { nameKey: 'fuelMiners', page: 'Miners', icon: Zap },
     { nameKey: 'deviceMining', page: 'DeviceMining', icon: Zap },
     { nameKey: 'aiAnalysis', page: 'AIAnalysis', icon: Brain },
+    { nameKey: 'connectBinance', page: 'ConnectBinance', icon: Link2, fallback: 'Connect Binance' },
     { nameKey: 'wallet', page: 'Wallet', icon: Users },
     { nameKey: 'deposit', page: 'Deposit', icon: TrendingUp },
     { nameKey: 'vipUpgrade', page: 'VIPUpgrade', icon: Crown },
@@ -113,7 +115,7 @@ export default function Layout({ children, currentPageName }) {
                 )}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
-                <span className="font-medium text-sm">{t(item.nameKey)}</span>
+                <span className="font-medium text-sm">{t(item.nameKey) || item.fallback || item.nameKey}</span>
                 {isActive && (
                   <ChevronRight className="w-4 h-4 ml-auto flex-shrink-0" />
                 )}

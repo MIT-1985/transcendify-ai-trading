@@ -1,0 +1,86 @@
+{
+  "name": "ExchangeConnection",
+  "type": "object",
+  "properties": {
+    "exchange": {
+      "type": "string",
+      "enum": [
+        "binance",
+        "coinbase",
+        "kraken",
+        "bybit",
+        "okx"
+      ],
+      "default": "binance"
+    },
+    "api_key_encrypted": {
+      "type": "string",
+      "description": "AES-256-GCM encrypted API key"
+    },
+    "api_secret_encrypted": {
+      "type": "string",
+      "description": "AES-256-GCM encrypted API secret"
+    },
+    "encryption_iv": {
+      "type": "string",
+      "description": "Base64 IVs separated by pipe"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "connected",
+        "disconnected",
+        "error",
+        "validating"
+      ],
+      "default": "disconnected"
+    },
+    "is_validated": {
+      "type": "boolean",
+      "default": false
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "balance_usdt": {
+      "type": "number",
+      "default": 0
+    },
+    "balances": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string"
+          },
+          "free": {
+            "type": "number"
+          },
+          "locked": {
+            "type": "number"
+          }
+        }
+      },
+      "description": "All non-zero balances"
+    },
+    "last_sync": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "label": {
+      "type": "string",
+      "description": "User-friendly label"
+    },
+    "listen_key": {
+      "type": "string",
+      "description": "Binance User Data Stream listen key"
+    }
+  },
+  "required": [
+    "exchange"
+  ]
+}
