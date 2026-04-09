@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Bot, Zap, Shield, TrendingUp, Sparkles } from 'lucide-react';
@@ -21,7 +23,32 @@ const riskColors = {
 };
 
 export default function BotCard({ bot, onSubscribe, isSubscribed }) {
+  const [loading, setLoading] = useState(false);
   const Icon = strategyIcons[bot.strategy] || Bot;
+
+  const handleSubscribe = async () => {
+    // Check if running in iframe (preview)
+    if (window.self !== window.top) {
+      alert('Checkout works only from the published app. Please open the app in a new tab.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await base44.functions.invoke('stripeCheckout', {
+        bot_id: bot.id,
+        success_url: `${window.location.origin}/PaymentSuccess?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${window.location.origin}/Bots`,
+      });
+      if (res.data?.url) {
+        window.location.href = res.data.url;
+      } else {
+        toast.error(res.data?.error || 'Failed to start checkout');
+      }
+    } catch (e) {
+      toast.error('Checkout failed: ' + e.message);
+    }
+    setLoading(false);
+  };
   
   return (
     <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 rounded-2xl p-6 hover:border-blue-500/50 transition-all duration-300 group">
@@ -67,14 +94,14 @@ export default function BotCard({ bot, onSubscribe, isSubscribed }) {
           )}
         </div>
         <Button 
-          onClick={() => onSubscribe(bot)}
-          disabled={isSubscribed}
+          onClick={isSubscribed ? undefined : handleSubscribe}
+          disabled={isSubscribed || loading}
           className={cn(
             "bg-blue-600 hover:bg-blue-500",
             isSubscribed && "bg-emerald-600 hover:bg-emerald-600"
           )}
         >
-          {isSubscribed ? 'Active' : 'Subscribe'}
+          {loading ? 'Loading...' : isSubscribed ? 'Active' : `Buy $${bot.price}`}
         </Button>
       </div>
     </div>
