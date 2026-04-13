@@ -37,7 +37,8 @@ export default function BotDashboard() {
     queryKey: ['userSubscriptions'],
     queryFn: () => base44.entities.UserSubscription.filter({ created_by: user?.email }),
     enabled: !!user,
-    refetchInterval: 3000
+    staleTime: 15000,
+    retry: false
   });
 
   const { data: bots = [] } = useQuery({

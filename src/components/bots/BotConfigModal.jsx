@@ -575,7 +575,7 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
             onClick={handleSubmit}
             className="flex-1 bg-blue-600 hover:bg-blue-500"
           >
-            Subscribe & Start Trading
+            Proceed to Payment →
           </Button>
         </div>
       </DialogContent>

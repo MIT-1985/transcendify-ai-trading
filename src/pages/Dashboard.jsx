@@ -27,25 +27,20 @@ export default function Dashboard() {
   const [unrealisedPnL, setUnrealisedPnL] = useState(0);
   const { user } = useAuth();
   
-  const { data: allSubscriptions = [], isLoading: loadingSubs } = useQuery({
-    queryKey: ['subscriptions'],
-    queryFn: () => base44.entities.UserSubscription.list()
-  });
-  const subscriptions = allSubscriptions.filter(s => !user || s.created_by === user.email);
-
-  const { data: exchangeConnections = [], refetch: refetchConnections } = useQuery({
-    queryKey: ['exchangeConnections', user?.email],
-    queryFn: async () => {
-      // Sync real balance from Binance first
-      try {
-        await base44.functions.invoke('binanceConnect', { action: 'test' });
-      } catch (e) {
-        console.log('Sync failed, showing cached balance');
-      }
-      return base44.entities.ExchangeConnection.filter({ created_by: user?.email });
-    },
+  const { data: subscriptions = [], isLoading: loadingSubs } = useQuery({
+    queryKey: ['subscriptions', user?.email],
+    queryFn: () => base44.entities.UserSubscription.filter({ created_by: user?.email }),
     enabled: !!user,
-    refetchInterval: 30000 // refresh every 30s
+    staleTime: 30000,
+    retry: false
+  });
+
+  const { data: exchangeConnections = [] } = useQuery({
+    queryKey: ['exchangeConnections', user?.email],
+    queryFn: () => base44.entities.ExchangeConnection.filter({ created_by: user?.email }),
+    enabled: !!user,
+    staleTime: 60000,
+    retry: false
   });
 
   const { data: bots = [] } = useQuery({
@@ -208,7 +203,7 @@ export default function Dashboard() {
               <MarketMetrics prices={prices} />
             </div>
 
-            {/* Binance Balances */}
+            {/* Exchange Balances */}
         {exchangeConnections.filter(c => c.status === 'connected').length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">

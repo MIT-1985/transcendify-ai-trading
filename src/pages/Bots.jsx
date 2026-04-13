@@ -17,35 +17,45 @@ export default function Bots() {
   
   const queryClient = useQueryClient();
 
+  const { data: user } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me()
+  });
+
   const { data: bots = [], isLoading } = useQuery({
     queryKey: ['bots'],
     queryFn: () => base44.entities.TradingBot.list()
   });
 
   const { data: subscriptions = [] } = useQuery({
-    queryKey: ['subscriptions'],
-    queryFn: () => base44.entities.UserSubscription.list()
+    queryKey: ['subscriptions', user?.email],
+    queryFn: () => base44.entities.UserSubscription.filter({ created_by: user?.email }),
+    enabled: !!user,
+    staleTime: 30000
   });
 
   const subscribeMutation = useMutation({
     mutationFn: async ({ bot, config }) => {
-      return base44.entities.UserSubscription.create({
+      if (window.self !== window.top) {
+        throw new Error('Checkout works only from the published app. Please open the app in a new tab.');
+      }
+      const res = await base44.functions.invoke('stripeCheckout', {
         bot_id: bot.id,
-        status: 'active',
-        start_date: new Date().toISOString().split('T')[0],
-        trading_pairs: bot.supported_markets?.slice(0, 3) || [],
-        ...config,
-        total_profit: 0,
-        total_trades: 0
+        bot_config: config,
+        success_url: `${window.location.origin}/PaymentSuccess?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${window.location.origin}/Bots`,
       });
+      if (res.data?.url) {
+        window.location.href = res.data.url;
+      } else {
+        throw new Error(res.data?.error || 'Failed to start checkout');
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
-      toast.success('Successfully subscribed to bot!');
       setSelectedBot(null);
     },
     onError: (error) => {
-      toast.error('Failed to subscribe: ' + error.message);
+      toast.error(error.message);
     }
   });
 
