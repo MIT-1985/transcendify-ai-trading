@@ -10,6 +10,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ConnectBinance from './pages/ConnectBinance';
+import ConnectOKX from './pages/ConnectOKX';
 import PaymentSuccess from './pages/PaymentSuccess';
 
 const { Pages, Layout, mainPage } = pagesConfig;
@@ -65,6 +66,11 @@ const AuthenticatedApp = () => {
       <Route path="/ConnectBinance" element={
             <LayoutWrapper currentPageName="ConnectBinance">
               <ConnectBinance />
+            </LayoutWrapper>
+          } />
+      <Route path="/ConnectOKX" element={
+            <LayoutWrapper currentPageName="ConnectOKX">
+              <ConnectOKX />
             </LayoutWrapper>
           } />
       <Route path="/PaymentSuccess" element={<PaymentSuccess />} />
