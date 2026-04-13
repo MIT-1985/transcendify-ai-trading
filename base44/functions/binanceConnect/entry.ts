@@ -58,7 +58,8 @@ function extractBalances(accountInfo) {
     .map(b => ({ asset: b.asset, free: parseFloat(b.free), locked: parseFloat(b.locked) }))
     .filter(b => b.free > 0 || b.locked > 0);
   const usdc = allBalances.find(b => b.asset === 'USDC');
-  const balanceUsdt = (usdc?.free || 0) + (usdc?.locked || 0);
+  const usdt = allBalances.find(b => b.asset === 'USDT');
+  const balanceUsdt = (usdc?.free || 0) + (usdc?.locked || 0) + (usdt?.free || 0) + (usdt?.locked || 0);
   return { allBalances, balanceUsdt };
 }
 
