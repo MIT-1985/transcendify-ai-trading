@@ -233,7 +233,6 @@ export default function OKXDashboard() {
   const okxConnections = connections.filter(c => c.status === 'connected');
   const totalBalance = okxConnections.reduce((sum, c) => sum + (c.balance_usdt || 0), 0);
 
-  // Bot trades (transactions)
   const botTrades = trades.slice().sort((a, b) => new Date(b.timestamp || b.created_date) - new Date(a.timestamp || a.created_date));
 
   return (
