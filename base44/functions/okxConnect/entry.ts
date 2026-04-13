@@ -8,7 +8,7 @@ async function sign(secret, message) {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
-async function okxRequest(apiKey, secret, passphrase, method, path, body = '') {
+async function okxRequest(apiKey, secret, passphrase, method, path, body = '', baseUrl = 'https://www.okx.com') {
   const timestamp = new Date().toISOString();
   const message = timestamp + method + path + body;
   const signature = await sign(secret, message);
@@ -21,7 +21,7 @@ async function okxRequest(apiKey, secret, passphrase, method, path, body = '') {
     'Content-Type': 'application/json'
   };
 
-  const res = await fetch('https://www.okx.com' + path, {
+  const res = await fetch(baseUrl + path, {
     method,
     headers,
     body: body || undefined
@@ -75,9 +75,19 @@ Deno.serve(async (req) => {
     const { api_key, api_secret, passphrase, label } = body;
 
     // Test the credentials first
-    const testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance');
+    console.log('Testing OKX connection for key:', api_key.substring(0, 8) + '...');
+    // Try main endpoint first, then AWS endpoint for EU users
+    let testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://www.okx.com');
+    console.log('OKX main endpoint - code:', testRes.code, 'msg:', testRes.msg);
+    
     if (testRes.code !== '0') {
-      return Response.json({ success: false, error: testRes.msg || 'Invalid credentials' });
+      // Try AWS endpoint (for EU/some regions)
+      testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://aws.okx.com');
+      console.log('OKX AWS endpoint - code:', testRes.code, 'msg:', testRes.msg);
+    }
+    
+    if (testRes.code !== '0') {
+      return Response.json({ success: false, error: testRes.msg || 'Invalid credentials', code: testRes.code });
     }
 
     // Encrypt and store
