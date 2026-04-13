@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, Bot, DollarSign, TrendingUp, Zap, BarChart3 } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
+import { Activity, Bot, DollarSign, TrendingUp, Zap, BarChart3, Wallet, Link2 } from 'lucide-react';
 import StatsCard from '@/components/trading/StatsCard';
 import PriceCard from '@/components/trading/PriceCard';
 import CandlestickChart from '@/components/trading/CandlestickChart';
@@ -23,10 +24,18 @@ const CRYPTO_SYMBOLS = [
 export default function Dashboard() {
   const [prices, setPrices] = useState([]);
   const [unrealisedPnL, setUnrealisedPnL] = useState(0);
+  const { user } = useAuth();
   
-  const { data: subscriptions = [], isLoading: loadingSubs } = useQuery({
+  const { data: allSubscriptions = [], isLoading: loadingSubs } = useQuery({
     queryKey: ['subscriptions'],
     queryFn: () => base44.entities.UserSubscription.list()
+  });
+  const subscriptions = allSubscriptions.filter(s => !user || s.created_by === user.email);
+
+  const { data: exchangeConnections = [] } = useQuery({
+    queryKey: ['exchangeConnections', user?.email],
+    queryFn: () => base44.entities.ExchangeConnection.filter({ created_by: user?.email }),
+    enabled: !!user
   });
 
   const { data: bots = [] } = useQuery({
@@ -180,7 +189,53 @@ export default function Dashboard() {
             </div>
             </div>
 
-            {/* Active Subscriptions */}
+            {/* Binance Balances */}
+        {exchangeConnections.filter(c => c.status === 'connected').length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Wallet className="w-5 h-5 text-yellow-400" />
+              <h2 className="text-xl font-semibold">My Exchange Balances</h2>
+              <span className="flex items-center gap-1 text-xs text-emerald-400 ml-2">
+                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                Live
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {exchangeConnections.filter(c => c.status === 'connected').map(conn => (
+                <div key={conn.id} className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                      <Link2 className="w-5 h-5 text-yellow-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold capitalize">{conn.exchange}</h4>
+                      <span className="text-xs text-emerald-400">● Connected</span>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <div className="text-xs text-slate-500">Total USDC</div>
+                      <div className="text-yellow-400 font-bold">${(conn.balance_usdt || 0).toFixed(2)}</div>
+                    </div>
+                  </div>
+                  {conn.balances && conn.balances.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      {conn.balances.filter(b => (b.free + b.locked) > 0).slice(0, 8).map(b => (
+                        <div key={b.asset} className="bg-slate-800/60 rounded-lg px-3 py-2 flex justify-between items-center">
+                          <span className="text-sm font-semibold text-white">{b.asset}</span>
+                          <div className="text-right">
+                            <div className="text-xs text-slate-300">{parseFloat(b.free).toFixed(4)}</div>
+                            {b.locked > 0 && <div className="text-xs text-slate-500">🔒 {parseFloat(b.locked).toFixed(4)}</div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Active Subscriptions */}
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Zap className="w-5 h-5 text-amber-400" />
