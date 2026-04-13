@@ -55,38 +55,41 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchPrices = async () => {
       try {
-        console.log('Fetching prices for', CRYPTO_SYMBOLS);
         const pricePromises = CRYPTO_SYMBOLS.map(async (symbol) => {
-          const response = await base44.functions.invoke('polygonMarketData', {
-            action: 'ticker',
-            symbol: symbol
-          });
-          
-          console.log(`Price response for ${symbol}:`, response.data);
-          
-          if (response.data?.success && response.data.data?.results?.[0]) {
-            const result = response.data.data.results[0];
-            return {
-              symbol: symbol.replace('X:', '').replace('USD', '/USD'),
-              price: result.c,
-              change: ((result.c - result.o) / result.o) * 100,
-              volume: result.v
-            };
+          try {
+            const response = await base44.functions.invoke('polygonMarketData', {
+              action: 'ticker',
+              symbol: symbol
+            });
+            
+            if (response?.data?.results?.[0]) {
+              const result = response.data.results[0];
+              return {
+                symbol: symbol.replace('X:', '').replace('USD', '/USD'),
+                price: result.c,
+                change: ((result.c - result.o) / result.o) * 100,
+                volume: result.v
+              };
+            }
+            return null;
+          } catch (err) {
+            console.error(`Error fetching ${symbol}:`, err.message);
+            return null;
           }
-          return null;
         });
 
         const results = await Promise.all(pricePromises);
         const validPrices = results.filter(p => p !== null);
-        console.log('Got', validPrices.length, 'valid prices:', validPrices);
-        setPrices(validPrices);
+        if (validPrices.length > 0) {
+          setPrices(validPrices);
+        }
       } catch (error) {
         console.error('Error fetching prices:', error);
       }
     };
 
     fetchPrices();
-    const interval = setInterval(fetchPrices, 5000); // Update every 5 seconds
+    const interval = setInterval(fetchPrices, 10000); // Update every 10 seconds
     return () => clearInterval(interval);
   }, []);
 
