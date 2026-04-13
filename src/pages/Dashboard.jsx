@@ -37,7 +37,7 @@ export default function Dashboard() {
     queryFn: async () => {
       // Sync real balance from Binance first
       try {
-        await base44.functions.invoke('binanceConnect', { action: 'sync' });
+        await base44.functions.invoke('binanceConnect', { action: 'test' });
       } catch (e) {
         console.log('Sync failed, showing cached balance');
       }
