@@ -19,7 +19,9 @@ export default function ConnectOKX() {
   const { data: connections = [], refetch } = useQuery({
     queryKey: ['okx-connections', user?.email],
     queryFn: () => base44.entities.ExchangeConnection.filter({ created_by: user?.email, exchange: 'okx' }),
-    enabled: !!user
+    enabled: !!user,
+    staleTime: 30000,
+    retry: false
   });
 
   const connected = connections.find(c => c.status === 'connected');
