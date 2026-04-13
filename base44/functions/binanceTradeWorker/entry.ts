@@ -27,7 +27,7 @@ async function hmacSign(secret, message) {
 
 async function binanceRequest(apiKey, apiSecret, endpoint, params = {}, method = 'GET') {
   const timestamp = Date.now();
-  const allParams = { ...params, timestamp: timestamp.toString(), recvWindow: '10000' };
+  const allParams = { ...params, timestamp: timestamp.toString(), recvWindow: '60000' };
   const queryString = new URLSearchParams(allParams).toString();
   const signature = await hmacSign(apiSecret, queryString);
   const url = `https://api.binance.com${endpoint}?${queryString}&signature=${signature}`;
@@ -36,8 +36,8 @@ async function binanceRequest(apiKey, apiSecret, endpoint, params = {}, method =
 }
 
 function toBinanceSymbol(symbol) {
-  // X:BTCUSD -> BTCUSDT, BTC/USDT -> BTCUSDT
-  return symbol.replace('X:', '').replace('/', '').replace(/USD$/, 'USDT');
+  // X:BTCUSD -> BTCUSDC, BTC/USDT -> BTCUSDC
+  return symbol.replace('X:', '').replace('/', '').replace(/USD$/, 'USDC').replace(/USDT$/, 'USDC');
 }
 
 // --- Main handler ---
@@ -75,11 +75,11 @@ Deno.serve(async (req) => {
       };
 
       if (type === 'MARKET') {
-        // For market buys, use quoteOrderQty (USDT amount) if quantity looks like a dollar amount
-        if (side === 'BUY' && quantity > 10) {
-          orderParams.quoteOrderQty = quantity.toFixed(2);
+        // For market BUYs use quoteOrderQty (USDC amount), for SELLs use quantity (asset amount)
+        if (side === 'BUY') {
+          orderParams.quoteOrderQty = parseFloat(quantity).toFixed(2);
         } else {
-          orderParams.quantity = quantity.toString();
+          orderParams.quantity = parseFloat(quantity).toFixed(8);
         }
       } else if (type === 'LIMIT') {
         orderParams.quantity = quantity.toString();
