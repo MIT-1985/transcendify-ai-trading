@@ -27,14 +27,19 @@ export default function ConnectOKX() {
   const handleConnect = async () => {
     setLoading(true);
     setResult(null);
-    const res = await base44.functions.invoke('okxConnect', { action: 'connect', api_key: apiKey, api_secret: apiSecret, passphrase, label });
-    setLoading(false);
-    if (res.data?.success) {
-      setResult({ type: 'success', message: 'OKX акаунтът е свързан успешно!' });
-      refetch();
-      setApiKey(''); setApiSecret(''); setPassphrase('');
-    } else {
-      setResult({ type: 'error', message: res.data?.error || 'Неуспешно свързване' });
+    try {
+      const res = await base44.functions.invoke('okxConnect', { action: 'connect', api_key: apiKey, api_secret: apiSecret, passphrase, label });
+      if (res.data?.success) {
+        setResult({ type: 'success', message: 'OKX акаунтът е свързан успешно!' });
+        refetch();
+        setApiKey(''); setApiSecret(''); setPassphrase('');
+      } else {
+        setResult({ type: 'error', message: res.data?.error || 'Неуспешно свързване' });
+      }
+    } catch (err) {
+      setResult({ type: 'error', message: err?.message || 'Грешка при свързване с OKX' });
+    } finally {
+      setLoading(false);
     }
   };
 

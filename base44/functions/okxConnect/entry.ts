@@ -76,15 +76,8 @@ Deno.serve(async (req) => {
 
     // Test the credentials first
     console.log('Testing OKX connection for key:', api_key.substring(0, 8) + '...');
-    // Try main endpoint first, then AWS endpoint for EU users
-    let testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://www.okx.com');
-    console.log('OKX main endpoint - code:', testRes.code, 'msg:', testRes.msg);
-    
-    if (testRes.code !== '0') {
-      // Try AWS endpoint (for EU/some regions)
-      testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://aws.okx.com');
-      console.log('OKX AWS endpoint - code:', testRes.code, 'msg:', testRes.msg);
-    }
+    const testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance');
+    console.log('OKX response - code:', testRes.code, 'msg:', testRes.msg);
     
     if (testRes.code !== '0') {
       return Response.json({ success: false, error: testRes.msg || 'Invalid credentials', code: testRes.code });
