@@ -13,13 +13,13 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createPageUrl } from '../utils';
 
-const CRYPTO_SYMBOLS = [
-  'X:BTCUSD',
-  'X:ETHUSD', 
-  'X:SOLUSD',
-  'X:XRPUSD',
-  'X:DOGEUSD',
-  'X:ADAUSD'
+const OKX_SYMBOLS = [
+  { instId: 'BTC-USDT', display: 'BTC/USDT' },
+  { instId: 'ETH-USDT', display: 'ETH/USDT' },
+  { instId: 'SOL-USDT', display: 'SOL/USDT' },
+  { instId: 'XRP-USDT', display: 'XRP/USDT' },
+  { instId: 'DOGE-USDT', display: 'DOGE/USDT' },
+  { instId: 'ADA-USDT', display: 'ADA/USDT' }
 ];
 
 export default function Dashboard() {
@@ -51,37 +51,32 @@ export default function Dashboard() {
   // Bots run automatically via BotEngine in BotRunner page
   // No need to call them from Dashboard
 
-  // Fetch real-time prices
+  // Fetch real-time prices from OKX
   useEffect(() => {
     const fetchPrices = async () => {
       try {
-        const pricePromises = CRYPTO_SYMBOLS.map(async (symbol) => {
-          try {
-            const response = await base44.functions.invoke('polygonMarketData', {
-              action: 'ticker',
-              symbol: symbol
-            });
-            
-            if (response?.data?.results?.[0]) {
-              const result = response.data.results[0];
+        const response = await base44.functions.invoke('okxMarketData', {
+          action: 'tickers',
+          symbols: OKX_SYMBOLS.map(s => s.instId)
+        });
+        
+        if (response?.data?.success && response?.data?.data) {
+          const priceData = OKX_SYMBOLS.map(symbol => {
+            const ticker = response.data.data.find(t => t.instId === symbol.instId);
+            if (ticker) {
               return {
-                symbol: symbol.replace('X:', '').replace('USD', '/USD'),
-                price: result.c,
-                change: ((result.c - result.o) / result.o) * 100,
-                volume: result.v
+                symbol: symbol.display,
+                price: parseFloat(ticker.price),
+                change: parseFloat(ticker.change),
+                volume: parseFloat(ticker.volume) * parseFloat(ticker.price)
               };
             }
             return null;
-          } catch (err) {
-            console.error(`Error fetching ${symbol}:`, err.message);
-            return null;
+          }).filter(p => p !== null);
+          
+          if (priceData.length > 0) {
+            setPrices(priceData);
           }
-        });
-
-        const results = await Promise.all(pricePromises);
-        const validPrices = results.filter(p => p !== null);
-        if (validPrices.length > 0) {
-          setPrices(validPrices);
         }
       } catch (error) {
         console.error('Error fetching prices:', error);
