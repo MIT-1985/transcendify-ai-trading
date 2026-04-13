@@ -41,9 +41,25 @@ async function binanceRequest(apiKey, apiSecret, endpoint, params = {}, method =
   const allParams = { ...params, timestamp: timestamp.toString(), recvWindow: '60000' };
   const queryString = new URLSearchParams(allParams).toString();
   const signature = await hmacSign(apiSecret, queryString);
-  const url = `https://api.binance.com${endpoint}?${queryString}&signature=${signature}`;
-  const response = await fetch(url, { method, headers: { 'X-MBX-APIKEY': apiKey } });
-  return response.json();
+  const hosts = ['https://api.binance.com', 'https://api1.binance.com', 'https://api2.binance.com', 'https://api3.binance.com', 'https://api4.binance.com', 'https://api-gcp.binance.com'];
+  let lastError = null;
+  for (const host of hosts) {
+    try {
+      const url = `${host}${endpoint}?${queryString}&signature=${signature}`;
+      const response = await fetch(url, { method, headers: { 'X-MBX-APIKEY': apiKey } });
+      const data = await response.json();
+      // Check for geo restriction FIRST before anything else
+      if (data.msg && (data.msg.includes('restricted location') || data.msg.includes('Service unavailable'))) {
+        lastError = data;
+        console.log(`Host ${host} geo-blocked, trying next...`);
+        continue;
+      }
+      return data;
+    } catch (e) {
+      lastError = { code: -1, msg: e.message };
+    }
+  }
+  return lastError || { code: -1, msg: 'All Binance hosts failed' };
 }
 
 async function getDecryptedKeys(conn) {
@@ -80,7 +96,7 @@ Deno.serve(async (req) => {
 
       const accountInfo = await binanceRequest(api_key, api_secret, '/api/v3/account');
       console.log('Binance connect response:', JSON.stringify(accountInfo).substring(0, 200));
-      if (accountInfo.code) {
+      if (accountInfo.code || (accountInfo.msg && accountInfo.msg.includes('restricted'))) {
         console.error('Binance error:', accountInfo.code, accountInfo.msg);
         return Response.json({ error: `Binance грешка: ${accountInfo.msg} (код: ${accountInfo.code})` }, { status: 400 });
       }
@@ -129,9 +145,9 @@ Deno.serve(async (req) => {
       const { apiKey, apiSecret } = await getDecryptedKeys(conn);
       const accountInfo = await binanceRequest(apiKey, apiSecret, '/api/v3/account');
 
-      if (accountInfo.code) {
+      if (accountInfo.code || (accountInfo.msg && accountInfo.msg.includes('restricted'))) {
         await base44.asServiceRole.entities.ExchangeConnection.update(conn.id, { status: 'error', is_validated: false });
-        return Response.json({ success: false, error: accountInfo.msg });
+        return Response.json({ success: false, error: accountInfo.msg || 'Binance API error' });
       }
 
       const { allBalances, balanceUsdt } = extractBalances(accountInfo);
