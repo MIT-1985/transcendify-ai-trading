@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { bot_id, success_url, cancel_url } = await req.json();
+    const { bot_id, bot_config, success_url, cancel_url } = await req.json();
 
     // Fetch bot details
     const bots = await base44.entities.TradingBot.filter({ id: bot_id });
@@ -49,10 +49,14 @@ Deno.serve(async (req) => {
         bot_strategy: bot.strategy || '',
         user_email: user.email,
         user_id: user.id,
-        trading_pairs: JSON.stringify(bot.supported_markets?.slice(0, 3) || []),
-        min_capital: String(bot.min_capital || 0),
-        stop_loss: String(bot.default_stop_loss || 5),
-        take_profit: String(bot.default_take_profit || 10),
+        trading_pairs: JSON.stringify(bot_config?.trading_pairs || bot.supported_markets?.slice(0, 3) || []),
+        min_capital: String(bot_config?.capital_allocated || bot.min_capital || 100),
+        stop_loss: String(bot_config?.stop_loss || bot.default_stop_loss || 5),
+        take_profit: String(bot_config?.take_profit || bot.default_take_profit || 10),
+        grid_levels: String(bot_config?.grid_levels || bot.grid_levels || 10),
+        grid_spacing: String(bot_config?.grid_spacing || bot.grid_spacing || 1),
+        dca_interval: String(bot_config?.dca_interval || bot.dca_interval || 60),
+        dca_amount: String(bot_config?.dca_amount || bot.dca_amount || 100),
       },
     });
 
