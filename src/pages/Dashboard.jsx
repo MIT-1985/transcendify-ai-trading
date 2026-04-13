@@ -32,10 +32,19 @@ export default function Dashboard() {
   });
   const subscriptions = allSubscriptions.filter(s => !user || s.created_by === user.email);
 
-  const { data: exchangeConnections = [] } = useQuery({
+  const { data: exchangeConnections = [], refetch: refetchConnections } = useQuery({
     queryKey: ['exchangeConnections', user?.email],
-    queryFn: () => base44.entities.ExchangeConnection.filter({ created_by: user?.email }),
-    enabled: !!user
+    queryFn: async () => {
+      // Sync real balance from Binance first
+      try {
+        await base44.functions.invoke('binanceConnect', { action: 'sync' });
+      } catch (e) {
+        console.log('Sync failed, showing cached balance');
+      }
+      return base44.entities.ExchangeConnection.filter({ created_by: user?.email });
+    },
+    enabled: !!user,
+    refetchInterval: 30000 // refresh every 30s
   });
 
   const { data: bots = [] } = useQuery({
