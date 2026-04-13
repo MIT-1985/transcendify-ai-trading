@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     const pubData = await pubRes.json();
     console.log('Public time:', JSON.stringify(pubData));
 
-    // Main endpoint
+    // Main www endpoint
     const ts1 = new Date().toISOString();
     const sig1 = await sign(apiSecret, ts1 + method + path);
     const res1 = await fetch('https://www.okx.com' + path, {
@@ -37,11 +37,27 @@ Deno.serve(async (req) => {
       }
     });
     const data1 = await res1.json();
-    console.log('Main OKX result - code:', data1.code, 'msg:', data1.msg);
+    console.log('www OKX result - code:', data1.code, 'msg:', data1.msg);
+
+    // EEA endpoint (production endpoint per docs)
+    const ts2 = new Date().toISOString();
+    const sig2 = await sign(apiSecret, ts2 + method + path);
+    const res2 = await fetch('https://eea.okx.com' + path, {
+      headers: {
+        'OK-ACCESS-KEY': apiKey,
+        'OK-ACCESS-SIGN': sig2,
+        'OK-ACCESS-TIMESTAMP': ts2,
+        'OK-ACCESS-PASSPHRASE': passphrase,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data2 = await res2.json();
+    console.log('EEA OKX result - code:', data2.code, 'msg:', data2.msg);
 
     return Response.json({
       public_time: pubData,
-      main_endpoint: { code: data1.code, msg: data1.msg, data: data1.data },
+      www_endpoint: { code: data1.code, msg: data1.msg },
+      eea_endpoint: { code: data2.code, msg: data2.msg },
       key_prefix: apiKey.substring(0, 8)
     });
   } catch (e) {

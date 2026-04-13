@@ -8,7 +8,7 @@ async function sign(secret, message) {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
-async function okxRequest(apiKey, secret, passphrase, method, path, body = '', baseUrl = 'https://www.okx.com') {
+async function okxRequest(apiKey, secret, passphrase, method, path, body = '', baseUrl = 'https://eea.okx.com') {
   const timestamp = new Date().toISOString();
   const message = timestamp + method + path + body;
   const signature = await sign(secret, message);
