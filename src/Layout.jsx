@@ -94,7 +94,7 @@ export default function Layout({ children, currentPageName }) {
           </div>
           <div>
             <span className="font-bold text-white text-lg">Transcendify</span>
-            <div className="text-xs text-slate-500">{language === 'bg' ? 'Платформа за Търговия' : language === 'de' ? 'Handelsplattform' : 'Trading Platform'}</div>
+            <div className="text-xs text-slate-500">{language === 'bg' ? 'AI Платформа за Автоматизирана Търговия' : language === 'de' ? 'KI-Handelsautomatisierungsplattform' : 'AI Trading Automation Platform'}</div>
           </div>
         </div>
 
