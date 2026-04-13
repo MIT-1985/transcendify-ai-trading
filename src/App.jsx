@@ -12,6 +12,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ConnectBinance from './pages/ConnectBinance';
 import ConnectOKX from './pages/ConnectOKX';
 import PaymentSuccess from './pages/PaymentSuccess';
+import OKXDashboard from './pages/OKXDashboard';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -74,6 +75,11 @@ const AuthenticatedApp = () => {
             </LayoutWrapper>
           } />
       <Route path="/PaymentSuccess" element={<PaymentSuccess />} />
+      <Route path="/OKXDashboard" element={
+            <LayoutWrapper currentPageName="OKXDashboard">
+              <OKXDashboard />
+            </LayoutWrapper>
+          } />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
