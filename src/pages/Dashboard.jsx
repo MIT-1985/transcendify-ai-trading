@@ -5,9 +5,10 @@ import { useAuth } from '@/lib/AuthContext';
 import { Activity, Bot, DollarSign, TrendingUp, Zap, BarChart3, Wallet, Link2 } from 'lucide-react';
 import StatsCard from '@/components/trading/StatsCard';
 import PriceCard from '@/components/trading/PriceCard';
-import CandlestickChart from '@/components/trading/CandlestickChart';
 import OrderBook from '@/components/trading/OrderBook';
 import RealTimeEarnings from '@/components/dashboard/RealTimeEarnings';
+import CryptoChart from '@/components/dashboard/CryptoChart';
+import MarketMetrics from '@/components/dashboard/MarketMetrics';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createPageUrl } from '../utils';
@@ -188,14 +189,23 @@ export default function Dashboard() {
             </div>
             </div>
 
-            {/* Trading Charts */}
+            {/* Interactive Chart */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div className="lg:col-span-2">
-            <CandlestickChart symbol="X:BTCUSD" trades={[]} />
+              <div className="lg:col-span-2">
+                <CryptoChart />
+              </div>
+              <div>
+                <OrderBook symbol="X:BTCUSD" />
+              </div>
             </div>
-            <div>
-            <OrderBook symbol="X:BTCUSD" />
-            </div>
+
+            {/* Market Metrics */}
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-4">
+                <Activity className="w-5 h-5 text-purple-400" />
+                <h2 className="text-xl font-semibold">Market Metrics</h2>
+              </div>
+              <MarketMetrics prices={prices} />
             </div>
 
             {/* Binance Balances */}
