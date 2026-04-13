@@ -6,29 +6,41 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Test OKX authenticated trading endpoint accessibility
-    const timestamp = new Date().toISOString();
-    const method = 'GET';
-    const path = '/api/v5/account/balance';
+    // Test OKX public endpoints - rate limits, instruments, trading rules
+    const tests = [
+      { name: 'Instruments (spot)', url: 'https://www.okx.com/api/v5/public/instruments?instType=SPOT&instId=BTC-USDT' },
+      { name: 'Order book depth', url: 'https://www.okx.com/api/v5/market/books?instId=BTC-USDT&sz=5' },
+      { name: 'Candlesticks 1m', url: 'https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1m&limit=5' },
+      { name: 'Ticker BTC', url: 'https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT' },
+      { name: 'All USDT pairs', url: 'https://www.okx.com/api/v5/public/instruments?instType=SPOT' },
+      { name: 'Fee schedule', url: 'https://www.okx.com/api/v5/public/discount-rate-interest-free-quota' },
+    ];
 
-    // Use dummy keys - a 401 means server is reachable, 403 = geo-blocked
-    const headers = {
-      'OK-ACCESS-KEY': 'test-key',
-      'OK-ACCESS-SIGN': 'test-sign',
-      'OK-ACCESS-TIMESTAMP': timestamp,
-      'OK-ACCESS-PASSPHRASE': 'test-pass',
-      'x-simulated-trading': '1', // testnet mode
-      'Content-Type': 'application/json'
-    };
+    const results = [];
+    for (const t of tests) {
+      try {
+        const r = await fetch(t.url, { headers: { 'Accept': 'application/json' } });
+        const json = await r.json();
+        // Extract trading limits from instruments
+        let info = json;
+        if (t.name.includes('Instruments') && json.data?.[0]) {
+          const d = json.data[0];
+          info = { minSz: d.minSz, lotSz: d.lotSz, tickSz: d.tickSz, maxLmtSz: d.maxLmtSz, maxMktSz: d.maxMktSz };
+        } else if (t.name.includes('Candlesticks')) {
+          info = { count: json.data?.length, sample: json.data?.[0] };
+        } else if (t.name.includes('All USDT')) {
+          info = { total_pairs: json.data?.length };
+        } else if (t.name.includes('Ticker')) {
+          const d = json.data?.[0];
+          info = { price: d?.last, bid: d?.bidPx, ask: d?.askPx, vol24h: d?.vol24h };
+        }
+        results.push({ name: t.name, status: r.status, data: info });
+      } catch(e) {
+        results.push({ name: t.name, error: e.message });
+      }
+    }
 
-    const r = await fetch('https://www.okx.com' + path, { headers });
-    const text = await r.text();
-    const isJson = text.trim().startsWith('{');
-
-    // Also test OKX demo trading
-    const r2 = await fetch('https://www.okx.com/api/v5/account/balance', { 
-      headers: { ...headers, 'x-simulated-trading': '1' } 
-    });
+    return Response.json({ results });
     const text2 = await r2.text();
 
     return Response.json({
