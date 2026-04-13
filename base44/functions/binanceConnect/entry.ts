@@ -38,7 +38,7 @@ async function hmacSign(secret, message) {
 
 async function binanceRequest(apiKey, apiSecret, endpoint, params = {}, method = 'GET') {
   const timestamp = Date.now();
-  const allParams = { ...params, timestamp: timestamp.toString(), recvWindow: '10000' };
+  const allParams = { ...params, timestamp: timestamp.toString(), recvWindow: '60000' };
   const queryString = new URLSearchParams(allParams).toString();
   const signature = await hmacSign(apiSecret, queryString);
   const url = `https://api.binance.com${endpoint}?${queryString}&signature=${signature}`;
@@ -57,8 +57,8 @@ function extractBalances(accountInfo) {
   const allBalances = (accountInfo.balances || [])
     .map(b => ({ asset: b.asset, free: parseFloat(b.free), locked: parseFloat(b.locked) }))
     .filter(b => b.free > 0 || b.locked > 0);
-  const usdt = allBalances.find(b => b.asset === 'USDT');
-  const balanceUsdt = (usdt?.free || 0) + (usdt?.locked || 0);
+  const usdc = allBalances.find(b => b.asset === 'USDC');
+  const balanceUsdt = (usdc?.free || 0) + (usdc?.locked || 0);
   return { allBalances, balanceUsdt };
 }
 
@@ -78,8 +78,10 @@ Deno.serve(async (req) => {
       if (!api_key || !api_secret) return Response.json({ error: 'API key and secret are required' }, { status: 400 });
 
       const accountInfo = await binanceRequest(api_key, api_secret, '/api/v3/account');
+      console.log('Binance connect response:', JSON.stringify(accountInfo).substring(0, 200));
       if (accountInfo.code) {
-        return Response.json({ error: `Binance: ${accountInfo.msg}`, code: accountInfo.code }, { status: 400 });
+        console.error('Binance error:', accountInfo.code, accountInfo.msg);
+        return Response.json({ error: `Binance грешка: ${accountInfo.msg} (код: ${accountInfo.code})` }, { status: 400 });
       }
 
       const permissions = accountInfo.permissions || [];

@@ -59,7 +59,7 @@ export default function ConnectBinance() {
     },
     onSuccess: (data) => {
       if (data.success) {
-        toast.success(`Връзката е OK! Баланс: ${data.balance_usdt?.toFixed(2)} USDT`);
+        toast.success(`Връзката е OK! Баланс: ${data.balance_usdt?.toFixed(2)} USDC`);
         queryClient.invalidateQueries({ queryKey: ['binance-connection'] });
       } else {
         toast.error(data.error || 'Тестът неуспешен');

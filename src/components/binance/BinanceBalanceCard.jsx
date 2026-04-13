@@ -12,7 +12,7 @@ export default function BinanceBalanceCard({ balanceUsdt = 0, balances = [] }) {
       </CardHeader>
       <CardContent>
         <div className="text-3xl font-bold text-white mb-4">
-          {balanceUsdt?.toFixed(2) || '0.00'} <span className="text-lg text-slate-400">USDT</span>
+          {balanceUsdt?.toFixed(2) || '0.00'} <span className="text-lg text-slate-400">USDC</span>
         </div>
         {balances?.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
