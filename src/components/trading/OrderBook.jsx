@@ -74,7 +74,7 @@ export default function OrderBook({ symbol = 'X:BTCUSD' }) {
     };
 
     fetchOrderBook();
-    const interval = setInterval(fetchOrderBook, 5000);
+    const interval = setInterval(fetchOrderBook, 30000);
     return () => clearInterval(interval);
   }, [symbol]);
 

@@ -32,6 +32,7 @@ export default function Dashboard() {
     queryFn: () => base44.entities.UserSubscription.filter({ created_by: user?.email }),
     enabled: !!user,
     staleTime: 30000,
+    refetchOnWindowFocus: false,
     retry: false
   });
 
@@ -40,6 +41,7 @@ export default function Dashboard() {
     queryFn: () => base44.entities.ExchangeConnection.filter({ created_by: user?.email }),
     enabled: !!user,
     staleTime: 60000,
+    refetchOnWindowFocus: false,
     retry: false
   });
 
@@ -84,7 +86,7 @@ export default function Dashboard() {
     };
 
     fetchPrices();
-    const interval = setInterval(fetchPrices, 10000); // Update every 10 seconds
+    const interval = setInterval(fetchPrices, 30000);
     return () => clearInterval(interval);
   }, []);
 
