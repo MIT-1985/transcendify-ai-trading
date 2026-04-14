@@ -8,7 +8,7 @@ async function sign(secret, message) {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
-async function okxRequest(apiKey, secret, passphrase, method, path, body = '', baseUrl = 'https://eea.okx.com') {
+async function okxRequest(apiKey, secret, passphrase, method, path, body = '', baseUrl = 'https://www.okx.com') {
   const timestamp = new Date().toISOString();
   const message = timestamp + method + path + body;
   const signature = await sign(secret, message);
@@ -76,8 +76,16 @@ Deno.serve(async (req) => {
 
     // Test the credentials first
     console.log('Testing OKX connection for key:', api_key.substring(0, 8) + '...');
-    const testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance');
-    console.log('OKX response - code:', testRes.code, 'msg:', testRes.msg);
+    
+    // Try main endpoint first, then EU endpoint
+    let testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://www.okx.com');
+    console.log('OKX www response - code:', testRes.code, 'msg:', testRes.msg);
+    
+    if (testRes.code !== '0') {
+      // Try EU endpoint as fallback
+      testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://eea.okx.com');
+      console.log('OKX eea response - code:', testRes.code, 'msg:', testRes.msg);
+    }
     
     if (testRes.code !== '0') {
       return Response.json({ success: false, error: testRes.msg || 'Invalid credentials', code: testRes.code });
@@ -102,7 +110,7 @@ Deno.serve(async (req) => {
     }
 
     // Find existing or create
-    const existing = await base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'okx' });
+    const existing = await base44.entities.ExchangeConnection.filter({ exchange: 'okx' });
     const data = {
       exchange: 'okx',
       api_key_encrypted: encKey,
@@ -117,7 +125,7 @@ Deno.serve(async (req) => {
     };
 
     if (existing.length > 0) {
-      await base44.asServiceRole.entities.ExchangeConnection.update(existing[0].id, data);
+      await base44.entities.ExchangeConnection.update(existing[0].id, data);
     } else {
       await base44.entities.ExchangeConnection.create(data);
     }
@@ -135,7 +143,10 @@ Deno.serve(async (req) => {
     const apiSecret = await decrypt(conn.api_secret_encrypted, MASTER_SECRET);
     const passphrase = await decrypt(conn.encryption_iv, MASTER_SECRET);
 
-    const res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance');
+    let res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://www.okx.com');
+    if (res.code !== '0') {
+      res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://eea.okx.com');
+    }
     if (res.code !== '0') return Response.json({ error: res.msg });
 
     const balances = [];
