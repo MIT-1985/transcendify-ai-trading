@@ -8,11 +8,10 @@ async function sign(secret, message) {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
-// EEA first for EU users (OKX requires EU users to use eea.okx.com)
+// Try www first (global), then eea (EU registered accounts)
 const OKX_ENDPOINTS = [
-  'https://eea.okx.com',
   'https://www.okx.com',
-  'https://aws.okx.com'
+  'https://eea.okx.com'
 ];
 
 async function okxRequest(apiKey, secret, passphrase, method, path, body = '', baseUrl = 'https://www.okx.com') {
@@ -90,12 +89,13 @@ Deno.serve(async (req) => {
       try {
         testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
         console.log(`OKX ${endpoint} response - code:`, testRes.code, 'msg:', testRes.msg);
-        // If we got a valid API response (even error), stop trying endpoints
-        // Only retry on network-level failures (no code) or geo-blocking (50000)
-        if (testRes.code !== undefined && testRes.code !== '50000') break;
+        // Stop only on success (code 0) or definitive auth errors (wrong password/signature)
+        // Continue trying other endpoints if key not found on this one (50119) or geo-blocked (50000)
+        if (testRes.code === '0') break;
+        if (testRes.code === '50102' || testRes.code === '50112' || testRes.code === '50113') break;
+        // 50119 = key not on this domain, try next endpoint
       } catch (networkErr) {
         console.log(`OKX ${endpoint} network error:`, networkErr.message);
-        // Continue to next endpoint on network error
       }
     }
     
@@ -166,7 +166,8 @@ Deno.serve(async (req) => {
     for (const endpoint of OKX_ENDPOINTS) {
       try {
         res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
-        if (res.code !== undefined && res.code !== '50000') break;
+        if (res.code === '0') break;
+        if (res.code === '50102' || res.code === '50112' || res.code === '50113') break;
       } catch (networkErr) {
         console.log(`OKX ${endpoint} network error:`, networkErr.message);
       }

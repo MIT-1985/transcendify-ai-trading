@@ -7,58 +7,52 @@ async function sign(secret, message) {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
+async function testEndpoint(url, apiKey, apiSecret, passphrase, path, method) {
+  const ts = new Date().toISOString();
+  const sig = await sign(apiSecret, ts + method + path);
+  const res = await fetch(url + path, {
+    headers: {
+      'OK-ACCESS-KEY': apiKey,
+      'OK-ACCESS-SIGN': sig,
+      'OK-ACCESS-TIMESTAMP': ts,
+      'OK-ACCESS-PASSPHRASE': passphrase,
+      'Content-Type': 'application/json'
+    }
+  });
+  const data = await res.json();
+  return { code: data.code, msg: data.msg, data: data.data };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const apiKey = 'cb70536d-aafa-4c39-af83-863b86ebaccc';
-    const apiSecret = '3C7385AF4CE9DD8B6161A2A69464F3C7';
-    const passphrase = 'Georgakiev1$';
+    const body = await req.json();
+    const apiKey = body.api_key;
+    const apiSecret = body.api_secret;
+    const passphrase = body.passphrase;
     const path = '/api/v5/account/balance';
     const method = 'GET';
 
-    // Test public endpoint first
+    console.log('Testing key:', apiKey?.substring(0, 8) + '...');
+
     const pubRes = await fetch('https://www.okx.com/api/v5/public/time');
     const pubData = await pubRes.json();
     console.log('Public time:', JSON.stringify(pubData));
 
-    // Main www endpoint
-    const ts1 = new Date().toISOString();
-    const sig1 = await sign(apiSecret, ts1 + method + path);
-    const res1 = await fetch('https://www.okx.com' + path, {
-      headers: {
-        'OK-ACCESS-KEY': apiKey,
-        'OK-ACCESS-SIGN': sig1,
-        'OK-ACCESS-TIMESTAMP': ts1,
-        'OK-ACCESS-PASSPHRASE': passphrase,
-        'Content-Type': 'application/json'
-      }
-    });
-    const data1 = await res1.json();
-    console.log('www OKX result - code:', data1.code, 'msg:', data1.msg);
+    const www = await testEndpoint('https://www.okx.com', apiKey, apiSecret, passphrase, path, method);
+    console.log('www result - code:', www.code, 'msg:', www.msg);
 
-    // EEA endpoint (production endpoint per docs)
-    const ts2 = new Date().toISOString();
-    const sig2 = await sign(apiSecret, ts2 + method + path);
-    const res2 = await fetch('https://eea.okx.com' + path, {
-      headers: {
-        'OK-ACCESS-KEY': apiKey,
-        'OK-ACCESS-SIGN': sig2,
-        'OK-ACCESS-TIMESTAMP': ts2,
-        'OK-ACCESS-PASSPHRASE': passphrase,
-        'Content-Type': 'application/json'
-      }
-    });
-    const data2 = await res2.json();
-    console.log('EEA OKX result - code:', data2.code, 'msg:', data2.msg);
+    const eea = await testEndpoint('https://eea.okx.com', apiKey, apiSecret, passphrase, path, method);
+    console.log('EEA result - code:', eea.code, 'msg:', eea.msg);
 
     return Response.json({
       public_time: pubData,
-      www_endpoint: { code: data1.code, msg: data1.msg },
-      eea_endpoint: { code: data2.code, msg: data2.msg },
-      key_prefix: apiKey.substring(0, 8)
+      www: { code: www.code, msg: www.msg },
+      eea: { code: eea.code, msg: eea.msg },
+      key_tested: apiKey?.substring(0, 8) + '...'
     });
   } catch (e) {
     console.error('Error:', e.message);
