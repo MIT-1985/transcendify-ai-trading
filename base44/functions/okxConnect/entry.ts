@@ -8,6 +8,12 @@ async function sign(secret, message) {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
+const OKX_ENDPOINTS = [
+  'https://www.okx.com',
+  'https://eea.okx.com',
+  'https://aws.okx.com'
+];
+
 async function okxRequest(apiKey, secret, passphrase, method, path, body = '', baseUrl = 'https://www.okx.com') {
   const timestamp = new Date().toISOString();
   const message = timestamp + method + path + body;
@@ -77,18 +83,16 @@ Deno.serve(async (req) => {
     // Test the credentials first
     console.log('Testing OKX connection for key:', api_key.substring(0, 8) + '...');
     
-    // Try main endpoint first, then EU endpoint
-    let testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://www.okx.com');
-    console.log('OKX www response - code:', testRes.code, 'msg:', testRes.msg);
-    
-    if (testRes.code !== '0') {
-      // Try EU endpoint as fallback
-      testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://eea.okx.com');
-      console.log('OKX eea response - code:', testRes.code, 'msg:', testRes.msg);
+    // Try all endpoints until one works
+    let testRes = null;
+    for (const endpoint of OKX_ENDPOINTS) {
+      testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
+      console.log(`OKX ${endpoint} response - code:`, testRes.code, 'msg:', testRes.msg);
+      if (testRes.code === '0') break;
     }
     
-    if (testRes.code !== '0') {
-      return Response.json({ success: false, error: testRes.msg || 'Invalid credentials', code: testRes.code });
+    if (!testRes || testRes.code !== '0') {
+      return Response.json({ success: false, error: testRes?.msg || 'Invalid credentials', code: testRes?.code });
     }
 
     // Encrypt and store
@@ -143,11 +147,12 @@ Deno.serve(async (req) => {
     const apiSecret = await decrypt(conn.api_secret_encrypted, MASTER_SECRET);
     const passphrase = await decrypt(conn.encryption_iv, MASTER_SECRET);
 
-    let res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://www.okx.com');
-    if (res.code !== '0') {
-      res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', 'https://eea.okx.com');
+    let res = null;
+    for (const endpoint of OKX_ENDPOINTS) {
+      res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
+      if (res.code === '0') break;
     }
-    if (res.code !== '0') return Response.json({ error: res.msg });
+    if (!res || res.code !== '0') return Response.json({ error: res?.msg || 'Failed to fetch balance' });
 
     const balances = [];
     let balanceUsdt = 0;
