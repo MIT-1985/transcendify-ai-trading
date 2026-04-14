@@ -30,7 +30,7 @@ export default function ConnectOKX() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await base44.functions.invoke('okxConnect', { action: 'connect', api_key: apiKey, api_secret: apiSecret, passphrase, label });
+      const res = await base44.functions.invoke('okxConnect', { action: 'connect', api_key: apiKey.trim(), api_secret: apiSecret.trim(), passphrase: passphrase.trim(), label });
       if (res.data?.success) {
         setResult({ type: 'success', message: 'OKX акаунтът е свързан успешно!' });
         refetch();
@@ -39,7 +39,19 @@ export default function ConnectOKX() {
         setResult({ type: 'error', message: res.data?.error || 'Неуспешно свързване' });
       }
     } catch (err) {
-      setResult({ type: 'error', message: err?.message || 'Грешка при свързване с OKX' });
+      // Network error - retry once
+      try {
+        const res2 = await base44.functions.invoke('okxConnect', { action: 'connect', api_key: apiKey.trim(), api_secret: apiSecret.trim(), passphrase: passphrase.trim(), label });
+        if (res2.data?.success) {
+          setResult({ type: 'success', message: 'OKX акаунтът е свързан успешно!' });
+          refetch();
+          setApiKey(''); setApiSecret(''); setPassphrase('');
+        } else {
+          setResult({ type: 'error', message: res2.data?.error || 'Неуспешно свързване' });
+        }
+      } catch (err2) {
+        setResult({ type: 'error', message: 'Мрежова грешка. Моля, опитайте отново след малко.' });
+      }
     } finally {
       setLoading(false);
     }
