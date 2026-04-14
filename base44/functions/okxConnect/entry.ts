@@ -83,16 +83,30 @@ Deno.serve(async (req) => {
     // Test the credentials first
     console.log('Testing OKX connection for key:', api_key.substring(0, 8) + '...');
     
-    // Try all endpoints until one works
+    // Try all endpoints until one works (for geo-blocking issues)
     let testRes = null;
     for (const endpoint of OKX_ENDPOINTS) {
-      testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
-      console.log(`OKX ${endpoint} response - code:`, testRes.code, 'msg:', testRes.msg);
-      if (testRes.code === '0') break;
+      try {
+        testRes = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
+        console.log(`OKX ${endpoint} response - code:`, testRes.code, 'msg:', testRes.msg);
+        // If we got a valid API response (even error), stop trying endpoints
+        // Only retry on network-level failures (no code) or geo-blocking (50000)
+        if (testRes.code !== undefined && testRes.code !== '50000') break;
+      } catch (networkErr) {
+        console.log(`OKX ${endpoint} network error:`, networkErr.message);
+        // Continue to next endpoint on network error
+      }
     }
     
     if (!testRes || testRes.code !== '0') {
-      return Response.json({ success: false, error: testRes?.msg || 'Invalid credentials', code: testRes?.code });
+      let errorMsg = testRes?.msg || 'Invalid credentials';
+      if (testRes?.code === '50102') errorMsg = 'Timestamp expired - check your device time';
+      if (testRes?.code === '50111') errorMsg = 'Invalid API Key';
+      if (testRes?.code === '50112') errorMsg = 'Invalid passphrase';
+      if (testRes?.code === '50113') errorMsg = 'Invalid signature - check your API Secret';
+      if (testRes?.code === '50119') errorMsg = 'API key does not exist';
+      console.log('OKX connection failed:', errorMsg, 'code:', testRes?.code);
+      return Response.json({ success: false, error: errorMsg, code: testRes?.code });
     }
 
     // Encrypt and store
@@ -113,8 +127,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Find existing or create
-    const existing = await base44.entities.ExchangeConnection.filter({ exchange: 'okx' });
+    // Find existing or create - filter by user!
+    const existing = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'okx' });
     const data = {
       exchange: 'okx',
       api_key_encrypted: encKey,
@@ -149,8 +163,12 @@ Deno.serve(async (req) => {
 
     let res = null;
     for (const endpoint of OKX_ENDPOINTS) {
-      res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
-      if (res.code === '0') break;
+      try {
+        res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
+        if (res.code !== undefined && res.code !== '50000') break;
+      } catch (networkErr) {
+        console.log(`OKX ${endpoint} network error:`, networkErr.message);
+      }
     }
     if (!res || res.code !== '0') return Response.json({ error: res?.msg || 'Failed to fetch balance' });
 
