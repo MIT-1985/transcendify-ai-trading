@@ -8,9 +8,10 @@ async function sign(secret, message) {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
+// EEA first for EU users (OKX requires EU users to use eea.okx.com)
 const OKX_ENDPOINTS = [
-  'https://www.okx.com',
   'https://eea.okx.com',
+  'https://www.okx.com',
   'https://aws.okx.com'
 ];
 

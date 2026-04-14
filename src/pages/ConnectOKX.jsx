@@ -161,16 +161,27 @@ export default function ConnectOKX() {
           <h3 className="font-semibold mb-4 flex items-center gap-2">
             <Shield className="w-5 h-5 text-blue-400" /> Как да създадете API ключ в OKX
           </h3>
+          {/* EU Warning */}
+          <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+            <p className="text-yellow-400 text-xs font-semibold mb-1">⚠️ За потребители в ЕС (Германия, България и др.)</p>
+            <p className="text-slate-400 text-xs">OKX изисква регистрация на <strong className="text-white">eea.okx.com</strong> за европейски потребители. Използвайте API ключове от вашия EEA акаунт.</p>
+          </div>
+
           <ol className="space-y-3 text-sm text-slate-400">
-            <li className="flex gap-3"><span className="text-blue-400 font-bold">1.</span> Влезте в OKX акаунта си</li>
+            <li className="flex gap-3"><span className="text-blue-400 font-bold">1.</span> Влезте в OKX акаунта си (ЕС: <strong className="text-white">eea.okx.com</strong>)</li>
             <li className="flex gap-3"><span className="text-blue-400 font-bold">2.</span> Отидете на <strong className="text-white">Профил → API Management</strong></li>
             <li className="flex gap-3"><span className="text-blue-400 font-bold">3.</span> Кликнете <strong className="text-white">Create API Key</strong></li>
             <li className="flex gap-3"><span className="text-blue-400 font-bold">4.</span> Изберете <strong className="text-white">Trade</strong> разрешения (НЕ включвайте Withdraw)</li>
             <li className="flex gap-3"><span className="text-blue-400 font-bold">5.</span> Копирайте API Key, Secret и Passphrase</li>
           </ol>
-          <a href="https://www.okx.com/account/my-api" target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm">
-            <ExternalLink className="w-4 h-4" /> Отвори OKX API Management
-          </a>
+          <div className="flex gap-3 mt-4 flex-wrap">
+            <a href="https://www.okx.com/account/my-api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm">
+              <ExternalLink className="w-4 h-4" /> OKX Global API
+            </a>
+            <a href="https://eea.okx.com/account/my-api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-yellow-400 hover:text-yellow-300 text-sm">
+              <ExternalLink className="w-4 h-4" /> OKX EEA (ЕС) API
+            </a>
+          </div>
         </div>
       </div>
     </div>
