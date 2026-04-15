@@ -40,6 +40,7 @@ Deno.serve(async (req) => {
           grid_spacing: Number(meta.grid_spacing) || 1,
           dca_interval: Number(meta.dca_interval) || 60,
           dca_amount: Number(meta.dca_amount) || 100,
+          exchange: meta.exchange || 'binance',
           total_profit: 0,
           total_trades: 0,
           api_key_configured: false,

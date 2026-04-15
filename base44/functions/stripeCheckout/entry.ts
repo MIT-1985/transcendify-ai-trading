@@ -57,6 +57,7 @@ Deno.serve(async (req) => {
         grid_spacing: String(bot_config?.grid_spacing || bot.grid_spacing || 1),
         dca_interval: String(bot_config?.dca_interval || bot.dca_interval || 60),
         dca_amount: String(bot_config?.dca_amount || bot.dca_amount || 100),
+        exchange: bot_config?.exchange || 'binance',
       },
     });
 

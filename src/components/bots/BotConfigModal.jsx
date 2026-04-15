@@ -18,6 +18,7 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
   const [config, setConfig] = useState({
     capital_allocated: bot?.min_capital || 1000,
     risk_profile: 'moderate',
+    exchange: 'binance',
     custom_strategy_enabled: false,
     strategy_rules: [],
     stop_loss: bot?.default_stop_loss || 5,
@@ -34,6 +35,12 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
     max_trades_per_hour: 10,
     min_trade_interval: 2,
     trading_pairs: ['X:BTCUSD', 'X:ETHUSD', 'X:SOLUSD', 'X:XRPUSD', 'X:ADAUSD']
+  });
+
+  const { data: exchangeConnections = [] } = useQuery({
+    queryKey: ['exchange-connections'],
+    queryFn: () => base44.entities.ExchangeConnection.filter({ status: 'connected' }),
+    enabled: isOpen
   });
 
   const [availableTickers, setAvailableTickers] = useState([]);
@@ -150,6 +157,42 @@ export default function BotConfigModal({ bot, isOpen, onClose, onSubscribe }) {
             <TabsTrigger value="strategy">Strategy</TabsTrigger>
             <TabsTrigger value="frequency">Frequency</TabsTrigger>
           </TabsList>
+
+          {/* Exchange Selection */}
+          <div className="mt-4 bg-slate-800/50 rounded-lg p-4">
+            <Label className="text-slate-300 mb-3 block font-semibold">Борса за търговия</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { id: 'binance', label: 'Binance', color: 'text-yellow-400', border: 'border-yellow-500' },
+                { id: 'okx', label: 'OKX', color: 'text-blue-400', border: 'border-blue-500' }
+              ].map(ex => {
+                const hasConn = exchangeConnections.some(c => c.exchange === ex.id);
+                return (
+                  <button
+                    key={ex.id}
+                    onClick={() => setConfig({ ...config, exchange: ex.id })}
+                    className={cn(
+                      'p-4 rounded-lg border-2 transition-all text-left relative',
+                      config.exchange === ex.id
+                        ? `${ex.border} bg-slate-700/60`
+                        : 'border-slate-700 bg-slate-700/20 hover:border-slate-600'
+                    )}
+                  >
+                    <div className={`font-bold text-lg ${ex.color}`}>{ex.label}</div>
+                    {hasConn
+                      ? <div className="text-xs text-emerald-400 mt-1">✓ Свързан</div>
+                      : <div className="text-xs text-red-400 mt-1">⚠ Не е свързан</div>
+                    }
+                  </button>
+                );
+              })}
+            </div>
+            {!exchangeConnections.some(c => c.exchange === config.exchange) && (
+              <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400">
+                ⚠️ Нямате свързан {config.exchange.toUpperCase()} акаунт. Ботът ще работи в SIM режим. Свържете акаунта от страницата Connect {config.exchange === 'binance' ? 'Binance' : 'OKX'}.
+              </div>
+            )}
+          </div>
 
           {/* Risk Profile Tab */}
           <TabsContent value="risk" className="space-y-4 mt-4">
