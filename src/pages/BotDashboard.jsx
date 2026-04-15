@@ -121,7 +121,7 @@ export default function BotDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-slate-400 mb-1">Active Bots</div>
-                  <div className="text-2xl font-bold">{activeCount}</div>
+                  <div className="text-2xl font-bold text-white">{activeCount}</div>
                 </div>
                 <Activity className="w-10 h-10 text-green-400 opacity-20" />
               </div>
@@ -151,7 +151,7 @@ export default function BotDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-slate-400 mb-1">Total Trades</div>
-                  <div className="text-2xl font-bold">{totalTrades}</div>
+                  <div className="text-2xl font-bold text-white">{totalTrades}</div>
                 </div>
                 <BarChart3 className="w-10 h-10 text-blue-400 opacity-20" />
               </div>
@@ -163,7 +163,7 @@ export default function BotDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-slate-400 mb-1">Total Capital</div>
-                  <div className="text-2xl font-bold">${totalCapital.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-white">${totalCapital.toLocaleString()}</div>
                 </div>
                 <DollarSign className="w-10 h-10 text-purple-400 opacity-20" />
               </div>
@@ -227,11 +227,11 @@ export default function BotDashboard() {
                       </div>
                       <div className="bg-slate-800/50 rounded-lg p-3">
                         <div className="text-xs text-slate-400 mb-1">Trades</div>
-                        <div className="text-lg font-bold">{subscription.total_trades || 0}</div>
+                        <div className="text-lg font-bold text-white">{subscription.total_trades || 0}</div>
                       </div>
                       <div className="bg-slate-800/50 rounded-lg p-3">
                         <div className="text-xs text-slate-400 mb-1">Capital</div>
-                        <div className="text-lg font-bold">${(subscription.capital_allocated || 0).toLocaleString()}</div>
+                        <div className="text-lg font-bold text-white">${(subscription.capital_allocated || 0).toLocaleString()}</div>
                       </div>
                     </div>
 
