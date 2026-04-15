@@ -37,7 +37,7 @@ export default function Dashboard() {
   });
 
   const { data: exchangeConnections = [], refetch: refetchConnections } = useQuery({
-    queryKey: ['exchangeConnections', user?.email],
+    queryKey: ['all-connections', user?.email],
     queryFn: () => base44.entities.ExchangeConnection.filter({ created_by: user?.email }),
     enabled: !!user,
     staleTime: 60000,

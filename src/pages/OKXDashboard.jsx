@@ -184,7 +184,7 @@ export default function OKXDashboard() {
   const [loadingTickers, setLoadingTickers] = useState(false);
 
   const { data: connections = [] } = useQuery({
-    queryKey: ['exchangeConnections', user?.email],
+    queryKey: ['okx-connections', user?.email],
     queryFn: () => base44.entities.ExchangeConnection.filter({ created_by: user?.email, exchange: 'okx' }),
     enabled: !!user,
     staleTime: 60000,
