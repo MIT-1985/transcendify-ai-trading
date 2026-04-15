@@ -36,9 +36,6 @@ export default function Bots() {
 
   const subscribeMutation = useMutation({
     mutationFn: async ({ bot, config }) => {
-      if (window.self !== window.top) {
-        throw new Error('Checkout works only from the published app. Please open the app in a new tab.');
-      }
       const res = await base44.functions.invoke('stripeCheckout', {
         bot_id: bot.id,
         bot_config: config,
@@ -46,7 +43,7 @@ export default function Bots() {
         cancel_url: `${window.location.origin}/Bots`,
       });
       if (res.data?.url) {
-        window.location.href = res.data.url;
+        window.open(res.data.url, '_blank');
       } else {
         throw new Error(res.data?.error || 'Failed to start checkout');
       }
