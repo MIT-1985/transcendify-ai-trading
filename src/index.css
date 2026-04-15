@@ -152,25 +152,36 @@ button:focus-visible {
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    color: inherit;
   }
   body {
     @apply bg-background;
     color: #ffffff !important;
   }
+}
 
-  /* Force ALL text white globally */
-  p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label, a, button, 
-  strong, em, small, pre, code, blockquote, figcaption, legend, caption {
-    color: inherit;
-  }
+/* Force ALL text white globally - outside @layer to have higher specificity */
+*, *::before, *::after {
+  color: #ffffff;
+}
 
-  input, textarea, select {
-    color: #ffffff !important;
-    caret-color: #ffffff !important;
-  }
+/* Allow colored text to work (green, red, blue, yellow, slate variants) */
+.text-green-400, .text-green-300, .text-green-500, .text-green-600 { color: rgb(74 222 128) !important; }
+.text-red-400, .text-red-300, .text-red-500 { color: rgb(248 113 113) !important; }
+.text-blue-400, .text-blue-300, .text-blue-500, .text-blue-600 { color: rgb(96 165 250) !important; }
+.text-yellow-400, .text-yellow-300, .text-yellow-500 { color: rgb(250 204 21) !important; }
+.text-purple-400, .text-purple-300, .text-purple-500 { color: rgb(192 132 252) !important; }
+.text-slate-400, .text-slate-300, .text-slate-500, .text-slate-600 { color: rgb(148 163 184) !important; }
+.text-slate-400 { color: rgb(148 163 184) !important; }
+.text-muted-foreground { color: rgb(148 163 184) !important; }
+.text-white { color: #ffffff !important; }
+.text-black { color: #ffffff !important; }
+.text-gray-900, .text-gray-800, .text-gray-700, .text-gray-600 { color: #ffffff !important; }
 
-  input::placeholder, textarea::placeholder {
-    color: rgba(255, 255, 255, 0.5) !important;
-  }
+input, textarea, select {
+  color: #ffffff !important;
+  caret-color: #ffffff !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
 }
