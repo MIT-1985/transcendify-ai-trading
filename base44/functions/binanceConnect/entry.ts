@@ -134,16 +134,25 @@ Deno.serve(async (req) => {
 
       if (!accountInfo.balances) {
         const errMsg = accountInfo.msg || 'Не може да се свърже с Binance';
-        console.error('Binance connect failed:', errMsg);
-        // Check if it's geo-block
+        const errCode = accountInfo.code;
+        console.error('Binance connect failed:', errCode, errMsg);
+        
+        // IP whitelist / permissions error
+        if (errCode === -2015 || errMsg.includes('IP') || errMsg.includes('permissions for action')) {
+          return Response.json({ 
+            error: 'IP Whitelist грешка (-2015): Binance отхвърля заявката защото IP адресът на сървъра не е в белия списък. Отидете в Binance → API Management → Edit → IP access restrictions → изберете "Unrestricted".',
+            ip_whitelist_error: true
+          }, { status: 400 });
+        }
+        // Geo-block
         const isGeoBlock = errMsg.includes('restricted') || errMsg.includes('Service unavailable');
         if (isGeoBlock) {
           return Response.json({ 
-            error: 'Binance API е блокиран от EU сървъри. Ключовете са запазени - моля опитайте Binance US или OKX.',
+            error: 'Binance API е блокиран от EU сървъри. Моля опитайте OKX.',
             geo_blocked: true
           }, { status: 400 });
         }
-        return Response.json({ error: `Binance грешка: ${errMsg}` }, { status: 400 });
+        return Response.json({ error: `Binance грешка (${errCode}): ${errMsg}` }, { status: 400 });
       }
 
       const permissions = accountInfo.permissions || [];

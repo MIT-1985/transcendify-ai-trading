@@ -75,11 +75,11 @@ export default function ConnectBinance() {
     onError: (err) => {
       const msg = err.message || '';
       if (msg.includes('API-key format invalid') || msg.includes('format invalid')) {
-        toast.error('Невалиден формат на API Key. Моля копирайте ключа отново от Binance → API Management. Уверете се че ключът е пълен и без допълнителни символи.');
-      } else if (msg.includes('Invalid API-key') || msg.includes('permissions')) {
-        toast.error('API Key е невалиден или няма необходимите разрешения. Проверете дали ключът е активен в Binance.');
+        toast.error('Невалиден формат на API Key. Моля копирайте ключа отново от Binance → API Management.', { duration: 8000 });
+      } else if (msg.includes('Invalid API-key') || msg.includes('-2015') || msg.includes('permissions') || msg.includes('IP')) {
+        toast.error('❌ IP Whitelist грешка! Трябва да зададете "Unrestricted" достъп в Binance → API Management → Edit → IP access restrictions → Unrestricted. Вижте инструкциите по-долу.', { duration: 12000 });
       } else {
-        toast.error(msg || 'Грешка при свързване');
+        toast.error(msg || 'Грешка при свързване', { duration: 8000 });
       }
     }
   });
@@ -251,24 +251,23 @@ export default function ConnectBinance() {
           </CardContent>
         </Card>
 
-        {/* IP Whitelist Notice */}
-        <Card className="bg-red-900/10 border-red-500/20 mt-4">
+        {/* EU/Bulgaria Warning */}
+        <Card className="bg-red-900/20 border-red-500/40 mt-4">
           <CardContent className="py-4 flex gap-3">
-            <Info className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-            <div className="text-sm text-slate-400">
-              <strong className="text-red-400">⚠️ Задължително: Изключете IP ограничението!</strong>
+            <AlertTriangle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
+            <div className="text-sm text-slate-300">
+              <strong className="text-red-400 text-base">🚫 Binance не работи от България / EU!</strong>
               <br /><br />
-              Binance API ключовете по подразбиране изискват IP whitelist. Трябва да зададете <strong className="text-white">"Unrestricted"</strong> или да добавите нашите сървърни IP адреси.
+              Binance е <strong className="text-white">блокиран за EU потребители</strong> — нашите сървъри са в Европа и Binance автоматично отхвърля всички заявки от тях. Това не може да се заобиколи с IP настройки.
               <br /><br />
-              <strong className="text-white">Как да оправите:</strong>
-              <ol className="mt-1 ml-4 list-decimal space-y-1">
-                <li>Отидете в <strong className="text-yellow-400">Binance → Profile → API Management</strong></li>
-                <li>Намерете вашия API ключ и натиснете <strong className="text-white">Edit</strong></li>
-                <li>В "IP access restrictions" изберете <strong className="text-emerald-400">"Unrestricted (Less Secure)"</strong></li>
-                <li>Потвърдете и изчакайте 5 минути преди да опитате отново</li>
-              </ol>
+              <strong className="text-emerald-400">✅ Препоръчваме OKX — работи напълно от България!</strong>
               <br />
-              <strong className="text-slate-300">Алтернатива:</strong> Използвайте <strong className="text-blue-400">OKX</strong> — работи без ограничения.
+              <button
+                onClick={() => navigate(createPageUrl('ConnectOKX'))}
+                className="mt-2 inline-block bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
+                Свържи OKX →
+              </button>
             </div>
           </CardContent>
         </Card>
