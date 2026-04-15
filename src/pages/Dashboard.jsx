@@ -234,7 +234,7 @@ export default function Dashboard() {
             </div>
 
             {/* Exchange Balances */}
-        {exchangeConnections.filter(c => c.status === 'connected').length > 0 && (
+        {exchangeConnections.filter(c => c.status === 'connected' && c.created_by === user?.email).length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <Wallet className="w-5 h-5 text-yellow-400" />
@@ -245,7 +245,7 @@ export default function Dashboard() {
               </span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {exchangeConnections.filter(c => c.status === 'connected').map(conn => (
+              {exchangeConnections.filter(c => c.status === 'connected' && c.created_by === user?.email).map(conn => (
                 <div key={conn.id} className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
