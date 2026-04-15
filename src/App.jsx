@@ -1,6 +1,7 @@
 import './App.css'
+import React from 'react'
 import { Toaster } from "@/components/ui/toaster"
-import { QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
@@ -23,7 +24,17 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   : <>{children}</>;
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin, user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Clear all cached data when user changes (prevents seeing another user's data)
+  const prevUserRef = React.useRef(null);
+  React.useEffect(() => {
+    if (prevUserRef.current && prevUserRef.current !== user?.email) {
+      queryClient.clear();
+    }
+    prevUserRef.current = user?.email;
+  }, [user?.email]);
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
