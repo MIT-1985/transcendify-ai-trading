@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
-import { Activity, Bot, DollarSign, TrendingUp, Zap, BarChart3, Wallet, Link2 } from 'lucide-react';
+import { Activity, Bot, DollarSign, TrendingUp, Zap, BarChart3, Wallet, Link2, FlaskConical } from 'lucide-react';
+import { useState } from 'react';
 import StatsCard from '@/components/trading/StatsCard';
 import PriceCard from '@/components/trading/PriceCard';
 import OrderBook from '@/components/trading/OrderBook';
@@ -103,6 +104,21 @@ export default function Dashboard() {
     const interval = setInterval(fetchPrices, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const [diagResult, setDiagResult] = useState(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+
+  const runBinanceDiag = async () => {
+    setDiagLoading(true);
+    try {
+      const res = await base44.functions.invoke('binanceDiag', {});
+      setDiagResult(res.data);
+      console.log('Binance diag result:', res.data);
+    } catch (e) {
+      setDiagResult({ error: e.message });
+    }
+    setDiagLoading(false);
+  };
 
   const activeBots = subscriptions.filter(s => s.status === 'active').length;
   const totalProfit = subscriptions.reduce((sum, s) => sum + (s.total_profit || 0), 0);
@@ -262,6 +278,22 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Binance Diag Test */}
+        <div className="mb-6 p-4 bg-slate-900/50 border border-slate-700 rounded-xl">
+          <div className="flex items-center gap-3 mb-3">
+            <FlaskConical className="w-5 h-5 text-purple-400" />
+            <span className="font-semibold text-purple-300">Binance IP Test (временен)</span>
+          </div>
+          <Button onClick={runBinanceDiag} disabled={diagLoading} className="bg-purple-700 hover:bg-purple-600 text-sm mb-3">
+            {diagLoading ? 'Тестване...' : 'Тествай Binance с моя IP'}
+          </Button>
+          {diagResult && (
+            <pre className="text-xs text-slate-300 bg-slate-950 rounded-lg p-3 overflow-auto max-h-48">
+              {JSON.stringify(diagResult, null, 2)}
+            </pre>
+          )}
+        </div>
 
         {/* Active Subscriptions */}
         <div>
