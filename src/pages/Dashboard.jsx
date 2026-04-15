@@ -36,7 +36,7 @@ export default function Dashboard() {
     retry: false
   });
 
-  const { data: exchangeConnections = [] } = useQuery({
+  const { data: exchangeConnections = [], refetch: refetchConnections } = useQuery({
     queryKey: ['exchangeConnections', user?.email],
     queryFn: () => base44.entities.ExchangeConnection.filter({ created_by: user?.email }),
     enabled: !!user,
@@ -44,6 +44,20 @@ export default function Dashboard() {
     refetchOnWindowFocus: false,
     retry: false
   });
+
+  // Auto-refresh Binance balance on load
+  useEffect(() => {
+    if (!user) return;
+    const refreshBinance = async () => {
+      try {
+        await base44.functions.invoke('binanceConnect', { action: 'test' });
+        refetchConnections();
+      } catch (e) {
+        // silently fail - cached data will be shown
+      }
+    };
+    refreshBinance();
+  }, [user?.email]);
 
   const { data: bots = [] } = useQuery({
     queryKey: ['bots'],
