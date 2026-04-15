@@ -75,9 +75,10 @@ export default function Layout({ children, currentPageName }) {
         </div>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="w-10 h-10 flex items-center justify-center text-white"
+          className="w-10 h-10 flex items-center justify-center"
+          style={{ color: '#ffffff' }}
         >
-          {sidebarOpen ? <X /> : <Menu />}
+          {sidebarOpen ? <X color="#ffffff" /> : <Menu color="#ffffff" />}
         </button>
       </div>
 
