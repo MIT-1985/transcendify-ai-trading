@@ -45,9 +45,9 @@ export default function Dashboard() {
     retry: false
   });
 
-  // Auto-refresh Binance balance on load
+  // Auto-refresh Binance balance on load - scoped to current user
   useEffect(() => {
-    if (!user) return;
+    if (!user?.email) return;
     const refreshBinance = async () => {
       try {
         await base44.functions.invoke('binanceConnect', { action: 'test' });
@@ -60,8 +60,9 @@ export default function Dashboard() {
   }, [user?.email]);
 
   const { data: bots = [] } = useQuery({
-    queryKey: ['bots'],
-    queryFn: () => base44.entities.TradingBot.list()
+    queryKey: ['bots', user?.email],
+    queryFn: () => base44.entities.TradingBot.list(),
+    enabled: !!user
   });
 
   // Bots run automatically via BotEngine in BotRunner page
