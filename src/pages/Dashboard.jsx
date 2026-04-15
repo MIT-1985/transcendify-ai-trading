@@ -3,7 +3,6 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { Activity, Bot, DollarSign, TrendingUp, Zap, BarChart3, Wallet, Link2, FlaskConical } from 'lucide-react';
-import { useState } from 'react';
 import StatsCard from '@/components/trading/StatsCard';
 import PriceCard from '@/components/trading/PriceCard';
 import OrderBook from '@/components/trading/OrderBook';
