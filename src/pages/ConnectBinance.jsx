@@ -24,9 +24,14 @@ export default function ConnectBinance() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const { data: connectionStatus, isLoading: statusLoading } = useQuery({
+  const { data: connectionStatus, isLoading: statusLoading, refetch: refetchStatus } = useQuery({
     queryKey: ['binance-connection'],
     queryFn: async () => {
+      // 'test' fetches fresh balance from Binance API and updates DB, falls back to 'status' if not connected
+      try {
+        const testRes = await base44.functions.invoke('binanceConnect', { action: 'test' });
+        if (testRes.data?.success) return { connected: true, ...testRes.data };
+      } catch {}
       const res = await base44.functions.invoke('binanceConnect', { action: 'status' });
       return res.data;
     }
@@ -140,7 +145,12 @@ export default function ConnectBinance() {
                 )}
               </CardContent>
             </Card>
-            <BinanceBalanceCard balanceUsdt={connectionStatus.balance_usdt} balances={connectionStatus.balances} />
+            <BinanceBalanceCard
+              balanceUsdt={connectionStatus.balance_usdt}
+              balances={connectionStatus.balances}
+              onRefresh={() => testMutation.mutate()}
+              isRefreshing={testMutation.isPending}
+            />
           </>
         ) : null}
 
