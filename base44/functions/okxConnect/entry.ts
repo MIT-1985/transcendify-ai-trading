@@ -115,21 +115,49 @@ Deno.serve(async (req) => {
     const encSecret = await encrypt(api_secret, MASTER_SECRET);
     const encPass = await encrypt(passphrase, MASTER_SECRET);
 
-    // Parse balances - handle both unified account (details) and other structures
-    const balances = [];
-    let balanceUsdt = 0;
-    console.log('Connect - full balance data:', JSON.stringify(testRes.data));
+    // Determine which endpoint worked
+    let workingEndpoint = 'https://www.okx.com';
+    for (const ep of OKX_ENDPOINTS) {
+      const r = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/account/balance', '', ep).catch(() => null);
+      if (r?.code === '0') { workingEndpoint = ep; break; }
+    }
+
+    // Also fetch Funding account balance
+    let fundingData = null;
+    try {
+      const fr = await okxRequest(api_key, api_secret, passphrase, 'GET', '/api/v5/asset/balances', '', workingEndpoint);
+      if (fr?.code === '0') fundingData = fr.data || [];
+      console.log('Connect - Funding data:', JSON.stringify(fundingData).substring(0, 300));
+    } catch (e) {
+      console.log('Connect - Funding error:', e.message);
+    }
+
+    // Parse balances - merge Trading + Funding
+    const balanceMap = {};
+    console.log('Connect - full trading data:', JSON.stringify(testRes.data));
     const acctData = testRes.data?.[0];
-    const details = acctData?.details || acctData?.balData || (Array.isArray(testRes.data) && testRes.data[0]?.ccy ? testRes.data : []);
+    const details = acctData?.details || [];
     console.log('Connect - details count:', details.length, 'sample:', JSON.stringify(details.slice(0, 5)));
     for (const d of details) {
-      const total = parseFloat(d.cashBal || d.bal || d.eq || 0);
+      const total = parseFloat(d.cashBal || d.eq || 0);
       const avail = parseFloat(d.availBal || d.availEq || total);
       if (total > 0.0001) {
-        balances.push({ asset: d.ccy, free: avail, locked: Math.max(0, total - avail) });
-        if (d.ccy === 'USDT' || d.ccy === 'USDC') balanceUsdt += total;
+        balanceMap[d.ccy] = balanceMap[d.ccy] || { free: 0, locked: 0 };
+        balanceMap[d.ccy].free += avail;
+        balanceMap[d.ccy].locked += Math.max(0, total - avail);
       }
     }
+    for (const d of (fundingData || [])) {
+      const total = parseFloat(d.bal || d.availBal || 0);
+      const avail = parseFloat(d.availBal || total);
+      if (total > 0.0001) {
+        balanceMap[d.ccy] = balanceMap[d.ccy] || { free: 0, locked: 0 };
+        balanceMap[d.ccy].free += avail;
+        balanceMap[d.ccy].locked += Math.max(0, total - avail);
+      }
+    }
+    const balances = Object.entries(balanceMap).map(([asset, b]) => ({ asset, free: b.free, locked: b.locked }));
+    let balanceUsdt = balances.filter(b => b.asset === 'USDT' || b.asset === 'USDC').reduce((s, b) => s + b.free + b.locked, 0);
 
     // Find existing or create - filter by user!
     const existing = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'okx' });
@@ -165,39 +193,69 @@ Deno.serve(async (req) => {
     const apiSecret = await decrypt(conn.api_secret_encrypted, MASTER_SECRET);
     const passphrase = await decrypt(conn.encryption_iv, MASTER_SECRET);
 
-    let res = null;
-    let workingEndpoint = null;
+    // Find working endpoint
+    let workingEndpoint = 'https://www.okx.com';
+    let tradingRes = null;
     for (const endpoint of OKX_ENDPOINTS) {
       try {
         const r = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
-        console.log(`Balance ${endpoint} code:`, r.code, 'data length:', r.data?.length, 'raw data:', JSON.stringify(r.data?.[0]).substring(0, 200));
-        if (r.code === '0') { res = r; workingEndpoint = endpoint; break; }
-        if (r.code === '50102' || r.code === '50112' || r.code === '50113') { res = r; break; }
+        console.log(`Trading balance ${endpoint} code:`, r.code, 'sample:', JSON.stringify(r.data?.[0]).substring(0, 300));
+        if (r.code === '0') { tradingRes = r; workingEndpoint = endpoint; break; }
+        if (r.code === '50102' || r.code === '50112' || r.code === '50113') { tradingRes = r; break; }
       } catch (networkErr) {
         console.log(`OKX ${endpoint} network error:`, networkErr.message);
       }
     }
-    if (!res || res.code !== '0') return Response.json({ error: res?.msg || 'Failed to fetch balance' });
 
-    console.log('Working endpoint:', workingEndpoint);
-    console.log('Full response data:', JSON.stringify(res.data));
+    // Also fetch Funding account balance (separate wallet in OKX)
+    let fundingRes = null;
+    try {
+      fundingRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/asset/balances', '', workingEndpoint);
+      console.log('Funding balance code:', fundingRes.code, 'data:', JSON.stringify(fundingRes.data).substring(0, 300));
+    } catch (e) {
+      console.log('Funding balance error:', e.message);
+    }
 
-    const balances = [];
-    let balanceUsdt = 0;
-    const accountData = res.data?.[0];
-    // Unified account uses 'details', funding account uses 'balData' or direct array
-    const details = accountData?.details || accountData?.balData || (Array.isArray(res.data) && res.data[0]?.ccy ? res.data : []);
-    console.log('Details length:', details.length, 'Sample:', JSON.stringify(details.slice(0, 5)));
-    
-    for (const d of details) {
-      // cashBal = total, availBal = available. Also try eq (equity) fields for unified account
-      const total = parseFloat(d.cashBal || d.bal || d.eq || 0);
-      const avail = parseFloat(d.availBal || d.availEq || d.frozenBal || total);
-      if (total > 0.0001) {
-        balances.push({ asset: d.ccy, free: avail, locked: Math.max(0, total - avail) });
-        if (d.ccy === 'USDT' || d.ccy === 'USDC') balanceUsdt += total;
+    const balanceMap = {}; // asset -> { free, locked }
+
+    // Parse Trading account (Unified)
+    if (tradingRes?.code === '0') {
+      const accountData = tradingRes.data?.[0];
+      const details = accountData?.details || [];
+      console.log('Trading details count:', details.length);
+      for (const d of details) {
+        const total = parseFloat(d.cashBal || d.eq || 0);
+        const avail = parseFloat(d.availBal || d.availEq || total);
+        if (total > 0.0001) {
+          balanceMap[d.ccy] = balanceMap[d.ccy] || { free: 0, locked: 0 };
+          balanceMap[d.ccy].free += avail;
+          balanceMap[d.ccy].locked += Math.max(0, total - avail);
+        }
       }
     }
+
+    // Parse Funding account (asset wallet)
+    if (fundingRes?.code === '0') {
+      const fundingItems = fundingRes.data || [];
+      console.log('Funding items count:', fundingItems.length);
+      for (const d of fundingItems) {
+        const total = parseFloat(d.bal || d.availBal || 0);
+        const avail = parseFloat(d.availBal || total);
+        if (total > 0.0001) {
+          balanceMap[d.ccy] = balanceMap[d.ccy] || { free: 0, locked: 0 };
+          balanceMap[d.ccy].free += avail;
+          balanceMap[d.ccy].locked += Math.max(0, total - avail);
+        }
+      }
+    }
+
+    if (!tradingRes || tradingRes.code !== '0') {
+      return Response.json({ error: tradingRes?.msg || 'Failed to fetch balance' });
+    }
+
+    const balances = Object.entries(balanceMap).map(([asset, b]) => ({ asset, free: b.free, locked: b.locked }));
+    const balanceUsdt = balances.filter(b => b.ccy === 'USDT' || b.asset === 'USDT' || b.asset === 'USDC')
+      .reduce((sum, b) => sum + b.free + b.locked, 0);
 
     console.log('Final balances:', JSON.stringify(balances), 'USDT:', balanceUsdt);
     await base44.entities.ExchangeConnection.update(conn.id, { balances, balance_usdt: balanceUsdt, last_sync: new Date().toISOString() });
