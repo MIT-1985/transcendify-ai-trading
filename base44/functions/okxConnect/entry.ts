@@ -159,8 +159,9 @@ Deno.serve(async (req) => {
     const balances = Object.entries(balanceMap).map(([asset, b]) => ({ asset, free: b.free, locked: b.locked }));
     let balanceUsdt = balances.filter(b => b.asset === 'USDT' || b.asset === 'USDC').reduce((s, b) => s + b.free + b.locked, 0);
 
-    // Find existing or create - filter by user!
-    const existing = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'okx' });
+    // Find existing or create - filter strictly by user!
+    const existing = await base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'okx' });
+    console.log(`Connect: user=${user.email}, existing connections=${existing.length}`);
     const data = {
       exchange: 'okx',
       api_key_encrypted: encKey,
@@ -175,9 +176,9 @@ Deno.serve(async (req) => {
     };
 
     if (existing.length > 0) {
-      await base44.entities.ExchangeConnection.update(existing[0].id, data);
+      await base44.asServiceRole.entities.ExchangeConnection.update(existing[0].id, data);
     } else {
-      await base44.entities.ExchangeConnection.create(data);
+      await base44.asServiceRole.entities.ExchangeConnection.create(data);
     }
 
     return Response.json({ success: true, balances, balance_usdt: balanceUsdt });
@@ -185,7 +186,8 @@ Deno.serve(async (req) => {
 
   // GET BALANCE - refresh balance
   if (action === 'balance') {
-    const connections = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'okx' });
+    const connections = await base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'okx' });
+    console.log(`Balance request for user: ${user.email}, found ${connections.length} connections`);
     if (!connections.length) return Response.json({ error: 'No OKX connection found' });
 
     const conn = connections[0];
@@ -258,14 +260,19 @@ Deno.serve(async (req) => {
       .reduce((sum, b) => sum + b.free + b.locked, 0);
 
     console.log('Final balances:', JSON.stringify(balances), 'USDT:', balanceUsdt);
-    await base44.entities.ExchangeConnection.update(conn.id, { balances, balance_usdt: balanceUsdt, last_sync: new Date().toISOString() });
+    // Verify this connection belongs to current user before updating
+    if (conn.created_by !== user.email) {
+      console.error(`SECURITY: user ${user.email} tried to access connection owned by ${conn.created_by}`);
+      return Response.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+    await base44.asServiceRole.entities.ExchangeConnection.update(conn.id, { balances, balance_usdt: balanceUsdt, last_sync: new Date().toISOString() });
     return Response.json({ success: true, balances, balance_usdt: balanceUsdt });
   }
 
   // PLACE ORDER
   if (action === 'trade') {
     const { instId, side, ordType, sz, px } = body; // e.g. instId=BTC-USDT, side=buy/sell, ordType=market/limit
-    const connections = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'okx' });
+    const connections = await base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'okx' });
     if (!connections.length) return Response.json({ error: 'No OKX connection found' });
 
     const conn = connections[0];
@@ -281,9 +288,9 @@ Deno.serve(async (req) => {
 
   // DISCONNECT
   if (action === 'disconnect') {
-    const connections = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'okx' });
+    const connections = await base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'okx' });
     for (const c of connections) {
-      await base44.entities.ExchangeConnection.update(c.id, { status: 'disconnected', is_validated: false });
+      await base44.asServiceRole.entities.ExchangeConnection.update(c.id, { status: 'disconnected', is_validated: false });
     }
     return Response.json({ success: true });
   }

@@ -162,7 +162,8 @@ Deno.serve(async (req) => {
       const encSecret = await encryptText(api_secret);
       const encryptionIv = encKey.iv + '|' + encSecret.iv;
 
-      const existing = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'binance' });
+      const existing = await base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'binance' });
+      console.log(`Binance connect: user=${user.email}, existing=${existing.length}`);
       const connData = {
         exchange: 'binance',
         api_key_encrypted: encKey.data,
@@ -177,7 +178,7 @@ Deno.serve(async (req) => {
       if (existing.length > 0) {
         await base44.asServiceRole.entities.ExchangeConnection.update(existing[0].id, connData);
       } else {
-        await base44.entities.ExchangeConnection.create(connData);
+        await base44.asServiceRole.entities.ExchangeConnection.create({ ...connData, created_by: user.email });
       }
 
       return Response.json({ success: true, balance_usdt: balanceUsdt, permissions, balances: allBalances });
@@ -185,7 +186,8 @@ Deno.serve(async (req) => {
 
     // ---- TEST / REFRESH BALANCE ----
     if (action === 'test') {
-      const connections = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'binance' });
+      const connections = await base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'binance' });
+      console.log(`Binance test: user=${user.email}, connections=${connections.length}`);
       if (!connections.length) return Response.json({ success: false, error: 'No Binance connection found' });
 
       const conn = connections[0];
@@ -225,7 +227,7 @@ Deno.serve(async (req) => {
 
     // ---- DISCONNECT ----
     if (action === 'disconnect') {
-      const connections = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'binance' });
+      const connections = await base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'binance' });
       if (connections.length > 0) {
         await base44.asServiceRole.entities.ExchangeConnection.update(connections[0].id, {
           status: 'disconnected', is_validated: false,
@@ -237,7 +239,7 @@ Deno.serve(async (req) => {
 
     // ---- STATUS ----
     if (action === 'status') {
-      const connections = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'binance' });
+      const connections = await base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'binance' });
       if (!connections.length) return Response.json({ connected: false });
 
       const c = connections[0];
