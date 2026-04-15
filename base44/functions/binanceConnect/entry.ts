@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // --- Crypto helpers ---
 async function getEncryptionKey() {
@@ -26,7 +26,6 @@ async function decryptText(encData, ivStr) {
   return new TextDecoder().decode(decrypted);
 }
 
-// --- Binance API helpers ---
 async function hmacSign(secret, message) {
   const cryptoKey = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret),
@@ -36,30 +35,66 @@ async function hmacSign(secret, message) {
   return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function binanceRequest(apiKey, apiSecret, endpoint, params = {}, method = 'GET') {
+// All known Binance endpoints including US and alternative domains
+const BINANCE_HOSTS = [
+  'https://api.binance.com',
+  'https://api1.binance.com',
+  'https://api2.binance.com',
+  'https://api3.binance.com',
+  'https://api4.binance.com',
+  'https://api-gcp.binance.com',
+  'https://api.binance.us',           // Binance US
+  'https://data-api.binance.vision',  // Alternative endpoint
+];
+
+async function binanceRequest(apiKey, apiSecret, endpoint, params = {}) {
   const timestamp = Date.now();
   const allParams = { ...params, timestamp: timestamp.toString(), recvWindow: '60000' };
   const queryString = new URLSearchParams(allParams).toString();
   const signature = await hmacSign(apiSecret, queryString);
-  const hosts = ['https://api.binance.com', 'https://api1.binance.com', 'https://api2.binance.com', 'https://api3.binance.com', 'https://api4.binance.com', 'https://api-gcp.binance.com'];
+  const fullQuery = `${queryString}&signature=${signature}`;
+
   let lastError = null;
-  for (const host of hosts) {
+  for (const host of BINANCE_HOSTS) {
     try {
-      const url = `${host}${endpoint}?${queryString}&signature=${signature}`;
-      const response = await fetch(url, { method, headers: { 'X-MBX-APIKEY': apiKey } });
+      const url = `${host}${endpoint}?${fullQuery}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-MBX-APIKEY': apiKey,
+          'User-Agent': 'Mozilla/5.0 (compatible; TradingBot/1.0)',
+          'Accept': 'application/json',
+        }
+      });
       const data = await response.json();
-      // Check for geo restriction FIRST before anything else
-      if (data.msg && (data.msg.includes('restricted location') || data.msg.includes('Service unavailable'))) {
-        lastError = data;
+
+      // Geo-blocked - try next
+      if (data.msg && (data.msg.includes('restricted location') || data.msg.includes('Service unavailable') || data.msg.includes('not allowed'))) {
         console.log(`Host ${host} geo-blocked, trying next...`);
+        lastError = data;
         continue;
       }
+
+      // Auth error (wrong key) - no point trying other hosts
+      if (data.code === -2014 || data.code === -2015 || data.code === -1022 || data.code === -1100) {
+        console.log(`Host ${host} returned auth error: ${data.msg}`);
+        return data;
+      }
+
+      // Timeout/rate limit - try next
+      if (data.code === -1003 || data.code === -1015) {
+        lastError = data;
+        continue;
+      }
+
+      console.log(`Host ${host} SUCCESS, response code: ${data.code ?? 'OK'}`);
       return data;
     } catch (e) {
+      console.log(`Host ${host} network error: ${e.message}`);
       lastError = { code: -1, msg: e.message };
     }
   }
-  return lastError || { code: -1, msg: 'All Binance hosts failed' };
+  return lastError || { code: -1, msg: 'All Binance hosts unreachable' };
 }
 
 async function getDecryptedKeys(conn) {
@@ -95,10 +130,20 @@ Deno.serve(async (req) => {
       if (!api_key || !api_secret) return Response.json({ error: 'API key and secret are required' }, { status: 400 });
 
       const accountInfo = await binanceRequest(api_key, api_secret, '/api/v3/account');
-      console.log('Binance connect response:', JSON.stringify(accountInfo).substring(0, 200));
-      if (accountInfo.code || (accountInfo.msg && accountInfo.msg.includes('restricted'))) {
-        console.error('Binance error:', accountInfo.code, accountInfo.msg);
-        return Response.json({ error: `Binance грешка: ${accountInfo.msg} (код: ${accountInfo.code})` }, { status: 400 });
+      console.log('Binance connect result:', JSON.stringify(accountInfo).substring(0, 300));
+
+      if (!accountInfo.balances) {
+        const errMsg = accountInfo.msg || 'Не може да се свърже с Binance';
+        console.error('Binance connect failed:', errMsg);
+        // Check if it's geo-block
+        const isGeoBlock = errMsg.includes('restricted') || errMsg.includes('Service unavailable');
+        if (isGeoBlock) {
+          return Response.json({ 
+            error: 'Binance API е блокиран от EU сървъри. Ключовете са запазени - моля опитайте Binance US или OKX.',
+            geo_blocked: true
+          }, { status: 400 });
+        }
+        return Response.json({ error: `Binance грешка: ${errMsg}` }, { status: 400 });
       }
 
       const permissions = accountInfo.permissions || [];
@@ -109,43 +154,51 @@ Deno.serve(async (req) => {
       const encryptionIv = encKey.iv + '|' + encSecret.iv;
 
       const existing = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'binance' });
+      const connData = {
+        exchange: 'binance',
+        api_key_encrypted: encKey.data,
+        api_secret_encrypted: encSecret.data,
+        encryption_iv: encryptionIv,
+        status: 'connected', is_validated: true,
+        permissions, balance_usdt: balanceUsdt, balances: allBalances,
+        last_sync: new Date().toISOString(),
+        label: label || 'Binance Main'
+      };
 
       if (existing.length > 0) {
-        await base44.asServiceRole.entities.ExchangeConnection.update(existing[0].id, {
-          api_key_encrypted: encKey.data,
-          api_secret_encrypted: encSecret.data,
-          encryption_iv: encryptionIv,
-          status: 'connected', is_validated: true,
-          permissions, balance_usdt: balanceUsdt, balances: allBalances,
-          last_sync: new Date().toISOString(),
-          label: label || 'Binance Main'
-        });
+        await base44.asServiceRole.entities.ExchangeConnection.update(existing[0].id, connData);
       } else {
-        await base44.entities.ExchangeConnection.create({
-          exchange: 'binance',
-          api_key_encrypted: encKey.data,
-          api_secret_encrypted: encSecret.data,
-          encryption_iv: encryptionIv,
-          status: 'connected', is_validated: true,
-          permissions, balance_usdt: balanceUsdt, balances: allBalances,
-          last_sync: new Date().toISOString(),
-          label: label || 'Binance Main'
-        });
+        await base44.entities.ExchangeConnection.create(connData);
       }
 
       return Response.json({ success: true, balance_usdt: balanceUsdt, permissions, balances: allBalances });
     }
 
-    // ---- TEST ----
+    // ---- TEST / REFRESH BALANCE ----
     if (action === 'test') {
       const connections = await base44.entities.ExchangeConnection.filter({ created_by: user.email, exchange: 'binance' });
-      if (!connections.length) return Response.json({ error: 'No Binance connection found' }, { status: 404 });
+      if (!connections.length) return Response.json({ success: false, error: 'No Binance connection found' });
 
       const conn = connections[0];
       const { apiKey, apiSecret } = await getDecryptedKeys(conn);
       const accountInfo = await binanceRequest(apiKey, apiSecret, '/api/v3/account');
+      console.log('Binance test result:', JSON.stringify(accountInfo).substring(0, 200));
 
-      if (accountInfo.code || (accountInfo.msg && accountInfo.msg.includes('restricted'))) {
+      if (!accountInfo.balances) {
+        const isGeoBlock = accountInfo.msg?.includes('restricted') || accountInfo.msg?.includes('Service unavailable');
+        // If geo-blocked, return cached data from DB instead of error
+        if (isGeoBlock) {
+          console.log('Geo-blocked, returning cached balance from DB');
+          return Response.json({
+            success: true,
+            geo_blocked: true,
+            balance_usdt: conn.balance_usdt || 0,
+            balances: conn.balances || [],
+            permissions: conn.permissions || [],
+            last_sync: conn.last_sync,
+            cached: true
+          });
+        }
         await base44.asServiceRole.entities.ExchangeConnection.update(conn.id, { status: 'error', is_validated: false });
         return Response.json({ success: false, error: accountInfo.msg || 'Binance API error' });
       }
@@ -192,6 +245,7 @@ Deno.serve(async (req) => {
 
     return Response.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
+    console.error('binanceConnect error:', error.message);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

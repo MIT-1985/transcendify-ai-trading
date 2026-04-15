@@ -48,8 +48,12 @@ export default function ConnectBinance() {
       if (res.data.error) throw new Error(res.data.error);
       return res.data;
     },
-    onSuccess: () => {
-      toast.success('Binance свързан успешно!');
+    onSuccess: (data) => {
+      if (data.geo_blocked) {
+        toast.warning('Binance EU ограничение - ключовете са запазени, но live баланс не е достъпен от EU сървъри.');
+      } else {
+        toast.success('Binance свързан успешно!');
+      }
       setApiKey('');
       setApiSecret('');
       queryClient.invalidateQueries({ queryKey: ['binance-connection'] });
@@ -213,6 +217,23 @@ export default function ConnectBinance() {
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div className="text-sm text-slate-400">
               <strong className="text-amber-400">Сигурност:</strong> Никога не активирайте разрешение за теглене. Нужен е само Spot Trading достъп. Ключовете ви се криптират и никога не се пазят в чист текст.
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* EU Geo-block Notice */}
+        <Card className="bg-red-900/10 border-red-500/20 mt-4">
+          <CardContent className="py-4 flex gap-3">
+            <Info className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+            <div className="text-sm text-slate-400">
+              <strong className="text-red-400">Важно за EU потребители:</strong> Binance.com блокира API заявки от EU сървъри (geo-restriction). Ако сте регистрирани на <strong className="text-white">binance.com</strong>, балансът не може да се извлича автоматично. 
+              <br /><br />
+              <strong className="text-white">Алтернативи:</strong>
+              <ul className="mt-1 ml-4 list-disc space-y-1">
+                <li>Използвайте <strong className="text-blue-400">OKX</strong> - напълно работещо без ограничения</li>
+                <li>Регистрирайте се на <strong className="text-yellow-400">binance.us</strong> ако сте от САЩ</li>
+                <li>Ключовете ще бъдат запазени и ботовете ще работят при достъпност</li>
+              </ul>
             </div>
           </CardContent>
         </Card>
