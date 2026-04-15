@@ -115,16 +115,19 @@ Deno.serve(async (req) => {
     const encSecret = await encrypt(api_secret, MASTER_SECRET);
     const encPass = await encrypt(passphrase, MASTER_SECRET);
 
-    // Parse balances
+    // Parse balances - handle both unified account (details) and other structures
     const balances = [];
     let balanceUsdt = 0;
-    if (testRes.data?.[0]?.details) {
-      for (const d of testRes.data[0].details) {
-        const total = parseFloat(d.cashBal || 0);
-        if (total > 0) {
-          balances.push({ asset: d.ccy, free: parseFloat(d.availBal || 0), locked: total - parseFloat(d.availBal || 0) });
-          if (d.ccy === 'USDT' || d.ccy === 'USDC') balanceUsdt += total;
-        }
+    console.log('Connect - full balance data:', JSON.stringify(testRes.data));
+    const acctData = testRes.data?.[0];
+    const details = acctData?.details || acctData?.balData || (Array.isArray(testRes.data) && testRes.data[0]?.ccy ? testRes.data : []);
+    console.log('Connect - details count:', details.length, 'sample:', JSON.stringify(details.slice(0, 5)));
+    for (const d of details) {
+      const total = parseFloat(d.cashBal || d.bal || d.eq || 0);
+      const avail = parseFloat(d.availBal || d.availEq || total);
+      if (total > 0.0001) {
+        balances.push({ asset: d.ccy, free: avail, locked: Math.max(0, total - avail) });
+        if (d.ccy === 'USDT' || d.ccy === 'USDC') balanceUsdt += total;
       }
     }
 
@@ -163,29 +166,40 @@ Deno.serve(async (req) => {
     const passphrase = await decrypt(conn.encryption_iv, MASTER_SECRET);
 
     let res = null;
+    let workingEndpoint = null;
     for (const endpoint of OKX_ENDPOINTS) {
       try {
-        res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
-        if (res.code === '0') break;
-        if (res.code === '50102' || res.code === '50112' || res.code === '50113') break;
+        const r = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
+        console.log(`Balance ${endpoint} code:`, r.code, 'data length:', r.data?.length, 'raw data:', JSON.stringify(r.data?.[0]).substring(0, 200));
+        if (r.code === '0') { res = r; workingEndpoint = endpoint; break; }
+        if (r.code === '50102' || r.code === '50112' || r.code === '50113') { res = r; break; }
       } catch (networkErr) {
         console.log(`OKX ${endpoint} network error:`, networkErr.message);
       }
     }
     if (!res || res.code !== '0') return Response.json({ error: res?.msg || 'Failed to fetch balance' });
 
+    console.log('Working endpoint:', workingEndpoint);
+    console.log('Full response data:', JSON.stringify(res.data));
+
     const balances = [];
     let balanceUsdt = 0;
-    if (res.data?.[0]?.details) {
-      for (const d of res.data[0].details) {
-        const total = parseFloat(d.cashBal || 0);
-        if (total > 0) {
-          balances.push({ asset: d.ccy, free: parseFloat(d.availBal || 0), locked: total - parseFloat(d.availBal || 0) });
-          if (d.ccy === 'USDT' || d.ccy === 'USDC') balanceUsdt += total;
-        }
+    const accountData = res.data?.[0];
+    // Unified account uses 'details', funding account uses 'balData' or direct array
+    const details = accountData?.details || accountData?.balData || (Array.isArray(res.data) && res.data[0]?.ccy ? res.data : []);
+    console.log('Details length:', details.length, 'Sample:', JSON.stringify(details.slice(0, 5)));
+    
+    for (const d of details) {
+      // cashBal = total, availBal = available. Also try eq (equity) fields for unified account
+      const total = parseFloat(d.cashBal || d.bal || d.eq || 0);
+      const avail = parseFloat(d.availBal || d.availEq || d.frozenBal || total);
+      if (total > 0.0001) {
+        balances.push({ asset: d.ccy, free: avail, locked: Math.max(0, total - avail) });
+        if (d.ccy === 'USDT' || d.ccy === 'USDC') balanceUsdt += total;
       }
     }
 
+    console.log('Final balances:', JSON.stringify(balances), 'USDT:', balanceUsdt);
     await base44.entities.ExchangeConnection.update(conn.id, { balances, balance_usdt: balanceUsdt, last_sync: new Date().toISOString() });
     return Response.json({ success: true, balances, balance_usdt: balanceUsdt });
   }

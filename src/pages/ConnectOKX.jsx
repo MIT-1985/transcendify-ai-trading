@@ -26,6 +26,13 @@ export default function ConnectOKX() {
 
   const connected = connections.find(c => c.status === 'connected');
 
+  // Auto-refresh balance on load if connected
+  useEffect(() => {
+    if (connected) {
+      base44.functions.invoke('okxConnect', { action: 'balance' }).then(() => refetch()).catch(() => {});
+    }
+  }, [connected?.id]);
+
   const handleConnect = async () => {
     setLoading(true);
     setResult(null);
@@ -59,8 +66,18 @@ export default function ConnectOKX() {
 
   const handleRefresh = async () => {
     setLoading(true);
-    await base44.functions.invoke('okxConnect', { action: 'balance' });
-    await refetch();
+    setResult(null);
+    try {
+      const res = await base44.functions.invoke('okxConnect', { action: 'balance' });
+      await refetch();
+      if (res.data?.success) {
+        setResult({ type: 'success', message: `Балансът е обновен: $${(res.data.balance_usdt || 0).toFixed(2)} USDT` });
+      } else {
+        setResult({ type: 'error', message: res.data?.error || 'Грешка при обновяване' });
+      }
+    } catch (e) {
+      setResult({ type: 'error', message: 'Грешка при обновяване на баланса' });
+    }
     setLoading(false);
   };
 
@@ -110,6 +127,14 @@ export default function ConnectOKX() {
               <div className="text-3xl font-bold text-yellow-400">${(connected.balance_usdt || 0).toFixed(2)}</div>
               <div className="text-xs text-slate-500 mt-1">Последно обновяване: {connected.last_sync ? new Date(connected.last_sync).toLocaleTimeString('bg-BG') : '-'}</div>
             </div>
+
+            {/* Refresh result */}
+            {result && (
+              <div className={`mb-3 flex items-center gap-2 p-3 rounded-lg ${result.type === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                {result.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                <span className="text-sm">{result.message}</span>
+              </div>
+            )}
 
             {/* Asset Balances */}
             {connected.balances?.length > 0 && (
