@@ -43,7 +43,7 @@ export default function Bots() {
         cancel_url: `${window.location.origin}/Bots`,
       });
       if (res.data?.url) {
-        window.open(res.data.url, '_blank');
+        window.location.href = res.data.url;
       } else {
         throw new Error(res.data?.error || 'Failed to start checkout');
       }
