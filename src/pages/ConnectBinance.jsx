@@ -283,10 +283,20 @@ export default function ConnectBinance() {
               Ако Binance изисква символи в белия списък, добавете следните двойки за да работят ботовете:
               <br /><br />
               <div className="bg-slate-800/60 rounded-lg p-3 font-mono text-xs text-emerald-300 flex flex-wrap gap-2 my-2">
-                {['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','MATICUSDT','LINKUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','ETCUSDT'].map(s => (
+                {[
+                  'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT',
+                  'DOTUSDT','MATICUSDT','LINKUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','ETCUSDT',
+                  'NEARUSDT','FTMUSDT','SANDUSDT','MANAUSDT','AXSUSDT','AAVEUSDT','COMPUSDT',
+                  'SHIBUSDT','TRXUSDT','XLMUSDT','VETUSDT','FILUSDT','ICPUSDT','HBARUSDT',
+                  'ALGOUSDT','EGLDUSDT','XTZUSDT','THETAUSDT','APEUSDT','GALAUSDT','ENJUSDT',
+                  'CHZUSDT','RUNEUSDT','KAVAUSDT','ZILUSDT','ONTUSDT','WAVESUSDT','IOSTUSDT',
+                  'BTCUSDC','ETHUSDC','SOLUSDC','BNBUSDC','XRPUSDC',
+                  'ETHBTC','BNBBTC','SOLBTC','XRPBTC'
+                ].map(s => (
                   <span key={s} className="bg-slate-700 px-2 py-0.5 rounded">{s}</span>
                 ))}
               </div>
+              <p className="text-xs text-slate-500 mt-1">💡 Препоръчително: добавете всички показани символи за максимална съвместимост с ботовете.</p>
               <strong className="text-white">Как:</strong> Binance → API Management → Edit → "Бял списък символи" → добавете символите → Потвърди
             </div>
           </CardContent>
