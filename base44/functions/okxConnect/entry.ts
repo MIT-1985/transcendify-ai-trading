@@ -276,6 +276,11 @@ Deno.serve(async (req) => {
     if (!connections.length) return Response.json({ error: 'No OKX connection found' });
 
     const conn = connections[0];
+    // Verify ownership before decrypting and using keys
+    if (conn.created_by !== user.email) {
+      console.error(`SECURITY: user ${user.email} tried to trade with connection owned by ${conn.created_by}`);
+      return Response.json({ error: 'Unauthorized' }, { status: 403 });
+    }
     const apiKey = await decrypt(conn.api_key_encrypted, MASTER_SECRET);
     const apiSecret = await decrypt(conn.api_secret_encrypted, MASTER_SECRET);
     const passphrase = await decrypt(conn.encryption_iv, MASTER_SECRET);
