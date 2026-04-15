@@ -251,19 +251,24 @@ export default function ConnectBinance() {
           </CardContent>
         </Card>
 
-        {/* EU Geo-block Notice */}
+        {/* IP Whitelist Notice */}
         <Card className="bg-red-900/10 border-red-500/20 mt-4">
           <CardContent className="py-4 flex gap-3">
             <Info className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
             <div className="text-sm text-slate-400">
-              <strong className="text-red-400">Важно за EU потребители:</strong> Binance.com блокира API заявки от EU сървъри (geo-restriction). Ако сте регистрирани на <strong className="text-white">binance.com</strong>, балансът не може да се извлича автоматично. 
+              <strong className="text-red-400">⚠️ Задължително: Изключете IP ограничението!</strong>
               <br /><br />
-              <strong className="text-white">Алтернативи:</strong>
-              <ul className="mt-1 ml-4 list-disc space-y-1">
-                <li>Използвайте <strong className="text-blue-400">OKX</strong> - напълно работещо без ограничения</li>
-                <li>Регистрирайте се на <strong className="text-yellow-400">binance.us</strong> ако сте от САЩ</li>
-                <li>Ключовете ще бъдат запазени и ботовете ще работят при достъпност</li>
-              </ul>
+              Binance API ключовете по подразбиране изискват IP whitelist. Трябва да зададете <strong className="text-white">"Unrestricted"</strong> или да добавите нашите сървърни IP адреси.
+              <br /><br />
+              <strong className="text-white">Как да оправите:</strong>
+              <ol className="mt-1 ml-4 list-decimal space-y-1">
+                <li>Отидете в <strong className="text-yellow-400">Binance → Profile → API Management</strong></li>
+                <li>Намерете вашия API ключ и натиснете <strong className="text-white">Edit</strong></li>
+                <li>В "IP access restrictions" изберете <strong className="text-emerald-400">"Unrestricted (Less Secure)"</strong></li>
+                <li>Потвърдете и изчакайте 5 минути преди да опитате отново</li>
+              </ol>
+              <br />
+              <strong className="text-slate-300">Алтернатива:</strong> Използвайте <strong className="text-blue-400">OKX</strong> — работи без ограничения.
             </div>
           </CardContent>
         </Card>
