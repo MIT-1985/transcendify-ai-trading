@@ -76,8 +76,8 @@ button:focus-visible {
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --background: 222 47% 5%;
+    --foreground: 0 0% 100%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
@@ -113,6 +113,7 @@ button:focus-visible {
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 100%;
+    color-scheme: dark;
     --card: 0 0% 3.9%;
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 3.9%;
@@ -151,18 +152,25 @@ button:focus-visible {
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    color: inherit;
   }
   body {
-    @apply bg-background text-foreground;
-    color: #ffffff;
-  }
-
-  /* Force white text on dark backgrounds throughout the app */
-  input, textarea, select {
+    @apply bg-background;
     color: #ffffff !important;
   }
 
+  /* Force ALL text white globally */
+  p, span, div, h1, h2, h3, h4, h5, h6, li, td, th, label, a, button, 
+  strong, em, small, pre, code, blockquote, figcaption, legend, caption {
+    color: inherit;
+  }
+
+  input, textarea, select {
+    color: #ffffff !important;
+    caret-color: #ffffff !important;
+  }
+
   input::placeholder, textarea::placeholder {
-    color: rgba(255, 255, 255, 0.45) !important;
+    color: rgba(255, 255, 255, 0.5) !important;
   }
 }
