@@ -37,12 +37,26 @@ export default function ConnectBinance() {
     }
   });
 
+  const validateKeys = () => {
+    const cleanKey = apiKey.trim();
+    const cleanSecret = apiSecret.trim();
+    if (cleanKey.length < 10 || cleanSecret.length < 10) {
+      toast.error('API Key или Secret е твърде кратък. Моля проверете дали сте копирали целия ключ.');
+      return false;
+    }
+    if (cleanKey.includes(' ') || cleanSecret.includes(' ')) {
+      toast.error('API Key или Secret съдържа интервали. Моля изтрийте излишните символи.');
+      return false;
+    }
+    return true;
+  };
+
   const connectMutation = useMutation({
     mutationFn: async () => {
       const res = await base44.functions.invoke('binanceConnect', {
         action: 'connect',
-        api_key: apiKey,
-        api_secret: apiSecret,
+        api_key: apiKey.trim(),
+        api_secret: apiSecret.trim(),
         label
       });
       if (res.data.error) throw new Error(res.data.error);
@@ -58,7 +72,16 @@ export default function ConnectBinance() {
       setApiSecret('');
       queryClient.invalidateQueries({ queryKey: ['binance-connection'] });
     },
-    onError: (err) => toast.error(err.message || 'Грешка при свързване')
+    onError: (err) => {
+      const msg = err.message || '';
+      if (msg.includes('API-key format invalid') || msg.includes('format invalid')) {
+        toast.error('Невалиден формат на API Key. Моля копирайте ключа отново от Binance → API Management. Уверете се че ключът е пълен и без допълнителни символи.');
+      } else if (msg.includes('Invalid API-key') || msg.includes('permissions')) {
+        toast.error('API Key е невалиден или няма необходимите разрешения. Проверете дали ключът е активен в Binance.');
+      } else {
+        toast.error(msg || 'Грешка при свързване');
+      }
+    }
   });
 
   const testMutation = useMutation({
@@ -176,7 +199,14 @@ export default function ConnectBinance() {
                 <Input value={label} onChange={e => setLabel(e.target.value)} placeholder="напр. Binance Main" className="bg-slate-800 border-slate-700 mt-1" />
               </div>
               <div>
-                <Label className="text-slate-300">API Key</Label>
+                <Label className="text-slate-300 flex items-center justify-between">
+                  API Key
+                  {apiKey.trim().length > 0 && (
+                    <span className={`text-xs font-mono ${apiKey.trim().length >= 60 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {apiKey.trim().length} символа {apiKey.trim().length < 60 ? '⚠ твърде кратък?' : '✓'}
+                    </span>
+                  )}
+                </Label>
                 <Input value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Поставете Binance API key" className="bg-slate-800 border-slate-700 mt-1 font-mono text-sm" />
               </div>
               <div>
@@ -195,7 +225,7 @@ export default function ConnectBinance() {
                 </div>
               </div>
               <Button
-                onClick={() => connectMutation.mutate()}
+                onClick={() => validateKeys() && connectMutation.mutate()}
                 disabled={!apiKey || !apiSecret || connectMutation.isPending}
                 className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-semibold"
               >
