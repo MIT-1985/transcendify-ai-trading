@@ -278,18 +278,16 @@ export default function ConnectBinance() {
           <CardContent className="py-4 flex gap-3">
             <AlertTriangle className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
             <div className="text-sm text-slate-400">
-              <strong className="text-orange-400">⚠️ Оставете "Бял списък с валутни двойки" ПРАЗЕН!</strong>
+              <strong className="text-orange-400">⚠️ Бял списък с валутни двойки — добавете всички необходими символи</strong>
               <br /><br />
-              Binance позволява ограничаване на API ключа до конкретни двойки (напр. само EULUSDC). Ако сте добавили символи там, ботовете не могат да търгуват с останалите двойки.
+              Ако Binance изисква символи в белия списък, добавете следните двойки за да работят ботовете:
               <br /><br />
-              <strong className="text-white">Как да оправите:</strong>
-              <ol className="mt-1 ml-4 list-decimal space-y-1">
-                <li>Отидете в <strong className="text-yellow-400">Binance → Profile → API Management</strong></li>
-                <li>Натиснете <strong className="text-white">Edit</strong> на вашия ключ</li>
-                <li>Намерете <strong className="text-white">"Бял списък със спот и маржин символи"</strong></li>
-                <li>Изтрийте всички добавени символи — оставете полето <strong className="text-emerald-400">напълно празно</strong></li>
-                <li>Потвърдете с <strong className="text-white">"Потвърди"</strong></li>
-              </ol>
+              <div className="bg-slate-800/60 rounded-lg p-3 font-mono text-xs text-emerald-300 flex flex-wrap gap-2 my-2">
+                {['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','MATICUSDT','LINKUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','ETCUSDT'].map(s => (
+                  <span key={s} className="bg-slate-700 px-2 py-0.5 rounded">{s}</span>
+                ))}
+              </div>
+              <strong className="text-white">Как:</strong> Binance → API Management → Edit → "Бял списък символи" → добавете символите → Потвърди
             </div>
           </CardContent>
         </Card>
