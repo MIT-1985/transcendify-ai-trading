@@ -14,17 +14,24 @@ export function useBotEngine(subscription, vipLevel = 'none') {
     if (!isRunning) setIsRunning(true);
 
     let binanceConnected = false;
+    let okxConnected = false;
 
-    const checkBinance = async () => {
+    const checkConnections = async () => {
       try {
         const res = await base44.functions.invoke('binanceConnect', { action: 'status' });
         binanceConnected = res.data?.connected === true;
       } catch (e) {
         binanceConnected = false;
       }
+      try {
+        const connections = await base44.entities.ExchangeConnection.filter({ exchange: 'okx', status: 'connected' });
+        okxConnected = connections.length > 0;
+      } catch (e) {
+        okxConnected = false;
+      }
     };
 
-    checkBinance();
+    checkConnections();
 
     const interval = setInterval(async () => {
       setElapsedSeconds(function(prev) { return prev + 1; });
@@ -54,6 +61,39 @@ export function useBotEngine(subscription, vipLevel = 'none') {
         const isBuy = Math.random() > 0.5;
         const quantity = Number((positionSize / currentPrice).toFixed(8));
 
+        // OKX live trading
+        if (okxConnected && subscription.exchange === 'okx') {
+          try {
+            const dcaAmount = subscription.dca_amount || 10;
+            // Convert symbol from BTC-USDT format (OKX uses BTC-USDT)
+            const okxSymbol = symbol.replace('/', '-').replace('X:', '').replace('USD', 'USDT');
+            // For DCA strategy, always BUY at market price
+            const result = await base44.functions.invoke('okxConnect', {
+              action: 'trade',
+              instId: okxSymbol,
+              side: 'buy',
+              ordType: 'market',
+              sz: String(dcaAmount) // USDT amount for market buy
+            });
+            if (result.data?.success) {
+              const newTrades = (subscription.total_trades || 0) + 1;
+              await base44.entities.UserSubscription.update(subscription.id, {
+                total_trades: newTrades
+              });
+              setLastTradeTime(now);
+              setTimeout(function() {
+                queryClient.invalidateQueries({ queryKey: ['userSubscriptions'] });
+              }, 2000);
+            } else {
+              console.error('[OKX BOT]', result.data?.error);
+            }
+          } catch (okxErr) {
+            console.error('[OKX BOT ERROR]', okxErr.message);
+          }
+          return;
+        }
+
+        // Binance live trading
         if (binanceConnected) {
           try {
             const side = isBuy ? 'BUY' : 'SELL';

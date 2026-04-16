@@ -256,7 +256,7 @@ Deno.serve(async (req) => {
     }
 
     const balances = Object.entries(balanceMap).map(([asset, b]) => ({ asset, free: b.free, locked: b.locked }));
-    const balanceUsdt = balances.filter(b => b.ccy === 'USDT' || b.asset === 'USDT' || b.asset === 'USDC')
+    const balanceUsdt = balances.filter(b => b.asset === 'USDT' || b.asset === 'USDC')
       .reduce((sum, b) => sum + b.free + b.locked, 0);
 
     console.log('Final balances:', JSON.stringify(balances), 'USDT:', balanceUsdt);
@@ -285,7 +285,11 @@ Deno.serve(async (req) => {
     const apiSecret = await decrypt(conn.api_secret_encrypted, MASTER_SECRET);
     const passphrase = await decrypt(conn.encryption_iv, MASTER_SECRET);
 
-    const orderBody = JSON.stringify({ instId, tdMode: 'cash', side, ordType, sz, ...(px ? { px } : {}) });
+    // For market buy with USDT amount, use tgtCcy=quote_ccy so sz means USDT not base coin
+    const orderPayload = { instId, tdMode: 'cash', side, ordType, sz };
+    if (ordType === 'market' && side === 'buy') orderPayload.tgtCcy = 'quote_ccy';
+    if (px) orderPayload.px = px;
+    const orderBody = JSON.stringify(orderPayload);
     const res = await okxRequest(apiKey, apiSecret, passphrase, 'POST', '/api/v5/trade/order', orderBody);
 
     return Response.json({ success: res.code === '0', data: res.data, error: res.msg });

@@ -45,18 +45,19 @@ export default function Dashboard() {
     retry: false
   });
 
-  // Auto-refresh Binance balance on load - scoped to current user
+  // Auto-refresh exchange balances on load
   useEffect(() => {
     if (!user?.email) return;
-    const refreshBinance = async () => {
+    const refreshBalances = async () => {
       try {
         await base44.functions.invoke('binanceConnect', { action: 'test' });
-        refetchConnections();
-      } catch (e) {
-        // silently fail - cached data will be shown
-      }
+      } catch (e) {}
+      try {
+        await base44.functions.invoke('okxConnect', { action: 'balance' });
+      } catch (e) {}
+      refetchConnections();
     };
-    refreshBinance();
+    refreshBalances();
   }, [user?.email]);
 
   const { data: bots = [] } = useQuery({
