@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
@@ -183,29 +183,66 @@ export default function OKXDashboard() {
   const [tickers, setTickers] = useState([]);
   const [loadingTickers, setLoadingTickers] = useState(false);
 
-  const { data: connections = [] } = useQuery({
-    queryKey: ['okx-connections', user?.email],
+  const { data: connectionsByCreator = [] } = useQuery({
+    queryKey: ['okx-connections-creator', user?.email],
     queryFn: () => base44.entities.ExchangeConnection.filter({ created_by: user?.email, exchange: 'okx' }),
     enabled: !!user,
     staleTime: 60000,
     retry: false
   });
+  const { data: connectionsByEmail = [] } = useQuery({
+    queryKey: ['okx-connections-email', user?.email],
+    queryFn: () => base44.entities.ExchangeConnection.filter({ user_email: user?.email, exchange: 'okx' }),
+    enabled: !!user,
+    staleTime: 60000,
+    retry: false
+  });
+  const connections = useMemo(() => {
+    const seen = new Set();
+    return [...connectionsByCreator, ...connectionsByEmail].filter(c => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  }, [connectionsByCreator, connectionsByEmail]);
 
-  const { data: trades = [] } = useQuery({
-    queryKey: ['trades', user?.email],
+  const { data: tradesByCreator = [] } = useQuery({
+    queryKey: ['trades-creator', user?.email],
     queryFn: () => base44.entities.Trade.filter({ created_by: user?.email }),
     enabled: !!user,
     staleTime: 15000,
     retry: false
   });
+  const { data: tradesByEmail = [] } = useQuery({
+    queryKey: ['trades-email', user?.email],
+    queryFn: () => base44.entities.Trade.filter({ user_email: user?.email }),
+    enabled: !!user,
+    staleTime: 15000,
+    retry: false
+  });
+  const trades = useMemo(() => {
+    const seen = new Set();
+    return [...tradesByCreator, ...tradesByEmail].filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
+  }, [tradesByCreator, tradesByEmail]);
 
-  const { data: subscriptions = [] } = useQuery({
-    queryKey: ['subscriptions', user?.email],
+  const { data: subsByCreator = [] } = useQuery({
+    queryKey: ['subs-creator', user?.email],
     queryFn: () => base44.entities.UserSubscription.filter({ created_by: user?.email }),
     enabled: !!user,
     staleTime: 30000,
     retry: false
   });
+  const { data: subsByEmail = [] } = useQuery({
+    queryKey: ['subs-email', user?.email],
+    queryFn: () => base44.entities.UserSubscription.filter({ user_email: user?.email }),
+    enabled: !!user,
+    staleTime: 30000,
+    retry: false
+  });
+  const subscriptions = useMemo(() => {
+    const seen = new Set();
+    return [...subsByCreator, ...subsByEmail].filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
+  }, [subsByCreator, subsByEmail]);
 
   const { data: bots = [] } = useQuery({
     queryKey: ['bots'],

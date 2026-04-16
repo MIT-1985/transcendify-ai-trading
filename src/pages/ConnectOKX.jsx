@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
@@ -16,13 +16,25 @@ export default function ConnectOKX() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
-  const { data: connections = [], refetch } = useQuery({
-    queryKey: ['okx-connections', user?.email],
+  const { data: connectionsByCreator = [], refetch: refetch1 } = useQuery({
+    queryKey: ['okx-conn-creator', user?.email],
     queryFn: () => base44.entities.ExchangeConnection.filter({ created_by: user?.email, exchange: 'okx' }),
     enabled: !!user,
     staleTime: 30000,
     retry: false
   });
+  const { data: connectionsByEmail = [], refetch: refetch2 } = useQuery({
+    queryKey: ['okx-conn-email', user?.email],
+    queryFn: () => base44.entities.ExchangeConnection.filter({ user_email: user?.email, exchange: 'okx' }),
+    enabled: !!user,
+    staleTime: 30000,
+    retry: false
+  });
+  const refetch = () => { refetch1(); refetch2(); };
+  const connections = useMemo(() => {
+    const seen = new Set();
+    return [...connectionsByCreator, ...connectionsByEmail].filter(c => { if (seen.has(c.id)) return false; seen.add(c.id); return true; });
+  }, [connectionsByCreator, connectionsByEmail]);
 
   const connected = connections.find(c => c.status === 'connected');
 
