@@ -1,0 +1,135 @@
+{
+  "name": "UserSubscription",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email of the user who owns this subscription"
+    },
+    "bot_id": {
+      "type": "string",
+      "description": "Reference to the trading bot"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "expired",
+        "cancelled"
+      ],
+      "default": "active"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "api_key_configured": {
+      "type": "boolean",
+      "default": false
+    },
+    "exchange": {
+      "type": "string",
+      "enum": [
+        "binance",
+        "coinbase",
+        "kraken",
+        "bybit",
+        "okx"
+      ]
+    },
+    "trading_pairs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "capital_allocated": {
+      "type": "number"
+    },
+    "total_profit": {
+      "type": "number",
+      "default": 0
+    },
+    "total_trades": {
+      "type": "number",
+      "default": 0
+    },
+    "stop_loss": {
+      "type": "number",
+      "description": "Stop loss percentage",
+      "default": 5
+    },
+    "take_profit": {
+      "type": "number",
+      "description": "Take profit percentage",
+      "default": 10
+    },
+    "grid_levels": {
+      "type": "number",
+      "description": "Number of grid levels",
+      "default": 10
+    },
+    "grid_spacing": {
+      "type": "number",
+      "description": "Grid spacing percentage",
+      "default": 1
+    },
+    "dca_interval": {
+      "type": "number",
+      "description": "DCA interval in minutes",
+      "default": 60
+    },
+    "dca_amount": {
+      "type": "number",
+      "description": "DCA amount per buy",
+      "default": 100
+    },
+    "momentum_period": {
+      "type": "number",
+      "description": "Momentum period in minutes",
+      "default": 15
+    },
+    "momentum_threshold": {
+      "type": "number",
+      "description": "Momentum threshold percentage",
+      "default": 2
+    },
+    "max_position_size": {
+      "type": "number",
+      "description": "Maximum position size as percentage of capital",
+      "default": 25
+    },
+    "trailing_stop": {
+      "type": "boolean",
+      "description": "Enable trailing stop loss",
+      "default": false
+    },
+    "ai_enabled": {
+      "type": "boolean",
+      "description": "Enable AI-powered strategy optimization",
+      "default": false
+    },
+    "ai_prompt": {
+      "type": "string",
+      "description": "Custom AI prompt for strategy generation"
+    },
+    "last_feedback_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time user provided feedback"
+    },
+    "feedback_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of feedbacks provided"
+    }
+  },
+  "required": [
+    "bot_id"
+  ]
+}
