@@ -201,7 +201,8 @@ Deno.serve(async (req) => {
     for (const endpoint of OKX_ENDPOINTS) {
       try {
         const r = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
-        console.log(`Trading balance ${endpoint} code:`, r.code, 'sample:', JSON.stringify(r.data?.[0]).substring(0, 300));
+        const sample = r.data?.[0] ? JSON.stringify(r.data[0]).substring(0, 300) : 'no data';
+        console.log(`Trading balance ${endpoint} code:`, r.code, 'sample:', sample);
         if (r.code === '0') { tradingRes = r; workingEndpoint = endpoint; break; }
         if (r.code === '50102' || r.code === '50112' || r.code === '50113') { tradingRes = r; break; }
       } catch (networkErr) {
@@ -251,7 +252,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!tradingRes || tradingRes.code !== '0') {
+    // If neither trading nor funding returned data, error
+    if (!tradingRes || (tradingRes.code !== '0' && (!fundingRes || fundingRes.code !== '0'))) {
       return Response.json({ error: tradingRes?.msg || 'Failed to fetch balance' });
     }
 
