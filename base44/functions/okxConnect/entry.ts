@@ -148,12 +148,16 @@ Deno.serve(async (req) => {
       }
     }
     for (const d of (fundingData || [])) {
-      const total = parseFloat(d.bal || d.availBal || 0);
+      const total = parseFloat(d.bal || 0);
       const avail = parseFloat(d.availBal || total);
+      const frozen = parseFloat(d.frozenBal || 0);
       if (total > 0.0001) {
-        balanceMap[d.ccy] = balanceMap[d.ccy] || { free: 0, locked: 0 };
-        balanceMap[d.ccy].free += avail;
-        balanceMap[d.ccy].locked += Math.max(0, total - avail);
+        const existing = balanceMap[d.ccy] || { free: 0, locked: 0 };
+        if (avail > existing.free || frozen > existing.locked) {
+          balanceMap[d.ccy] = { free: Math.max(avail, existing.free), locked: Math.max(frozen, existing.locked) };
+        } else if (!balanceMap[d.ccy]) {
+          balanceMap[d.ccy] = { free: avail, locked: frozen };
+        }
       }
     }
     const balances = Object.entries(balanceMap).map(([asset, b]) => ({ asset, free: b.free, locked: b.locked }));
@@ -231,7 +235,7 @@ Deno.serve(async (req) => {
 
     const balanceMap = {}; // asset -> { free, locked }
 
-    // Parse Trading account (Unified)
+    // Parse Trading account (Unified) - may be empty if user only has Spot/Funding account
     if (tradingRes?.code === '0') {
       const accountData = tradingRes.data?.[0];
       const details = accountData?.details || [];
@@ -247,17 +251,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Parse Funding account (asset wallet)
+    // Parse Funding account (asset/spot wallet) - ALWAYS fetch this, many users only have funding wallet
     if (fundingRes?.code === '0') {
       const fundingItems = fundingRes.data || [];
       console.log('Funding items count:', fundingItems.length);
       for (const d of fundingItems) {
-        const total = parseFloat(d.bal || d.availBal || 0);
+        const total = parseFloat(d.bal || 0);
         const avail = parseFloat(d.availBal || total);
+        const frozen = parseFloat(d.frozenBal || 0);
         if (total > 0.0001) {
-          balanceMap[d.ccy] = balanceMap[d.ccy] || { free: 0, locked: 0 };
-          balanceMap[d.ccy].free += avail;
-          balanceMap[d.ccy].locked += Math.max(0, total - avail);
+          // Use max to avoid double-counting if asset exists in both wallets
+          const existing = balanceMap[d.ccy] || { free: 0, locked: 0 };
+          // If funding has more, prefer funding data (trading details may be empty)
+          if (avail > existing.free || frozen > existing.locked) {
+            balanceMap[d.ccy] = { free: Math.max(avail, existing.free), locked: Math.max(frozen, existing.locked) };
+          } else if (!balanceMap[d.ccy]) {
+            balanceMap[d.ccy] = { free: avail, locked: frozen };
+          }
         }
       }
     }
