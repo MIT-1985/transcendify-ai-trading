@@ -181,11 +181,17 @@ Deno.serve(async (req) => {
       balance_usdt: balanceUsdt,
       balances,
       last_sync: new Date().toISOString(),
-      label: label || 'OKX Account'
+      label: label || 'OKX Account',
+      user_email: user.email  // Always store user_email so dual-filter works reliably
     };
 
     if (existing.length > 0) {
+      // Update the first found record, delete any duplicates
       await base44.asServiceRole.entities.ExchangeConnection.update(existing[0].id, data);
+      for (let i = 1; i < existing.length; i++) {
+        await base44.asServiceRole.entities.ExchangeConnection.delete(existing[i].id);
+        console.log(`Deleted duplicate connection: ${existing[i].id}`);
+      }
     } else {
       await base44.asServiceRole.entities.ExchangeConnection.create(data);
     }
@@ -287,7 +293,7 @@ Deno.serve(async (req) => {
       console.error(`SECURITY: user ${user.email} tried to access connection owned by ${conn.created_by}`);
       return Response.json({ error: 'Unauthorized' }, { status: 403 });
     }
-    await base44.asServiceRole.entities.ExchangeConnection.update(conn.id, { balances, balance_usdt: balanceUsdt, last_sync: new Date().toISOString() });
+    await base44.asServiceRole.entities.ExchangeConnection.update(conn.id, { balances, balance_usdt: balanceUsdt, last_sync: new Date().toISOString(), user_email: user.email });
     return Response.json({ success: true, balances, balance_usdt: balanceUsdt });
   }
 
