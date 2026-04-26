@@ -1,0 +1,44 @@
+{
+  "name": "Referral",
+  "type": "object",
+  "properties": {
+    "referrer_email": {
+      "type": "string",
+      "description": "Email of the person who referred"
+    },
+    "referred_email": {
+      "type": "string",
+      "description": "Email of the referred person"
+    },
+    "level": {
+      "type": "number",
+      "description": "Referral level (1-3)"
+    },
+    "commission_rate": {
+      "type": "number",
+      "description": "Commission percentage"
+    },
+    "total_commission_earned": {
+      "type": "number",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "active",
+        "inactive"
+      ],
+      "default": "pending"
+    },
+    "signup_date": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "referrer_email",
+    "referred_email",
+    "level"
+  ]
+}

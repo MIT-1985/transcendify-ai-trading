@@ -1,0 +1,61 @@
+{
+  "name": "Transaction",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "deposit",
+        "withdrawal",
+        "commission",
+        "bot_profit",
+        "subscription_payment",
+        "fuel_purchase"
+      ]
+    },
+    "amount": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string",
+      "enum": [
+        "TFI",
+        "USD",
+        "BTC",
+        "ETH"
+      ],
+      "default": "TFI"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "default": "pending"
+    },
+    "reference": {
+      "type": "string",
+      "description": "Transaction reference or ID"
+    },
+    "description": {
+      "type": "string"
+    },
+    "from_address": {
+      "type": "string"
+    },
+    "to_address": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "type",
+    "amount"
+  ]
+}

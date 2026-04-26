@@ -1,0 +1,21 @@
+{
+  "name": "Watchlist",
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string",
+      "description": "Crypto symbol (e.g., X:BTCUSD)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name"
+    },
+    "notes": {
+      "type": "string",
+      "description": "User notes"
+    }
+  },
+  "required": [
+    "symbol"
+  ]
+}

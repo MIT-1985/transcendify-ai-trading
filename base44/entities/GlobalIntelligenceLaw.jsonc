@@ -1,0 +1,53 @@
+{
+  "name": "GlobalIntelligenceLaw",
+  "type": "object",
+  "properties": {
+    "domain": {
+      "type": "string",
+      "description": "Field of study (Physics, AI, Trading, etc.)"
+    },
+    "law_principle": {
+      "type": "string",
+      "description": "Name of the law or principle"
+    },
+    "formula_statement": {
+      "type": "string",
+      "description": "Mathematical formula representation"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "Theoretical",
+        "Empirical",
+        "Model",
+        "Heuristic",
+        "Observational"
+      ],
+      "description": "Type of law/principle"
+    },
+    "use_cases_notes": {
+      "type": "string",
+      "description": "Application areas"
+    },
+    "epoch_version": {
+      "type": "string",
+      "description": "Version or category grouping"
+    },
+    "kpi_value": {
+      "type": "number",
+      "description": "TROK KPI value (0-1)",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "optimization_weight": {
+      "type": "number",
+      "description": "Weight in optimization calculations",
+      "default": 1.0
+    }
+  },
+  "required": [
+    "domain",
+    "law_principle",
+    "formula_statement"
+  ]
+}

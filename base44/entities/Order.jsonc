@@ -1,0 +1,87 @@
+{
+  "name": "Order",
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string",
+      "description": "Trading pair (e.g., X:BTCUSD)"
+    },
+    "side": {
+      "type": "string",
+      "enum": [
+        "BUY",
+        "SELL"
+      ],
+      "description": "Order side"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "MARKET",
+        "LIMIT",
+        "STOP_LOSS",
+        "TAKE_PROFIT"
+      ],
+      "default": "MARKET",
+      "description": "Order type"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Amount to buy/sell"
+    },
+    "price": {
+      "type": "number",
+      "description": "Price (for limit orders)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "FILLED",
+        "PARTIALLY_FILLED",
+        "CANCELLED",
+        "REJECTED"
+      ],
+      "default": "PENDING",
+      "description": "Order status"
+    },
+    "filled_quantity": {
+      "type": "number",
+      "default": 0,
+      "description": "Amount filled"
+    },
+    "average_price": {
+      "type": "number",
+      "description": "Average execution price"
+    },
+    "total_value": {
+      "type": "number",
+      "description": "Total order value"
+    },
+    "fee": {
+      "type": "number",
+      "default": 0,
+      "description": "Trading fee"
+    },
+    "execution_mode": {
+      "type": "string",
+      "enum": [
+        "SIM",
+        "TESTNET",
+        "MAINNET"
+      ],
+      "default": "SIM",
+      "description": "Execution environment"
+    },
+    "filled_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When order was filled"
+    }
+  },
+  "required": [
+    "symbol",
+    "side",
+    "quantity"
+  ]
+}

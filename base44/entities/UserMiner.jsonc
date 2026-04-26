@@ -1,0 +1,38 @@
+{
+  "name": "UserMiner",
+  "type": "object",
+  "properties": {
+    "miner_id": {
+      "type": "string",
+      "description": "Reference to the miner"
+    },
+    "purchase_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "total_fuel_generated": {
+      "type": "number",
+      "default": 0
+    },
+    "active_minutes_today": {
+      "type": "number",
+      "default": 0
+    },
+    "last_mining_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "benchmark_factor": {
+      "type": "number",
+      "default": 1.0,
+      "description": "Device performance multiplier"
+    }
+  },
+  "required": [
+    "miner_id"
+  ]
+}

@@ -1,0 +1,177 @@
+{
+  "name": "CustomStrategy",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Strategy name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Strategy description"
+    },
+    "indicators": {
+      "type": "object",
+      "description": "Technical indicators configuration",
+      "properties": {
+        "rsi": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "period": {
+              "type": "number",
+              "default": 14
+            },
+            "overbought": {
+              "type": "number",
+              "default": 70
+            },
+            "oversold": {
+              "type": "number",
+              "default": 30
+            }
+          }
+        },
+        "macd": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "fast": {
+              "type": "number",
+              "default": 12
+            },
+            "slow": {
+              "type": "number",
+              "default": 26
+            },
+            "signal": {
+              "type": "number",
+              "default": 9
+            }
+          }
+        },
+        "bollinger": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "period": {
+              "type": "number",
+              "default": 20
+            },
+            "stdDev": {
+              "type": "number",
+              "default": 2
+            }
+          }
+        },
+        "sma": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "periods": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "default": [
+                20,
+                50
+              ]
+            }
+          }
+        },
+        "ema": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "periods": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "default": [
+                12,
+                26
+              ]
+            }
+          }
+        }
+      }
+    },
+    "entry_conditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "indicator": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          }
+        }
+      },
+      "description": "Entry signal conditions"
+    },
+    "exit_conditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "indicator": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          }
+        }
+      },
+      "description": "Exit signal conditions"
+    },
+    "risk_management": {
+      "type": "object",
+      "properties": {
+        "stop_loss": {
+          "type": "number",
+          "default": 5
+        },
+        "take_profit": {
+          "type": "number",
+          "default": 10
+        },
+        "trailing_stop": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

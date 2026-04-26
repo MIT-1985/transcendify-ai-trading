@@ -1,0 +1,72 @@
+{
+  "name": "AIAgent",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Agent name"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "data_analysis",
+        "strategy_optimization",
+        "news_sentiment",
+        "risk_assessment",
+        "execution",
+        "orchestrator"
+      ],
+      "description": "Agent type/role"
+    },
+    "description": {
+      "type": "string",
+      "description": "Agent description and capabilities"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "busy",
+        "error",
+        "offline"
+      ],
+      "default": "idle",
+      "description": "Current agent status"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of agent capabilities"
+    },
+    "config": {
+      "type": "object",
+      "description": "Agent configuration and parameters"
+    },
+    "last_active": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last activity timestamp"
+    },
+    "tasks_completed": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of completed tasks"
+    },
+    "success_rate": {
+      "type": "number",
+      "default": 1.0,
+      "description": "Task success rate"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Is agent active"
+    }
+  },
+  "required": [
+    "name",
+    "type"
+  ]
+}

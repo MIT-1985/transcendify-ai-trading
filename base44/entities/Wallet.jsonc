@@ -1,0 +1,60 @@
+{
+  "name": "Wallet",
+  "type": "object",
+  "properties": {
+    "balance_tfi": {
+      "type": "number",
+      "default": 0,
+      "description": "TFI token balance"
+    },
+    "balance_usd": {
+      "type": "number",
+      "default": 0,
+      "description": "USD balance"
+    },
+    "balance_usdt": {
+      "type": "number",
+      "default": 0,
+      "description": "USDT balance"
+    },
+    "balance_usdc": {
+      "type": "number",
+      "default": 0,
+      "description": "USDC balance"
+    },
+    "total_deposited": {
+      "type": "number",
+      "default": 0
+    },
+    "total_withdrawn": {
+      "type": "number",
+      "default": 0
+    },
+    "total_earned": {
+      "type": "number",
+      "default": 0
+    },
+    "fuel_tokens": {
+      "type": "number",
+      "default": 0,
+      "description": "Fuel tokens for bot operations"
+    },
+    "vip_level": {
+      "type": "string",
+      "enum": [
+        "none",
+        "bronze",
+        "silver",
+        "gold",
+        "platinum",
+        "diamond"
+      ],
+      "default": "none"
+    },
+    "last_fuel_generation": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,36 @@
+{
+  "name": "MarketData",
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string",
+      "description": "Trading pair symbol e.g. BTCUSD"
+    },
+    "price": {
+      "type": "number"
+    },
+    "change_24h": {
+      "type": "number"
+    },
+    "volume_24h": {
+      "type": "number"
+    },
+    "high_24h": {
+      "type": "number"
+    },
+    "low_24h": {
+      "type": "number"
+    },
+    "market_cap": {
+      "type": "number"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "symbol",
+    "price"
+  ]
+}

@@ -153,16 +153,18 @@ Deno.serve(async (req) => {
         const bot = bots[0];
         if (!bot) continue;
 
-        // Get user's exchange connection
+        // Get user's exchange connection (search by both created_by and user_email)
         const exchange = sub.exchange || 'binance';
-        const connections = await base44.asServiceRole.entities.ExchangeConnection.filter({
-          created_by: sub.created_by,
-          exchange,
-          status: 'connected'
-        });
+        const userEmail = sub.user_email || sub.created_by;
+        const [connsByCreator, connsByEmail] = await Promise.all([
+          base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: userEmail, exchange, status: 'connected' }),
+          base44.asServiceRole.entities.ExchangeConnection.filter({ user_email: userEmail, exchange, status: 'connected' })
+        ]);
+        const seenConns = new Set();
+        const allConns = [...connsByCreator, ...connsByEmail].filter(c => { if (seenConns.has(c.id)) return false; seenConns.add(c.id); return true; });
 
         // If no real connection - fall back to SIM
-        const conn = connections[0];
+        const conn = allConns[0];
         const isLive = !!conn;
 
         // VIP boost
@@ -257,10 +259,13 @@ Deno.serve(async (req) => {
               const apiSecret = await decryptOkx(conn.api_secret_encrypted);
               const passphrase = await decryptOkx(conn.encryption_iv);
 
-              // OKX instId: BTC-USDT format
+              // OKX instId: BTC-USDT format (handle X:BTCUSD, BTC/USDT, BTC-USDT etc.)
               let instId = symbol.replace('X:', '').replace('/', '-');
-              if (!instId.includes('-')) instId = instId.replace(/([A-Z]{3,4})(USDT|USDC|USD)$/, '$1-$2');
+              if (instId.endsWith('USD') && !instId.endsWith('USDT')) instId = instId.replace(/USD$/, 'USDT');
+              if (!instId.includes('-')) instId = instId.replace(/([A-Z]{3,4})(USDT|USDC|BTC|ETH)$/, '$1-$2');
               if (!instId.includes('-')) instId += '-USDT';
+              // If already in BTC-USDT format, use as-is
+              console.log(`[LIVE-OKX] instId resolved to: ${instId} from symbol: ${symbol}`);
 
               const sz = positionSize / currentPrice; // base currency amount
               console.log(`[LIVE-OKX] ${sub.created_by} | ${isBuy ? 'buy' : 'sell'} ${instId} sz=${sz.toFixed(4)}`);
@@ -293,7 +298,8 @@ Deno.serve(async (req) => {
           average_price: realAvgPrice, total_value: Number(positionSize.toFixed(2)),
           fee: realFee, execution_mode: executionMode,
           filled_at: new Date().toISOString(),
-          created_by: sub.created_by
+          created_by: userEmail,
+          user_email: userEmail
         });
 
         // Record trade
@@ -309,7 +315,8 @@ Deno.serve(async (req) => {
           execution_mode: executionMode,
           strategy_used: `${bot.strategy} (${exchange.toUpperCase()}, Conf:${(confidence * 100).toFixed(0)}%)`,
           timestamp: new Date().toISOString(),
-          created_by: sub.created_by
+          created_by: userEmail,
+          user_email: userEmail
         });
 
         // Update subscription stats (only SIM profit is tracked instantly)

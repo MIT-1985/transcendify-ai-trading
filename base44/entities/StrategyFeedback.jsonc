@@ -1,0 +1,55 @@
+{
+  "name": "StrategyFeedback",
+  "type": "object",
+  "properties": {
+    "subscription_id": {
+      "type": "string",
+      "description": "Reference to user subscription"
+    },
+    "bot_id": {
+      "type": "string",
+      "description": "Reference to trading bot"
+    },
+    "rating": {
+      "type": "number",
+      "description": "User rating 1-5 stars",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "is_positive": {
+      "type": "boolean",
+      "description": "Overall positive/negative feedback"
+    },
+    "comment": {
+      "type": "string",
+      "description": "User feedback text"
+    },
+    "performance_snapshot": {
+      "type": "object",
+      "description": "Performance metrics at feedback time"
+    },
+    "ai_prompt_used": {
+      "type": "string",
+      "description": "AI prompt that was active"
+    },
+    "strategy_parameters": {
+      "type": "object",
+      "description": "Strategy parameters at feedback time"
+    },
+    "feedback_type": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "automated",
+        "milestone"
+      ],
+      "default": "manual",
+      "description": "How feedback was collected"
+    }
+  },
+  "required": [
+    "subscription_id",
+    "rating",
+    "is_positive"
+  ]
+}

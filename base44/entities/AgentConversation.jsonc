@@ -1,0 +1,53 @@
+{
+  "name": "AgentConversation",
+  "type": "object",
+  "properties": {
+    "from_agent": {
+      "type": "string",
+      "description": "Sender agent ID"
+    },
+    "to_agent": {
+      "type": "string",
+      "description": "Receiver agent ID"
+    },
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "query",
+        "response",
+        "notification",
+        "collaboration_request"
+      ],
+      "description": "Message type"
+    },
+    "message": {
+      "type": "object",
+      "description": "Message content"
+    },
+    "context": {
+      "type": "object",
+      "description": "Conversation context"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "sent",
+        "received",
+        "processed",
+        "failed"
+      ],
+      "default": "sent",
+      "description": "Message status"
+    },
+    "parent_task_id": {
+      "type": "string",
+      "description": "Related task ID"
+    }
+  },
+  "required": [
+    "from_agent",
+    "to_agent",
+    "message_type",
+    "message"
+  ]
+}

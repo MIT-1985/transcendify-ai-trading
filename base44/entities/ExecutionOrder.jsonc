@@ -1,0 +1,91 @@
+{
+  "name": "ExecutionOrder",
+  "type": "object",
+  "properties": {
+    "agent_task_id": {
+      "type": "string",
+      "description": "Related agent task"
+    },
+    "risk_profile_id": {
+      "type": "string",
+      "description": "Applied risk profile"
+    },
+    "symbol": {
+      "type": "string",
+      "description": "Trading pair"
+    },
+    "side": {
+      "type": "string",
+      "enum": [
+        "BUY",
+        "SELL"
+      ],
+      "description": "Order side"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Order quantity"
+    },
+    "order_type": {
+      "type": "string",
+      "enum": [
+        "MARKET",
+        "LIMIT"
+      ],
+      "default": "MARKET"
+    },
+    "limit_price": {
+      "type": "number",
+      "description": "Limit price if LIMIT order"
+    },
+    "exchange": {
+      "type": "string",
+      "description": "Target exchange"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending_approval",
+        "approved",
+        "rejected",
+        "executing",
+        "filled",
+        "failed",
+        "cancelled"
+      ],
+      "default": "pending_approval"
+    },
+    "orchestrator_decision": {
+      "type": "object",
+      "description": "Orchestrator's decision data"
+    },
+    "risk_assessment": {
+      "type": "object",
+      "description": "Risk analysis before execution"
+    },
+    "trok_constants_applied": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "TROK constants used in decision"
+    },
+    "execution_result": {
+      "type": "object",
+      "description": "Exchange execution response"
+    },
+    "executed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "error_message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "symbol",
+    "side",
+    "quantity",
+    "exchange"
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "name": "AIPrompt",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Prompt name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Prompt description"
+    },
+    "prompt_text": {
+      "type": "string",
+      "description": "The actual prompt content"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "conservative",
+        "aggressive",
+        "volatility",
+        "trend_following",
+        "mean_reversion",
+        "custom"
+      ],
+      "default": "custom",
+      "description": "Prompt category"
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "condition",
+              "action",
+              "variable",
+              "logic"
+            ]
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Prompt building blocks"
+    },
+    "variables": {
+      "type": "object",
+      "description": "Variable values used in prompt"
+    },
+    "version": {
+      "type": "number",
+      "default": 1,
+      "description": "Prompt version number"
+    },
+    "parent_prompt_id": {
+      "type": "string",
+      "description": "Parent prompt ID for versioning"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "test_results": {
+      "type": "object",
+      "description": "Playground test results"
+    },
+    "feedback_score": {
+      "type": "number",
+      "description": "Average user feedback score"
+    },
+    "times_used": {
+      "type": "number",
+      "default": 0
+    },
+    "success_rate": {
+      "type": "number",
+      "description": "Success rate when used in live trading"
+    }
+  },
+  "required": [
+    "name",
+    "prompt_text"
+  ]
+}

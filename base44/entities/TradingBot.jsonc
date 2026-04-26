@@ -1,0 +1,119 @@
+{
+  "name": "TradingBot",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the trading bot"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of what the bot does"
+    },
+    "strategy": {
+      "type": "string",
+      "enum": [
+        "scalping",
+        "swing",
+        "arbitrage",
+        "grid",
+        "dca",
+        "momentum"
+      ],
+      "description": "Trading strategy used by the bot"
+    },
+    "supported_markets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of supported crypto pairs"
+    },
+    "price": {
+      "type": "number",
+      "description": "Price in USD"
+    },
+    "monthly_fee": {
+      "type": "number",
+      "description": "Monthly subscription fee"
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "extreme"
+      ],
+      "description": "Risk level of the bot"
+    },
+    "expected_roi": {
+      "type": "string",
+      "description": "Expected monthly ROI range"
+    },
+    "min_capital": {
+      "type": "number",
+      "description": "Minimum capital required"
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of features"
+    },
+    "default_stop_loss": {
+      "type": "number",
+      "description": "Default stop loss percentage",
+      "default": 5
+    },
+    "default_take_profit": {
+      "type": "number",
+      "description": "Default take profit percentage",
+      "default": 10
+    },
+    "grid_levels": {
+      "type": "number",
+      "description": "Number of grid levels for grid strategy",
+      "default": 10
+    },
+    "grid_spacing": {
+      "type": "number",
+      "description": "Percentage spacing between grid levels",
+      "default": 1
+    },
+    "dca_interval": {
+      "type": "number",
+      "description": "DCA buy interval in minutes",
+      "default": 60
+    },
+    "dca_amount": {
+      "type": "number",
+      "description": "DCA amount per buy",
+      "default": 100
+    },
+    "momentum_period": {
+      "type": "number",
+      "description": "Period for momentum calculation in minutes",
+      "default": 15
+    },
+    "momentum_threshold": {
+      "type": "number",
+      "description": "Momentum threshold percentage",
+      "default": 2
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "icon": {
+      "type": "string",
+      "description": "Icon name for the bot"
+    }
+  },
+  "required": [
+    "name",
+    "strategy",
+    "price"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "PriceAlert",
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string",
+      "description": "Crypto symbol"
+    },
+    "target_price": {
+      "type": "number",
+      "description": "Price to trigger alert"
+    },
+    "condition": {
+      "type": "string",
+      "enum": [
+        "above",
+        "below"
+      ],
+      "description": "Trigger when price goes above or below"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "triggered_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When alert was triggered"
+    }
+  },
+  "required": [
+    "symbol",
+    "target_price",
+    "condition"
+  ]
+}

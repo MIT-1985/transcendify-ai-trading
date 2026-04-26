@@ -1,0 +1,65 @@
+{
+  "name": "Trade",
+  "type": "object",
+  "properties": {
+    "subscription_id": {
+      "type": "string",
+      "description": "Reference to user subscription"
+    },
+    "symbol": {
+      "type": "string",
+      "description": "Trading pair"
+    },
+    "side": {
+      "type": "string",
+      "enum": [
+        "BUY",
+        "SELL"
+      ]
+    },
+    "quantity": {
+      "type": "number"
+    },
+    "price": {
+      "type": "number"
+    },
+    "total_value": {
+      "type": "number"
+    },
+    "fee": {
+      "type": "number"
+    },
+    "profit_loss": {
+      "type": "number"
+    },
+    "entry_price": {
+      "type": "number"
+    },
+    "exit_price": {
+      "type": "number"
+    },
+    "execution_mode": {
+      "type": "string",
+      "enum": [
+        "SIM",
+        "TESTNET",
+        "MAINNET"
+      ],
+      "default": "SIM"
+    },
+    "strategy_used": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "subscription_id",
+    "symbol",
+    "side",
+    "quantity",
+    "price"
+  ]
+}

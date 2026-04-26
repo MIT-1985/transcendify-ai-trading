@@ -1,0 +1,54 @@
+{
+  "name": "Miner",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the miner"
+    },
+    "tier": {
+      "type": "number",
+      "description": "Miner tier (1-5)"
+    },
+    "price": {
+      "type": "number",
+      "description": "Price in TFI"
+    },
+    "daily_fuel_tokens": {
+      "type": "number",
+      "description": "Fuel tokens generated per day"
+    },
+    "hash_rate": {
+      "type": "number",
+      "description": "Mining hash rate"
+    },
+    "power_consumption": {
+      "type": "string",
+      "description": "Power consumption rating"
+    },
+    "efficiency": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "ultra"
+      ],
+      "description": "Mining efficiency"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Icon name"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "name",
+    "tier",
+    "price",
+    "daily_fuel_tokens"
+  ]
+}

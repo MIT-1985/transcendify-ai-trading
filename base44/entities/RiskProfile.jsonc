@@ -1,0 +1,69 @@
+{
+  "name": "RiskProfile",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Profile name"
+    },
+    "risk_tolerance": {
+      "type": "string",
+      "enum": [
+        "conservative",
+        "moderate",
+        "aggressive",
+        "ultra"
+      ],
+      "default": "moderate",
+      "description": "Overall risk tolerance level"
+    },
+    "max_position_size": {
+      "type": "number",
+      "default": 0.1,
+      "description": "Max position size as % of portfolio"
+    },
+    "max_daily_loss": {
+      "type": "number",
+      "default": 0.05,
+      "description": "Max daily loss as % of portfolio"
+    },
+    "max_drawdown": {
+      "type": "number",
+      "default": 0.15,
+      "description": "Max drawdown before auto-stop"
+    },
+    "require_orchestrator_approval": {
+      "type": "boolean",
+      "default": true,
+      "description": "Require orchestrator approval for trades"
+    },
+    "min_confidence_threshold": {
+      "type": "number",
+      "default": 0.75,
+      "description": "Minimum AI confidence to execute"
+    },
+    "use_trok_optimization": {
+      "type": "boolean",
+      "default": true,
+      "description": "Use TROK constants for risk assessment"
+    },
+    "allowed_exchanges": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "binance"
+      ],
+      "description": "Allowed exchanges for execution"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "name",
+    "risk_tolerance"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "name": "AgentTask",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Agent executing the task"
+    },
+    "task_type": {
+      "type": "string",
+      "description": "Type of task"
+    },
+    "input_data": {
+      "type": "object",
+      "description": "Task input parameters"
+    },
+    "output_data": {
+      "type": "object",
+      "description": "Task output/results"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Task status"
+    },
+    "priority": {
+      "type": "number",
+      "default": 5,
+      "description": "Task priority (1-10)"
+    },
+    "requested_by": {
+      "type": "string",
+      "description": "Agent or user who requested the task"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Task start time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Task completion time"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error message if failed"
+    }
+  },
+  "required": [
+    "agent_id",
+    "task_type"
+  ]
+}

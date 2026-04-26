@@ -1,0 +1,83 @@
+{
+  "name": "BacktestResult",
+  "type": "object",
+  "properties": {
+    "strategy_name": {
+      "type": "string",
+      "description": "Name of the strategy tested"
+    },
+    "symbol": {
+      "type": "string",
+      "description": "Trading pair"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "initial_capital": {
+      "type": "number",
+      "description": "Starting capital"
+    },
+    "final_capital": {
+      "type": "number",
+      "description": "Ending capital"
+    },
+    "total_return": {
+      "type": "number",
+      "description": "Total return percentage"
+    },
+    "total_trades": {
+      "type": "number",
+      "description": "Number of trades executed"
+    },
+    "winning_trades": {
+      "type": "number"
+    },
+    "losing_trades": {
+      "type": "number"
+    },
+    "win_rate": {
+      "type": "number",
+      "description": "Percentage of winning trades"
+    },
+    "avg_win": {
+      "type": "number"
+    },
+    "avg_loss": {
+      "type": "number"
+    },
+    "max_drawdown": {
+      "type": "number",
+      "description": "Maximum drawdown percentage"
+    },
+    "sharpe_ratio": {
+      "type": "number"
+    },
+    "profit_factor": {
+      "type": "number"
+    },
+    "total_fees": {
+      "type": "number"
+    },
+    "parameters": {
+      "type": "object",
+      "description": "Strategy parameters used"
+    },
+    "equity_curve": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Equity over time"
+    }
+  },
+  "required": [
+    "strategy_name",
+    "symbol",
+    "initial_capital"
+  ]
+}
