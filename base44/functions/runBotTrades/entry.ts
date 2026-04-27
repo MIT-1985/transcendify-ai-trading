@@ -75,30 +75,54 @@ async function hmacSignOkx(secret, message) {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
-async function okxPlaceOrder(apiKey, secret, passphrase, instId, side, sz) {
+async function okxRequest(apiKey, secret, passphrase, method, path, bodyStr = '', baseUrl = 'https://www.okx.com') {
   const timestamp = new Date().toISOString();
-  const bodyStr = JSON.stringify({ instId, tdMode: 'cash', side, ordType: 'market', sz: sz.toFixed(4) });
-  const message = timestamp + 'POST' + '/api/v5/trade/order' + bodyStr;
+  const message = timestamp + method + path + bodyStr;
   const signature = await hmacSignOkx(secret, message);
+  const res = await fetch(baseUrl + path, {
+    method,
+    headers: {
+      'OK-ACCESS-KEY': apiKey,
+      'OK-ACCESS-SIGN': signature,
+      'OK-ACCESS-TIMESTAMP': timestamp,
+      'OK-ACCESS-PASSPHRASE': passphrase,
+      'Content-Type': 'application/json'
+    },
+    body: bodyStr || undefined
+  });
+  return res.json();
+}
 
+async function okxEnsureTradingFunds(apiKey, secret, passphrase, ccy, amount, baseUrl) {
+  // Transfer from Funding to Trading account if needed
+  const bodyStr = JSON.stringify({ ccy, amt: amount.toFixed(6), from: '6', to: '18', type: '0' });
+  const res = await okxRequest(apiKey, secret, passphrase, 'POST', '/api/v5/asset/transfer', bodyStr, baseUrl);
+  console.log(`[OKX-TRANSFER] Funding→Trading ${ccy} ${amount}: code=${res.code} msg=${res.msg}`);
+  return res;
+}
+
+async function okxPlaceOrder(apiKey, secret, passphrase, instId, side, usdtAmount, currentPrice) {
   const endpoints = ['https://www.okx.com', 'https://eea.okx.com'];
   for (const base of endpoints) {
     try {
-      const res = await fetch(base + '/api/v5/trade/order', {
-        method: 'POST',
-        headers: {
-          'OK-ACCESS-KEY': apiKey,
-          'OK-ACCESS-SIGN': signature,
-          'OK-ACCESS-TIMESTAMP': timestamp,
-          'OK-ACCESS-PASSPHRASE': passphrase,
-          'Content-Type': 'application/json'
-        },
-        body: bodyStr
-      });
-      const data = await res.json();
+      // For market BUY: use USDT amount with tgtCcy=quote_ccy (sz = USDT amount)
+      // For market SELL: use base currency amount (sz = coin amount)
+      let orderBody;
+      if (side === 'buy') {
+        orderBody = { instId, tdMode: 'cash', side: 'buy', ordType: 'market', sz: usdtAmount.toFixed(2), tgtCcy: 'quote_ccy' };
+      } else {
+        const coinAmount = usdtAmount / currentPrice;
+        orderBody = { instId, tdMode: 'cash', side: 'sell', ordType: 'market', sz: coinAmount.toFixed(6) };
+      }
+      const bodyStr = JSON.stringify(orderBody);
+      console.log(`[OKX-ORDER] ${base} body: ${bodyStr}`);
+      const data = await okxRequest(apiKey, secret, passphrase, 'POST', '/api/v5/trade/order', bodyStr, base);
+      console.log(`[OKX-ORDER] response: code=${data.code} msg=${data.msg} data=${JSON.stringify(data.data)}`);
       if (data.code === '0') return data;
-      if (data.code !== '50119') return data; // 50119 = key not on this domain
-    } catch (_) { /* try next */ }
+      if (data.code !== '50119') return data; // 50119 = key not on this domain, try next
+    } catch (e) {
+      console.log(`[OKX-ORDER] ${base} error: ${e.message}`);
+    }
   }
   return { code: '-1', msg: 'All OKX endpoints failed' };
 }
@@ -162,6 +186,7 @@ Deno.serve(async (req) => {
         ]);
         const seenConns = new Set();
         const allConns = [...connsByCreator, ...connsByEmail].filter(c => { if (seenConns.has(c.id)) return false; seenConns.add(c.id); return true; });
+        console.log(`[runBotTrades] sub=${sub.id} userEmail=${userEmail} exchange=${exchange} conns found=${allConns.length} (byCreator=${connsByCreator.length}, byEmail=${connsByEmail.length})`);
 
         // If no real connection - fall back to SIM
         const conn = allConns[0];
@@ -267,9 +292,15 @@ Deno.serve(async (req) => {
               // If already in BTC-USDT format, use as-is
               console.log(`[LIVE-OKX] instId resolved to: ${instId} from symbol: ${symbol}`);
 
-              const sz = positionSize / currentPrice; // base currency amount
-              console.log(`[LIVE-OKX] ${sub.created_by} | ${isBuy ? 'buy' : 'sell'} ${instId} sz=${sz.toFixed(4)}`);
-              const orderRes = await okxPlaceOrder(apiKey, apiSecret, passphrase, instId, isBuy ? 'buy' : 'sell', sz);
+              // Try to transfer funds from Funding to Trading wallet (try both endpoints)
+              let transferDone = false;
+              for (const ep of ['https://www.okx.com', 'https://eea.okx.com']) {
+                const tr = await okxEnsureTradingFunds(apiKey, apiSecret, passphrase, 'USDT', positionSize, ep);
+                if (tr.code === '0' || tr.code === '58350') { transferDone = true; break; } // 58350 = already in trading
+              }
+
+              console.log(`[LIVE-OKX] ${userEmail} | ${isBuy ? 'buy' : 'sell'} ${instId} usdtAmt=${positionSize.toFixed(2)}`);
+              const orderRes = await okxPlaceOrder(apiKey, apiSecret, passphrase, instId, isBuy ? 'buy' : 'sell', positionSize, currentPrice);
 
               if (orderRes.code === '0') {
                 executionMode = 'MAINNET';
