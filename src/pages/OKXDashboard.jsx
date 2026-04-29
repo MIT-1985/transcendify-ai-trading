@@ -325,30 +325,47 @@ export default function OKXDashboard() {
   const [loadingTickers, setLoadingTickers] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Suzana's OKX connection (by created_by nikitasuziface77)
-  const { data: suzanaConnByCreator = [], refetch: refetchSC1 } = useQuery({
-    queryKey: ['suzana-conn-creator'],
-    queryFn: () => base44.asServiceRole?.entities
-      ? base44.entities.ExchangeConnection.filter({ created_by: SUZANA_EMAIL, exchange: 'okx' })
-      : base44.entities.ExchangeConnection.filter({ created_by: SUZANA_EMAIL, exchange: 'okx' }),
-    staleTime: 30000,
-    retry: false
-  });
+  // Live balance from OKX for Suzana (via backend function)
+  const [liveBalance, setLiveBalance] = useState(null);
+  const [liveBalances, setLiveBalances] = useState([]);
+  const [lastSync, setLastSync] = useState(null);
 
-  // All OKX connections (service role not available on frontend, use entity filter)
+  const fetchSuzanaBalance = async () => {
+    try {
+      const res = await base44.functions.invoke('getSuzanaBalance', {});
+      if (res.data?.success) {
+        setLiveBalance(res.data.balance_usdt);
+        setLiveBalances(res.data.balances || []);
+        setLastSync(new Date().toISOString());
+      }
+    } catch (e) { console.error('getSuzanaBalance error', e); }
+  };
+
+  useEffect(() => {
+    fetchSuzanaBalance();
+    const interval = setInterval(fetchSuzanaBalance, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Build suzanaConn from live data
+  const suzanaConn = useMemo(() => {
+    if (liveBalance === null) return null;
+    return {
+      balance_usdt: liveBalance,
+      balances: liveBalances,
+      last_sync: lastSync,
+      status: 'connected',
+      label: 'My OKX Account'
+    };
+  }, [liveBalance, liveBalances, lastSync]);
+
+  // All OKX connections (for own user)
   const { data: allOkxConns = [], refetch: refetchAll } = useQuery({
     queryKey: ['all-okx-conns'],
     queryFn: () => base44.entities.ExchangeConnection.filter({ exchange: 'okx' }),
     staleTime: 30000,
     retry: false
   });
-
-  // Find Suzana's connection from all connections
-  const suzanaConn = useMemo(() => {
-    return allOkxConns.find(c =>
-      c.created_by === SUZANA_EMAIL || c.user_email === SUZANA_EMAIL
-    ) || null;
-  }, [allOkxConns]);
 
   // Suzana's subscription
   const { data: suzanaSub } = useQuery({
@@ -413,6 +430,7 @@ export default function OKXDashboard() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    await fetchSuzanaBalance();
     await refetchAll();
     setRefreshing(false);
   };
