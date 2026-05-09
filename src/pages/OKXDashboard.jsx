@@ -180,10 +180,9 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
   const balance = connection?.balance_usdt ?? 0;
   const isLoadingBalance = connection?.loading && balance === 0;
   const totalTrades = Math.max(subscription?.total_trades || 0, trades.length);
-  // Real profit = current balance - total capital allocated across all bots
-  const totalCapitalAllocated = subs?.reduce((s, sb) => s + (sb.capital_allocated || 0), 0) || 0;
-  const realProfit = balance > 0 && totalCapitalAllocated > 0 ? balance - totalCapitalAllocated : null;
-  const totalProfit = realProfit !== null ? realProfit : (subscription?.total_profit || 0);
+  const initialDeposit = 100; // Suzana's initial deposit in USD
+  const realProfit = balance - initialDeposit;
+  const totalProfit = realProfit;
 
   return (
     <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-emerald-500/30 rounded-2xl p-6 mb-6">
@@ -245,7 +244,7 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
             {totalProfit >= 0 ? '+' : ''}${totalProfit.toFixed(2)}
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            {totalCapitalAllocated > 0 ? `Баланс - Капитал ($${totalCapitalAllocated})` : 'от стартиране'}
+            Баланс - начален депозит ($100)
           </div>
         </div>
       </div>
