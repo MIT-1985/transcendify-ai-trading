@@ -35,7 +35,15 @@ export default function BotDashboard() {
 
   const { data: subscriptions = [], isLoading } = useQuery({
     queryKey: ['userSubscriptions', user?.email],
-    queryFn: () => base44.entities.UserSubscription.filter({ created_by: user?.email }),
+    queryFn: async () => {
+      const [byCreator, byEmail] = await Promise.all([
+        base44.entities.UserSubscription.filter({ created_by: user?.email }),
+        base44.entities.UserSubscription.filter({ user_email: user?.email })
+      ]);
+      const all = [...byCreator, ...byEmail];
+      const seen = new Set();
+      return all.filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
+    },
     enabled: !!user,
     staleTime: 15000,
     retry: false
