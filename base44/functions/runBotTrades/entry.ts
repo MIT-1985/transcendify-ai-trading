@@ -204,7 +204,9 @@ Deno.serve(async (req) => {
         const tradingPairs = sub.trading_pairs || ['X:BTCUSD'];
         const symbol = tradingPairs[Math.floor(Math.random() * tradingPairs.length)];
         const capital = sub.capital_allocated || 1000;
-        const positionSize = Math.min(capital, capital * 0.25);
+        // Scalping: small position sizes for fast frequent trades ($5-$15)
+        const maxPos = bot.strategy === 'scalping' ? 0.05 : 0.10;
+        const positionSize = Math.min(capital * maxPos, 15); // max $15 per trade
 
         // Fetch price + candles
         const polygonKey = Deno.env.get('POLYGON_API_KEY');
@@ -222,11 +224,15 @@ Deno.serve(async (req) => {
 
         // Check for open BUY position (last trade for this sub with no exit_price)
         const recentTrades = await base44.asServiceRole.entities.Trade.filter({ subscription_id: sub.id });
-        const openPosition = recentTrades.find(t => t.side === 'BUY' && !t.exit_price && t.execution_mode === 'MAINNET');
+        const openPositions = recentTrades.filter(t => t.side === 'BUY' && !t.exit_price && t.execution_mode === 'MAINNET');
+        const openPosition = openPositions[0] || null;
 
-        // If open position exists → SELL to close it, otherwise BUY
+        // Scalping: alternate BUY/SELL rapidly. If open position → SELL, else BUY
         const { signal, confidence } = calcSignal(candles, currentPrice, sub.stop_loss, sub.take_profit);
-        const isBuy = openPosition ? false : (signal === 'BUY');
+        // Force more trades: if last trade was BUY (SIM), flip to SELL
+        const lastTrade = recentTrades[0];
+        const lastWasBuy = lastTrade?.side === 'BUY';
+        const isBuy = openPosition ? false : (lastWasBuy ? false : true);
         const isWin = Math.random() < confidence;
 
         // Profit simulation (used for SIM mode and for recording)
