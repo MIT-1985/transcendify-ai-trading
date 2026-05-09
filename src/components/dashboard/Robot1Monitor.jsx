@@ -100,26 +100,33 @@ export default function Robot1Monitor() {
         // Find active position (BUY without exit_price)
         const activePos = robot1Trades.find(t => t.side === 'BUY' && !t.exit_price);
 
-        // Calculate realized P&L only from completed BUY→SELL pairs
+        // Calculate realized P&L from verified OKX order pairs
+        // Match BUY→SELL pairs by symbol & timestamp sequence
         let realizedPnL = 0;
         let closedCount = 0;
 
-        const buyTrades = robot1Trades.filter(t => t.side === 'BUY').sort((a, b) => 
-          new Date(a.created_date) - new Date(b.created_date)
-        );
-        const sellTrades = robot1Trades.filter(t => t.side === 'SELL').sort((a, b) => 
-          new Date(a.created_date) - new Date(b.created_date)
-        );
+        const paired = new Map(); // symbol -> { buys: [], sells: [] }
+        for (const trade of robot1Trades) {
+          const sym = trade.symbol;
+          if (!paired.has(sym)) paired.set(sym, { buys: [], sells: [] });
+          const p = paired.get(sym);
+          if (trade.side === 'BUY') p.buys.push(trade);
+          else p.sells.push(trade);
+        }
 
-        let buyIndex = 0;
-        for (const sell of sellTrades) {
-          if (buyIndex < buyTrades.length) {
-            const buy = buyTrades[buyIndex];
-            const buyValue = buy.entry_price * buy.quantity + (buy.fee || 0);
-            const sellValue = sell.exit_price * sell.quantity - (sell.fee || 0);
+        for (const { buys, sells } of paired.values()) {
+          buys.sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
+          sells.sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
+
+          for (let i = 0; i < Math.min(buys.length, sells.length); i++) {
+            const buy = buys[i];
+            const sell = sells[i];
+            if (buy.exit_price) continue; // Skip if buy has exit (matched with another sell)
+
+            const buyValue = (buy.entry_price || buy.price) * buy.quantity + (buy.fee || 0);
+            const sellValue = (sell.exit_price || sell.price) * sell.quantity - (sell.fee || 0);
             realizedPnL += sellValue - buyValue;
             closedCount++;
-            buyIndex++;
           }
         }
 

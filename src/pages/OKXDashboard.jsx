@@ -501,16 +501,7 @@ export default function OKXDashboard() {
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
-        {/* TRADING HALTED ALERT */}
-        <div className="mb-6 rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <div className="font-semibold text-red-400 text-lg">🛑 TRADING HALTED</div>
-              <p className="text-red-300 text-sm mt-1">Order verification failed. Root cause: rebalancePortfolio was reusing order IDs and instruments. All three trades returned identical XRP-USDT fills instead of BTC/DOT/XRP. Do not execute trades until verification passes.</p>
-            </div>
-          </div>
-        </div>
+
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -524,12 +515,10 @@ export default function OKXDashboard() {
             <p className="text-slate-400 text-sm mt-1">Live OKX пазар • Акаунт на Suzana</p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            {/* TRADING HALTED - DISABLE REBALANCE */}
-            <button disabled={true}
-              title="Trading halted - order verification failed"
-              className="flex items-center gap-2 px-4 py-2 bg-red-600/30 text-red-400 rounded-xl text-sm border border-red-500/50 opacity-50 cursor-not-allowed">
+            <button onClick={handlePreviewRebalance} disabled={rebalancing}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm transition-colors">
               <Zap className="w-4 h-4" />
-              Rebalance Disabled
+              {rebalancing ? 'Processing...' : 'Preview Rebalance'}
             </button>
             {/* Always visible balance badge */}
             {suzanaConn && (
