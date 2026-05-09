@@ -7,19 +7,54 @@ export default function RealTradesSummary({ orders = [], balance = 0 }) {
     const openTrades = orders.filter(o => ['live', 'partially_filled'].includes(o.state));
     const closedTrades = orders.filter(o => o.state === 'filled');
     
-    const totalProfit = orders.reduce((sum, o) => {
-      const pnl = parseFloat(o.pnl || 0);
-      return sum + pnl;
-    }, 0);
+    // Calculate realized P&L by matching buy/sell pairs (FIFO)
+    const symbolTrades = {};
+    closedTrades.forEach(o => {
+      if (!symbolTrades[o.instId]) symbolTrades[o.instId] = { buys: [], sells: [] };
+      if (o.side === 'BUY' || o.side === 'buy') symbolTrades[o.instId].buys.push(o);
+      else if (o.side === 'SELL' || o.side === 'sell') symbolTrades[o.instId].sells.push(o);
+    });
+
+    let totalProfit = 0;
+    const tradesPnl = {};
+    
+    Object.entries(symbolTrades).forEach(([symbol, { buys, sells }]) => {
+      buys.sort((a, b) => a.cTime - b.cTime);
+      sells.sort((a, b) => a.cTime - b.cTime);
+      
+      let buyQueue = [...buys];
+      sells.forEach(sell => {
+        if (!sell.accFillSz || !sell.avgPx) return;
+        
+        let remainingSellQty = parseFloat(sell.accFillSz);
+        while (remainingSellQty > 0 && buyQueue.length > 0) {
+          const buy = buyQueue[0];
+          const qtyToClose = Math.min(remainingSellQty, parseFloat(buy.accFillSz || 0));
+          
+          const pnl = (parseFloat(sell.avgPx) - parseFloat(buy.avgPx)) * qtyToClose 
+                    - Math.abs(parseFloat(buy.fee || 0)) 
+                    - Math.abs(parseFloat(sell.fee || 0));
+          
+          tradesPnl[sell.ordId] = pnl;
+          totalProfit += pnl;
+          remainingSellQty -= qtyToClose;
+          buy.accFillSz = parseFloat(buy.accFillSz || 0) - qtyToClose;
+          
+          if (parseFloat(buy.accFillSz) <= 0) {
+            buyQueue.shift();
+          }
+        }
+      });
+    });
 
     const totalVolume = orders.reduce((sum, o) => {
       return sum + parseFloat(o.notional || o.sz * o.avgPx || 0);
     }, 0);
 
-    const winTrades = closedTrades.filter(o => (o.pnl || 0) > 0).length;
+    const winTrades = closedTrades.filter(o => (tradesPnl[o.ordId] || 0) > 0).length;
     const winRate = closedTrades.length > 0 ? (winTrades / closedTrades.length * 100).toFixed(1) : 0;
 
-    return { openTrades, closedTrades, totalProfit, totalVolume, winRate, winTrades };
+    return { openTrades, closedTrades, totalProfit, totalVolume, winRate, winTrades, tradesPnl };
   }, [orders]);
 
   return (
@@ -117,24 +152,25 @@ export default function RealTradesSummary({ orders = [], balance = 0 }) {
               </thead>
               <tbody>
                 {metrics.closedTrades.slice(0, 5).map(o => {
-                  const pnl = parseFloat(o.pnl || 0);
-                  return (
-                    <tr key={o.ordId} className="border-t border-slate-700/50 hover:bg-slate-800/30">
-                      <td className="px-3 py-2 font-semibold text-white">{o.instId}</td>
-                      <td className="px-3 py-2">
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${o.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {o.side.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono text-slate-300">{parseFloat(o.accFillSz || o.sz).toFixed(4)}</td>
-                      <td className="px-3 py-2 text-right text-slate-300">${parseFloat(o.avgPx).toFixed(2)}</td>
-                      <td className={`px-3 py-2 text-right font-bold ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {pnl >= 0 ? '+' : ''}${pnl.toFixed(4)}
-                      </td>
-                      <td className="px-3 py-2 text-right text-slate-500">{moment(o.cTime).fromNow()}</td>
-                    </tr>
-                  );
-                })}
+                   const pnl = metrics.tradesPnl[o.ordId] !== undefined ? metrics.tradesPnl[o.ordId] : parseFloat(o.pnl || 0);
+                   const isSell = o.side === 'SELL' || o.side === 'sell';
+                   return (
+                     <tr key={o.ordId} className="border-t border-slate-700/50 hover:bg-slate-800/30">
+                       <td className="px-3 py-2 font-semibold text-white">{o.instId}</td>
+                       <td className="px-3 py-2">
+                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${(o.side === 'BUY' || o.side === 'buy') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                           {o.side.toUpperCase()}
+                         </span>
+                       </td>
+                       <td className="px-3 py-2 text-right font-mono text-slate-300">{parseFloat(o.accFillSz || o.sz).toFixed(4)}</td>
+                       <td className="px-3 py-2 text-right text-slate-300">${parseFloat(o.avgPx).toFixed(2)}</td>
+                       <td className={`px-3 py-2 text-right font-bold ${isSell && pnl >= 0 ? 'text-emerald-400' : isSell && pnl < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                         {isSell ? (pnl >= 0 ? '+' : '')+ pnl.toFixed(4) : '—'}
+                       </td>
+                       <td className="px-3 py-2 text-right text-slate-500">{moment(o.cTime).fromNow()}</td>
+                     </tr>
+                   );
+                 })}
               </tbody>
             </table>
           </div>

@@ -326,11 +326,20 @@ Deno.serve(async (req) => {
               // If already in BTC-USDT format, use as-is
               console.log(`[LIVE-OKX] instId resolved to: ${instId} from symbol: ${symbol}`);
 
-              // Try to transfer funds from Funding to Trading wallet (try both endpoints)
-              let transferDone = false;
-              for (const ep of ['https://www.okx.com', 'https://eea.okx.com']) {
-                const tr = await okxEnsureTradingFunds(apiKey, apiSecret, passphrase, 'USDT', positionSize, ep);
-                if (tr.code === '0' || tr.code === '58350') { transferDone = true; break; } // 58350 = already in trading
+              // For BUY orders: ensure we have enough USDT in Trading wallet
+              // For SELL orders: ensure we have enough of the coin
+              if (isBuy) {
+                // Try to transfer funds from Funding to Trading wallet
+                let transferDone = false;
+                for (const ep of ['https://www.okx.com', 'https://eea.okx.com']) {
+                  const tr = await okxEnsureTradingFunds(apiKey, apiSecret, passphrase, 'USDT', positionSize, ep);
+                  if (tr.code === '0' || tr.code === '58350') { transferDone = true; break; }
+                }
+                if (!transferDone) {
+                  console.log(`[LIVE-OKX] Transfer failed, skipping BUY order`);
+                  executionMode = 'SIM';
+                  throw new Error('Insufficient USDT for trading');
+                }
               }
 
               console.log(`[LIVE-OKX] ${userEmail} | ${isBuy ? 'buy' : 'sell'} ${instId} usdtAmt=${positionSize.toFixed(2)}`);
@@ -340,6 +349,31 @@ Deno.serve(async (req) => {
                 executionMode = 'MAINNET';
                 realOrderId = orderRes.data?.[0]?.ordId;
                 console.log(`[LIVE-OKX] Placed ordId=${realOrderId}`);
+
+                // Fetch order details to get actual fill info (try both endpoints)
+                if (realOrderId) {
+                  let filled = false;
+                  for (const ep of ['https://www.okx.com', 'https://eea.okx.com']) {
+                    try {
+                      const orderDetailsPath = `/api/v5/trade/orders/${realOrderId}?instId=${instId}`;
+                      const detailsRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', orderDetailsPath, '', ep);
+                      if (detailsRes.code === '0' && detailsRes.data?.[0]) {
+                        const orderDetail = detailsRes.data[0];
+                        realQty = parseFloat(orderDetail.accFillSz || quantity);
+                        realAvgPrice = orderDetail.avgPx ? parseFloat(orderDetail.avgPx) : currentPrice;
+                        realFee = orderDetail.fee ? Math.abs(parseFloat(orderDetail.fee)) : (positionSize * 0.001);
+                        console.log(`[LIVE-OKX] Order detail from ${ep}: qty=${realQty} avgPrice=${realAvgPrice} fee=${realFee} state=${orderDetail.state}`);
+                        filled = true;
+                        break;
+                      }
+                    } catch (e) {
+                      console.log(`[LIVE-OKX] Detail fetch from ${ep} failed: ${e.message}`);
+                    }
+                  }
+                  if (!filled) {
+                    console.log(`[LIVE-OKX] Could not fetch order details, using defaults`);
+                  }
+                }
               } else {
                 console.error(`[LIVE-OKX] Order failed: ${orderRes.msg}`);
                 executionMode = 'SIM';

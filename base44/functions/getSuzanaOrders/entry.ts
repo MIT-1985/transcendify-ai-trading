@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       uTime: parseInt(o.uTime),
     }));
 
-    // Calculate realized P&L by matching buy/sell pairs per symbol
+    // Calculate realized P&L by matching buy/sell pairs per symbol (FIFO)
     const symbolTrades = {};
     orders.forEach(o => {
       if (!symbolTrades[o.instId]) symbolTrades[o.instId] = { buys: [], sells: [] };
@@ -103,40 +103,44 @@ Deno.serve(async (req) => {
     });
 
     let totalRealizedPnl = 0;
-    Object.values(symbolTrades).forEach(({ buys, sells }) => {
+    Object.entries(symbolTrades).forEach(([symbol, { buys, sells }]) => {
+      // Sort by time (FIFO)
       buys.sort((a, b) => a.cTime - b.cTime);
       sells.sort((a, b) => a.cTime - b.cTime);
       
-      let buyIdx = 0, sellIdx = 0;
-      let remainingQty = 0, avgCostPerUnit = 0;
+      let buyQueue = [...buys]; // Queue of available buys to match against sells
       
-      // Process all buys first to accumulate cost
-      buys.forEach(buy => {
-        if (buy.accFillSz > 0 && buy.avgPx > 0) {
-          avgCostPerUnit = (avgCostPerUnit * remainingQty + buy.avgPx * buy.accFillSz) / (remainingQty + buy.accFillSz);
-          remainingQty += buy.accFillSz;
-        }
-      });
-      
-      // Match sells against buys
       sells.forEach(sell => {
-        if (sell.accFillSz > 0 && sell.avgPx > 0 && remainingQty > 0) {
-          const qtyToClose = Math.min(remainingQty, sell.accFillSz);
-          const pnl = (sell.avgPx - avgCostPerUnit) * qtyToClose - Math.abs(sell.fee) - (qtyToClose * avgCostPerUnit * 0.002); // subtract maker fees
+        if (sell.accFillSz <= 0 || sell.avgPx <= 0) return;
+        
+        let remainingSellQty = sell.accFillSz;
+        
+        // Match this sell against queued buys (FIFO)
+        while (remainingSellQty > 0 && buyQueue.length > 0) {
+          const buy = buyQueue[0];
+          const qtyToClose = Math.min(remainingSellQty, buy.accFillSz);
+          
+          // P&L per unit: (sell price - buy price) * qty - fees
+          const grossPnl = (sell.avgPx - buy.avgPx) * qtyToClose;
+          const feePnl = Math.abs(buy.fee) + Math.abs(sell.fee); // both buy and sell fees
+          const pnl = grossPnl - feePnl;
+          
           totalRealizedPnl += pnl;
-          remainingQty -= qtyToClose;
+          remainingSellQty -= qtyToClose;
+          buy.accFillSz -= qtyToClose;
+          
+          // Remove buy from queue if fully matched
+          if (buy.accFillSz <= 0) {
+            buyQueue.shift();
+          }
+          
+          console.log(`[PnL-Match] ${symbol}: Buy @${buy.avgPx} * ${qtyToClose} vs Sell @${sell.avgPx} = $${pnl.toFixed(4)}`);
         }
       });
     });
 
-    // Add calculated P&L to orders for display
-    const ordersWithPnl = orders.map(o => ({
-      ...o,
-      calculatedPnl: totalRealizedPnl > 0 ? o.side === 'SELL' ? totalRealizedPnl : 0 : 0
-    }));
-
     console.log(`[getSuzanaOrders] Fetched ${orders.length} orders, total realized P&L: $${totalRealizedPnl.toFixed(4)}`);
-    return Response.json({ success: true, orders: ordersWithPnl, totalRealizedPnl });
+    return Response.json({ success: true, orders, totalRealizedPnl });
   } catch (err) {
     console.error('[getSuzanaOrders]', err.message);
     return Response.json({ success: false, error: err.message }, { status: 500 });
