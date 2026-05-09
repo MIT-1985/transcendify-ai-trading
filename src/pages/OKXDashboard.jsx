@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, RefreshCw, Link2, Activity, BarChart2, Wallet, ArrowUpDown, Bot, CheckCircle2, Zap } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import RealTradesSummary from '@/components/dashboard/RealTradesSummary';
 import moment from 'moment';
 
 const OKX_SYMBOLS = [
@@ -503,8 +504,11 @@ export default function OKXDashboard() {
           onRefresh={handleRefresh}
         />
 
+        {/* Real Trades Summary */}
+        <RealTradesSummary orders={suzanaOrders} balance={suzanaConn.balance_usdt} />
+
         {/* Live Prices */}
-        <div className="mb-6">
+        <div className="mb-6 mt-6">
           <div className="flex items-center gap-2 mb-3">
             <Activity className="w-5 h-5 text-emerald-400" />
             <h2 className="text-lg font-semibold">Live OKX Цени</h2>
