@@ -270,7 +270,8 @@ Deno.serve(async (req) => {
         // Force more trades: if last trade was BUY (SIM), flip to SELL
         const lastTrade = recentTrades[0];
         const lastWasBuy = lastTrade?.side === 'BUY';
-        const isBuy = openPosition ? false : (lastWasBuy ? false : true);
+        // For OKX live trading (Suzana), ONLY do BUY orders (no SELL without holding the asset)
+        const isBuy = (exchange?.toLowerCase() === 'okx' && isLive) ? true : (openPosition ? false : (lastWasBuy ? false : true));
         const isWin = Math.random() < confidence; // base signal confidence
 
         // Profit simulation: win rate ~70%, losses capped so max loss per trade ≤ $2
