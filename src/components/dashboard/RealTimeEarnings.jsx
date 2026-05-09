@@ -15,7 +15,7 @@ export default function RealTimeEarnings({ subscriptions = [], trades = [] }) {
   const activeSubscriptions = subscriptions.filter(s => s.status === 'active');
 
   // Use real trade data passed from parent
-  const totalEarnings = trades.reduce((sum, t) => sum + (t.profit_loss || 0), 0);
+  const totalEarnings = trades.reduce((sum, t) => sum + (parseFloat(t.pnl) || parseFloat(t.profit_loss) || 0), 0);
   const totalTrades = trades.length;
 
   useEffect(() => {

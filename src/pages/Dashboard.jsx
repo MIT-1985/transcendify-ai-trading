@@ -140,27 +140,37 @@ export default function Dashboard() {
 
   const activeBots = subscriptions.filter(s => s.status === 'active').length;
 
-  // Fetch real today's trades from the Trade entity
-  const { data: allTrades = [] } = useQuery({
-    queryKey: ['trades-today', user?.email],
+  // Fetch real orders from OKX/Binance via backend
+  const { data: liveOrders = [] } = useQuery({
+    queryKey: ['live-orders-today'],
     queryFn: async () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayStart = today.toISOString();
-      
-      // Get all trades and filter by today's date
-      const trades = await base44.entities.Trade.filter({ created_by: user?.email });
-      return trades.filter(t => new Date(t.timestamp || t.created_date) >= new Date(todayStart));
+      try {
+        // Get Suzana's live OKX orders
+        const res = await base44.functions.invoke('getSuzanaOrders', {});
+        const orders = res.data?.orders || [];
+        
+        // Filter for today's trades
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStart = today.getTime();
+        
+        return orders.filter(o => {
+          const orderTime = new Date(o.cTime).getTime();
+          return orderTime >= todayStart;
+        });
+      } catch (e) {
+        console.error('Failed to fetch live orders', e);
+        return [];
+      }
     },
-    enabled: !!user,
-    staleTime: 10000,
+    staleTime: 15000,
     refetchOnWindowFocus: false,
     retry: false
   });
 
-  // Calculate real today's profit and trades from actual trade records
-  const totalProfit = allTrades.reduce((sum, t) => sum + (t.profit_loss || 0), 0);
-  const totalTrades = allTrades.length;
+  // Calculate profit and trades from real live orders
+  const totalProfit = liveOrders.reduce((sum, o) => sum + (parseFloat(o.pnl) || 0), 0);
+  const totalTrades = liveOrders.length;
   
   useEffect(() => {
     setUnrealisedPnL(totalProfit);
@@ -192,7 +202,7 @@ export default function Dashboard() {
         {/* Real-Time Earnings */}
         {activeBots > 0 && (
           <div className="mb-6 sm:mb-8">
-            <RealTimeEarnings subscriptions={subscriptions} trades={allTrades} />
+            <RealTimeEarnings subscriptions={subscriptions} trades={liveOrders} />
           </div>
         )}
 
