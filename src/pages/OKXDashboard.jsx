@@ -180,8 +180,17 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
   const balance = connection?.balance_usdt ?? 0;
   const isLoadingBalance = connection?.loading && balance === 0;
   const totalTrades = Math.max(subscription?.total_trades || 0, trades.length);
-  const initialDeposit = 100; // Suzana's initial deposit
-  const realProfit = balance - initialDeposit; // Real P&L from OKX
+  
+  // Calculate initial deposit from subscription or trades
+  let initialDeposit = subscription?.capital_allocated || 0;
+  
+  if (initialDeposit === 0 && trades.length > 0) {
+    // Estimate from earliest trades if capital_allocated not set
+    const sortedByTime = [...trades].sort((a, b) => a.cTime - b.cTime);
+    initialDeposit = parseFloat(sortedByTime[0]?.notionalUsd) || 100;
+  }
+  
+  const realProfit = balance - (initialDeposit || 100); // Real P&L from OKX
   const totalProfit = realProfit;
 
   return (
@@ -244,7 +253,7 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
             {totalProfit >= 0 ? '+' : ''}${totalProfit.toFixed(2)}
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            Баланс $12.10 - Депозит $100
+            Баланс ${balance.toFixed(2)} - Депозит ${(initialDeposit || 100).toFixed(2)}
           </div>
         </div>
       </div>
