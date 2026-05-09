@@ -94,8 +94,49 @@ Deno.serve(async (req) => {
       uTime: parseInt(o.uTime),
     }));
 
-    console.log(`[getSuzanaOrders] Fetched ${orders.length} orders`);
-    return Response.json({ success: true, orders });
+    // Calculate realized P&L by matching buy/sell pairs per symbol
+    const symbolTrades = {};
+    orders.forEach(o => {
+      if (!symbolTrades[o.instId]) symbolTrades[o.instId] = { buys: [], sells: [] };
+      if (o.side === 'BUY') symbolTrades[o.instId].buys.push(o);
+      else if (o.side === 'SELL') symbolTrades[o.instId].sells.push(o);
+    });
+
+    let totalRealizedPnl = 0;
+    Object.values(symbolTrades).forEach(({ buys, sells }) => {
+      buys.sort((a, b) => a.cTime - b.cTime);
+      sells.sort((a, b) => a.cTime - b.cTime);
+      
+      let buyIdx = 0, sellIdx = 0;
+      let remainingQty = 0, avgCostPerUnit = 0;
+      
+      // Process all buys first to accumulate cost
+      buys.forEach(buy => {
+        if (buy.accFillSz > 0 && buy.avgPx > 0) {
+          avgCostPerUnit = (avgCostPerUnit * remainingQty + buy.avgPx * buy.accFillSz) / (remainingQty + buy.accFillSz);
+          remainingQty += buy.accFillSz;
+        }
+      });
+      
+      // Match sells against buys
+      sells.forEach(sell => {
+        if (sell.accFillSz > 0 && sell.avgPx > 0 && remainingQty > 0) {
+          const qtyToClose = Math.min(remainingQty, sell.accFillSz);
+          const pnl = (sell.avgPx - avgCostPerUnit) * qtyToClose - Math.abs(sell.fee) - (qtyToClose * avgCostPerUnit * 0.002); // subtract maker fees
+          totalRealizedPnl += pnl;
+          remainingQty -= qtyToClose;
+        }
+      });
+    });
+
+    // Add calculated P&L to orders for display
+    const ordersWithPnl = orders.map(o => ({
+      ...o,
+      calculatedPnl: totalRealizedPnl > 0 ? o.side === 'SELL' ? totalRealizedPnl : 0 : 0
+    }));
+
+    console.log(`[getSuzanaOrders] Fetched ${orders.length} orders, total realized P&L: $${totalRealizedPnl.toFixed(4)}`);
+    return Response.json({ success: true, orders: ordersWithPnl, totalRealizedPnl });
   } catch (err) {
     console.error('[getSuzanaOrders]', err.message);
     return Response.json({ success: false, error: err.message }, { status: 500 });

@@ -141,26 +141,29 @@ export default function Dashboard() {
   const activeBots = subscriptions.filter(s => s.status === 'active').length;
 
   // Fetch real orders from OKX/Binance via backend
-  const { data: liveOrders = [] } = useQuery({
+  const { data: ordersResponse = {} } = useQuery({
     queryKey: ['live-orders-today'],
     queryFn: async () => {
       try {
-        // Get Suzana's live OKX orders
+        // Get Suzana's live OKX orders with calculated P&L
         const res = await base44.functions.invoke('getSuzanaOrders', {});
         const orders = res.data?.orders || [];
+        const totalRealizedPnl = res.data?.totalRealizedPnl || 0;
         
         // Filter for today's trades
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayStart = today.getTime();
         
-        return orders.filter(o => {
+        const todaysOrders = orders.filter(o => {
           const orderTime = new Date(o.cTime).getTime();
           return orderTime >= todayStart;
         });
+        
+        return { orders: todaysOrders, totalRealizedPnl };
       } catch (e) {
         console.error('Failed to fetch live orders', e);
-        return [];
+        return { orders: [], totalRealizedPnl: 0 };
       }
     },
     staleTime: 15000,
@@ -168,9 +171,9 @@ export default function Dashboard() {
     retry: false
   });
 
-  // Calculate profit and trades from real live orders
-  const totalProfit = liveOrders.reduce((sum, o) => sum + (parseFloat(o.pnl) || 0), 0);
-  const totalTrades = liveOrders.length;
+  const liveOrders = ordersResponse.orders || [];
+  const totalProfit = ordersResponse.totalRealizedPnl || 0;
+  const totalTrades = liveOrders.filter(o => o.state === 'filled').length;
   
   useEffect(() => {
     setUnrealisedPnL(totalProfit);
