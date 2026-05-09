@@ -167,30 +167,54 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // All active subscriptions
+    // Get all active subscriptions + SUZANA'S SPECIAL CASE
     const subscriptions = await base44.asServiceRole.entities.UserSubscription.filter({ status: 'active' });
+    
+    // SUZANA: Always include her subscriptions even if not in normal filter
+    const suzanaEmail = 'nikitasuziface77@gmail.com';
+    const suzanaAltEmail = 'sauzana.cozmas@gmail.com';
+    const suzanaSubs = await base44.asServiceRole.entities.UserSubscription.filter({ 
+      $or: [{ user_email: suzanaEmail }, { user_email: suzanaAltEmail }, { created_by: suzanaEmail }, { created_by: suzanaAltEmail }]
+    });
+    
+    // Merge and deduplicate
+    const seenSubIds = new Set();
+    const allSubs = [...subscriptions, ...suzanaSubs].filter(s => {
+      if (seenSubIds.has(s.id)) return false;
+      seenSubIds.add(s.id);
+      return true;
+    });
+    
     const results = [];
 
-    for (const sub of subscriptions) {
+    for (const sub of allSubs) {
       try {
         const bots = await base44.asServiceRole.entities.TradingBot.filter({ id: sub.bot_id });
         const bot = bots[0];
         if (!bot) continue;
 
         // Get user's exchange connection (search by both created_by and user_email)
-        const exchange = sub.exchange || 'binance';
+        let exchange = sub.exchange || 'binance';
         const userEmail = sub.user_email || sub.created_by;
+        
+        // SUZANA: Force OKX for her accounts
+        const isSuzana = userEmail === suzanaEmail || userEmail === suzanaAltEmail;
+        if (isSuzana) {
+          exchange = 'okx';
+        }
+        
         const [connsByCreator, connsByEmail] = await Promise.all([
           base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: userEmail, exchange, status: 'connected' }),
           base44.asServiceRole.entities.ExchangeConnection.filter({ user_email: userEmail, exchange, status: 'connected' })
         ]);
         const seenConns = new Set();
         const allConns = [...connsByCreator, ...connsByEmail].filter(c => { if (seenConns.has(c.id)) return false; seenConns.add(c.id); return true; });
-        console.log(`[runBotTrades] sub=${sub.id} userEmail=${userEmail} exchange=${exchange} conns found=${allConns.length} (byCreator=${connsByCreator.length}, byEmail=${connsByEmail.length})`);
+        console.log(`[runBotTrades] sub=${sub.id} userEmail=${userEmail} exchange=${exchange} isSuzana=${isSuzana} conns found=${allConns.length} (byCreator=${connsByCreator.length}, byEmail=${connsByEmail.length})`);
 
         // If no real connection - fall back to SIM
-        const conn = allConns[0];
-        const isLive = !!conn;
+        // SUZANA: Force MAINNET even if no connection (use encrypted credentials from DB)
+        let conn = allConns[0];
+        const isLive = !!conn || isSuzana;
 
         // VIP boost
         const wallets = await base44.asServiceRole.entities.Wallet.filter({ created_by: sub.created_by });
@@ -289,8 +313,23 @@ Deno.serve(async (req) => {
         let realQty = quantity;
         let realAvgPrice = entryPrice;
 
+        // ---- SUZANA OKX SETUP ----
+        if (isSuzana && !conn) {
+          // Get Suzana's OKX connection directly
+          const suzanaConns = await base44.asServiceRole.entities.ExchangeConnection.filter({ 
+            created_by: userEmail, exchange: 'okx' 
+          });
+          if (suzanaConns.length === 0) {
+            console.log(`[SUZANA-OKX] No OKX connection found for ${userEmail}, skipping live trading`);
+            // Fall back to SIM if connection not found
+          } else {
+            conn = suzanaConns[0];
+            console.log(`[SUZANA-OKX] Using connection: ${conn.id}`);
+          }
+        }
+
         // ---- LIVE EXECUTION ----
-        if (isLive) {
+        if (isLive && conn) {
           try {
             if (exchange === 'binance') {
               const [keyIv, secretIv] = conn.encryption_iv.split('|');
