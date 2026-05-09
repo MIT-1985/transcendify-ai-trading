@@ -178,7 +178,13 @@ export default function Dashboard() {
   const liveOrders = ordersResponse.orders || [];
   const totalProfit = ordersResponse.totalRealizedPnl || 0;
   const totalTrades = liveOrders.filter(o => o.state === 'filled').length;
-  
+
+  // Prepare trades for RealTimeEarnings with proper PnL calculation
+  const tradesForEarnings = liveOrders.map(o => ({
+    ...o,
+    pnl: parseFloat(o.pnl || 0)
+  }));
+
   useEffect(() => {
     setUnrealisedPnL(totalProfit);
   }, [totalProfit]);
@@ -221,11 +227,9 @@ export default function Dashboard() {
         </div>
 
         {/* Real-Time Earnings */}
-        {activeBots > 0 && (
-          <div className="mb-6 sm:mb-8">
-            <RealTimeEarnings subscriptions={subscriptions} trades={liveOrders} />
-          </div>
-        )}
+        <div className="mb-6 sm:mb-8">
+          <RealTimeEarnings subscriptions={subscriptions} trades={tradesForEarnings} />
+        </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
