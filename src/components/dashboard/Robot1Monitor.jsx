@@ -11,7 +11,9 @@ export default function Robot1Monitor() {
     realizedPnlToday: 0,
     skippedReasons: [],
     lastOrderId: null,
-    lastOrderTime: null
+    lastOrderTime: null,
+    error: null,
+    ordersStatus: null
   });
   const [loading, setLoading] = useState(true);
 
@@ -21,7 +23,29 @@ export default function Robot1Monitor() {
         const user = await base44.auth.me();
         if (!user) return;
 
-        // Get all orders for today
+        // Try to fetch live OKX orders first
+        let liveOrders = [];
+        let ordersStatus = 'LOADING';
+        let ordersError = null;
+        
+        try {
+          const res = await base44.functions.invoke('getSuzanaOrders', {});
+          if (res.data?.success) {
+            liveOrders = res.data.orders || [];
+            ordersStatus = 'ACCESSIBLE';
+            console.log(`[Robot1Monitor] Got ${liveOrders.length} live orders from OKX`);
+          } else {
+            ordersStatus = res.data?.status || 'FAILED';
+            ordersError = res.data?.reason || res.data?.error;
+            console.log(`[Robot1Monitor] Orders fetch failed: ${ordersStatus} - ${ordersError}`);
+          }
+        } catch (err) {
+          ordersStatus = 'OKX_ORDERS_NOT_ACCESSIBLE';
+          ordersError = err.message || '403_forbidden';
+          console.log(`[Robot1Monitor] Exception calling getSuzanaOrders: ${err.message}`);
+        }
+
+        // Get all orders for today (fallback to local DB)
         const today = new Date().toISOString().split('T')[0];
         const orders = await base44.entities.Order.list();
         
@@ -74,12 +98,12 @@ export default function Robot1Monitor() {
 
         // Get free USDT from OKX (approximate from first order's timestamp)
         const firstOrder = todayOrders[0];
-        let freeUsdt = 0;
+        let freeUSDT = 0;
         if (firstOrder) {
           // Note: actual freeUSDT would come from OKX balance API
           // For now, estimate from capital_allocated
           const subs = await base44.entities.UserSubscription.list();
-          freeUsdt = subs.reduce((sum, s) => sum + (s.capital_allocated || 0), 0);
+          freeUSDT = subs.reduce((sum, s) => sum + (s.capital_allocated || 0), 0);
         }
 
         const lastOrder = todayOrders[todayOrders.length - 1];
@@ -91,7 +115,9 @@ export default function Robot1Monitor() {
           realizedPnlToday: Number(realizedPnl.toFixed(2)),
           skippedReasons: [],
           lastOrderId: lastOrder?.id,
-          lastOrderTime: lastOrder?.filled_at
+          lastOrderTime: lastOrder?.filled_at,
+          error: ordersStatus !== 'ACCESSIBLE' ? ordersError : null,
+          ordersStatus
         });
       } catch (err) {
         console.error('[Robot1Monitor] Error:', err);
@@ -107,6 +133,25 @@ export default function Robot1Monitor() {
 
   if (loading) {
     return <div className="text-center p-4 text-slate-400">Loading Robot 1 data...</div>;
+  }
+
+  if (data.ordersStatus !== 'ACCESSIBLE') {
+    return (
+      <Card className="border-red-700 bg-red-900/20 col-span-full">
+        <CardHeader>
+          <CardTitle className="text-red-400 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5" /> OKX ORDER STATUS
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="text-sm"><span className="text-slate-400">Status:</span> <span className="text-red-400 font-mono">{data.ordersStatus}</span></div>
+            <div className="text-sm"><span className="text-slate-400">Reason:</span> <span className="text-red-300 font-mono">{data.error}</span></div>
+            <div className="text-xs text-slate-500 mt-3">Robot 1 cannot verify trading state without live OKX order history.</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

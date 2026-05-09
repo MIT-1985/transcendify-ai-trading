@@ -1,5 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
+const OKX_ENDPOINTS = ['https://www.okx.com', 'https://eea.okx.com'];
+
 async function deriveOkxKey() {
   const enc = new TextEncoder();
   const appId = Deno.env.get('BASE44_APP_ID') || 'okx-master-secret';
@@ -26,9 +29,9 @@ async function hmacSignOkx(secret, message) {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
-async function okxRequest(apiKey, secret, passphrase, method, path, baseUrl = 'https://www.okx.com') {
+async function okxRequest(apiKey, secret, passphrase, method, path, body = '', baseUrl = 'https://www.okx.com') {
   const timestamp = new Date().toISOString();
-  const message = timestamp + method + path;
+  const message = timestamp + method + path + body;
   const signature = await hmacSignOkx(secret, message);
   const res = await fetch(baseUrl + path, {
     method,
@@ -43,42 +46,86 @@ async function okxRequest(apiKey, secret, passphrase, method, path, baseUrl = 'h
   return res.json();
 }
 
-const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
-
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    
+    // Allow admin or Suzana only
+    if (!user || (user.role !== 'admin' && user.email !== SUZANA_EMAIL)) {
+      return Response.json({ error: 'Forbidden: Admin or Suzana access only' }, { status: 403 });
+    }
 
     // Find Suzana's OKX connection
-    const conns = await base44.asServiceRole.entities.ExchangeConnection.filter({
-      created_by: SUZANA_EMAIL, exchange: 'okx', status: 'connected'
+    const [byCreator, byEmail] = await Promise.all([
+      base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: SUZANA_EMAIL, exchange: 'okx' }),
+      base44.asServiceRole.entities.ExchangeConnection.filter({ user_email: SUZANA_EMAIL, exchange: 'okx' })
+    ]);
+    
+    const seen = new Set();
+    const conns = [...byCreator, ...byEmail].filter(c => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
     });
+    
     const conn = conns[0];
-    if (!conn) return Response.json({ success: false, error: 'No OKX connection found' }, { status: 404 });
+    if (!conn) {
+      return Response.json({ 
+        success: false, 
+        error: 'No OKX connection found',
+        status: 'OKX_ORDERS_NOT_ACCESSIBLE',
+        reason: 'no_connection'
+      }, { status: 404 });
+    }
 
     const apiKey = await decryptOkx(conn.api_key_encrypted);
     const apiSecret = await decryptOkx(conn.api_secret_encrypted);
     const passphrase = await decryptOkx(conn.encryption_iv);
 
-    // Try both endpoints - fetch ALL orders with pagination (max 300 per request)
-    const endpoints = ['https://www.okx.com', 'https://eea.okx.com'];
-    let allOrders = [];
+    // Try both endpoints
     let ordersData = null;
+    let workingEndpoint = null;
     
-    for (const ep of endpoints) {
+    for (const ep of OKX_ENDPOINTS) {
       try {
-        // Fetch up to 100 filled orders (OKX max per request is 300, but 100 is safer)
-        const data = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/trade/orders-history?instType=SPOT&limit=100', ep);
-        if (data.code === '0') { ordersData = data; allOrders = data.data || []; break; }
-        if (data.code !== '50119') { ordersData = data; allOrders = data.data || []; break; }
+        const data = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/trade/orders-history?instType=SPOT&limit=100', '', ep);
+        console.log(`[getSuzanaOrders] ${ep} code=${data.code} msg=${data.msg || ''}`);
+        if (data.code === '0') { 
+          ordersData = data; 
+          workingEndpoint = ep;
+          break; 
+        }
+        if (data.code !== '50119') { 
+          ordersData = data; 
+          workingEndpoint = ep;
+          break; 
+        }
       } catch (e) {
-        console.log(`[getSuzanaOrders] ${ep} error: ${e.message}`);
+        console.log(`[getSuzanaOrders] ${ep} exception: ${e.message}`);
       }
     }
 
-    if (!ordersData || ordersData.code !== '0') {
-      return Response.json({ success: false, error: ordersData?.msg || 'Failed to fetch orders' }, { status: 500 });
+    if (!ordersData) {
+      return Response.json({ 
+        success: false, 
+        error: 'Failed to reach any OKX endpoint',
+        status: 'OKX_ORDERS_NOT_ACCESSIBLE',
+        reason: 'no_working_endpoint'
+      }, { status: 503 });
     }
+    
+    if (ordersData.code !== '0') {
+      return Response.json({ 
+        success: false, 
+        error: ordersData.msg || 'OKX API error',
+        status: 'OKX_ORDERS_NOT_ACCESSIBLE',
+        reason: `okx_code_${ordersData.code}`,
+        endpoint: workingEndpoint
+      }, { status: 403 });
+    }
+    
+    const allOrders = ordersData.data || [];
 
     const orders = allOrders.map(o => ({
       ordId: o.ordId,
@@ -143,7 +190,13 @@ Deno.serve(async (req) => {
     });
 
     console.log(`[getSuzanaOrders] Fetched ${orders.length} orders, total realized P&L: $${totalRealizedPnl.toFixed(4)}`);
-    return Response.json({ success: true, orders, totalRealizedPnl });
+    return Response.json({ 
+      success: true, 
+      orders, 
+      totalRealizedPnl,
+      endpoint: workingEndpoint,
+      connection_id: conn.id
+    });
   } catch (err) {
     console.error('[getSuzanaOrders]', err.message);
     return Response.json({ success: false, error: err.message }, { status: 500 });

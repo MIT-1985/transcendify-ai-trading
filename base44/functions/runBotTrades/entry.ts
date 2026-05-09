@@ -272,28 +272,49 @@ Deno.serve(async (req) => {
         const instIdAsset = symbol.split('-')[0]; // ETH or SOL
         let openPositions = {}; // { 'ETH': { qty: 1.5, cost: 5000 }, ... }
         
+        // Fetch live OKX orders directly using OKX API (same method as getSuzanaOrders)
         try {
-          // Fetch filled orders from getSuzanaOrders (live OKX data)
-          const filledOrdersRes = await base44.asServiceRole.functions.invoke('getSuzanaOrders', { userEmail });
-          const filledOrders = filledOrdersRes.data?.orders || [];
+          const apiKey = await decryptOkx(conn.api_key_encrypted);
+          const apiSecret = await decryptOkx(conn.api_secret_encrypted);
+          const passphrase = await decryptOkx(conn.encryption_iv);
           
-          // Build FIFO positions
+          let ordersData = null;
+          for (const ep of ['https://www.okx.com', 'https://eea.okx.com']) {
+            try {
+              const data = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/trade/orders-history?instType=SPOT&limit=100', '', ep);
+              if (data.code === '0') { ordersData = data; break; }
+            } catch (e) {
+              console.log(`[SKIP_REASON] OKX endpoint ${ep} failed: ${e.message}`);
+            }
+          }
+          
+          if (!ordersData || ordersData.code !== '0') {
+            console.log(`[SKIP_REASON] Live order fetch failed, cannot verify positions`);
+            continue;
+          }
+          
+          // Build FIFO positions from OKX orders
+          const filledOrders = ordersData.data || [];
           for (const order of filledOrders) {
             if (order.instId === symbol) {
               const asset = order.instId.split('-')[0];
               if (!openPositions[asset]) openPositions[asset] = { qty: 0, cost: 0 };
               
-              if (order.side === 'BUY') {
-                openPositions[asset].qty += order.filledQty;
-                openPositions[asset].cost += order.filledQty * order.filledPrice;
-              } else {
-                openPositions[asset].qty -= order.filledQty;
+              const fillQty = parseFloat(order.accFillSz || 0);
+              const fillPrice = parseFloat(order.avgPx || 0);
+              
+              if (order.side?.toUpperCase() === 'BUY') {
+                openPositions[asset].qty += fillQty;
+                openPositions[asset].cost += fillQty * fillPrice;
+              } else if (order.side?.toUpperCase() === 'SELL') {
+                openPositions[asset].qty -= fillQty;
                 if (openPositions[asset].qty < 0) openPositions[asset].qty = 0;
               }
             }
           }
+          console.log(`[BOT_DECISION] Fetched ${filledOrders.length} live orders, built positions`);
         } catch (e) {
-          console.log(`[SKIP_REASON] Could not fetch live orders: ${e.message}`);
+          console.log(`[SKIP_REASON] Exception fetching live orders: ${e.message}`);
           continue;
         }
         
