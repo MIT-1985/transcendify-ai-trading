@@ -236,7 +236,7 @@ export default function Dashboard() {
             icon={Bot}
           />
           <StatsCard
-            title="Total Profit"
+            title="Total P&L"
             value={`$${totalProfit.toFixed(2)}`}
             subtitle={totalProfit >= 0 ? 'Profit' : 'Loss'}
             icon={DollarSign}
@@ -245,16 +245,13 @@ export default function Dashboard() {
           <StatsCard
             title="Total Trades"
             value={totalTrades.toLocaleString()}
-            subtitle="Today"
+            subtitle="Filled Today"
             icon={Activity}
           />
           <StatsCard
             title="Win Rate"
-            value={totalTrades > 0 ? `${((subscriptions.reduce((sum, s) => {
-              const profit = s.total_profit || 0;
-              return profit > 0 ? sum + 1 : sum;
-            }, 0) / subscriptions.length) * 100).toFixed(1)}%` : '0%'}
-            subtitle="Bot performance"
+            value={liveOrders.length > 0 ? `${(liveOrders.filter(o => (parseFloat(o.pnl || 0) > 0)).length / liveOrders.filter(o => o.side === 'sell' || o.side === 'SELL').length * 100).toFixed(1)}%` : '0%'}
+            subtitle="Sell Orders"
             icon={TrendingUp}
             trend="up"
           />
