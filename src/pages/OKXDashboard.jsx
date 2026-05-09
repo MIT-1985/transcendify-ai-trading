@@ -180,7 +180,10 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
   const balance = connection?.balance_usdt ?? 0;
   const isLoadingBalance = connection?.loading && balance === 0;
   const totalTrades = Math.max(subscription?.total_trades || 0, trades.length);
-  const totalProfit = subscription?.total_profit || 0;
+  // Real profit = current balance - total capital allocated across all bots
+  const totalCapitalAllocated = subs?.reduce((s, sb) => s + (sb.capital_allocated || 0), 0) || 0;
+  const realProfit = balance > 0 && totalCapitalAllocated > 0 ? balance - totalCapitalAllocated : null;
+  const totalProfit = realProfit !== null ? realProfit : (subscription?.total_profit || 0);
 
   return (
     <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-emerald-500/30 rounded-2xl p-6 mb-6">
@@ -237,11 +240,13 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
 
         {/* Total Profit */}
         <div className="bg-slate-800/70 rounded-xl p-4 border border-emerald-500/20">
-          <div className="text-xs text-slate-400 mb-1">Общ Profit</div>
+          <div className="text-xs text-slate-400 mb-1">Реален P&L</div>
           <div className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {totalProfit >= 0 ? '+' : ''}${totalProfit.toFixed(2)}
           </div>
-          <div className="text-xs text-slate-500 mt-1">от стартиране</div>
+          <div className="text-xs text-slate-500 mt-1">
+            {totalCapitalAllocated > 0 ? `Баланс - Капитал ($${totalCapitalAllocated})` : 'от стартиране'}
+          </div>
         </div>
       </div>
 
