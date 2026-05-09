@@ -6,7 +6,7 @@ import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-import { TrendingUp, TrendingDown, RefreshCw, Link2, Activity, BarChart2, Wallet, ArrowUpDown, Bot, CheckCircle2, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, Link2, Activity, BarChart2, Wallet, ArrowUpDown, Bot, CheckCircle2, Zap, AlertCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import RealTradesSummary from '@/components/dashboard/RealTradesSummary';
 import Robot1Monitor from '@/components/dashboard/Robot1Monitor.jsx';
@@ -340,6 +340,8 @@ export default function OKXDashboard() {
   const [tickers, setTickers] = useState([]);
   const [loadingTickers, setLoadingTickers] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [rebalancing, setRebalancing] = useState(false);
+  const [rebalanceResult, setRebalanceResult] = useState(null);
 
   // Live balance from OKX for Suzana (via backend function)
   const [liveBalance, setLiveBalance] = useState(0);
@@ -455,6 +457,24 @@ export default function OKXDashboard() {
     setRefreshing(false);
   };
 
+  const handleRebalance = async () => {
+    setRebalancing(true);
+    setRebalanceResult(null);
+    try {
+      const res = await base44.functions.invoke('rebalancePortfolio', {});
+      setRebalanceResult(res.data);
+      // Refresh balance after rebalance
+      setTimeout(() => {
+        fetchSuzanaBalance();
+        refetchOrders();
+      }, 2000);
+    } catch (e) {
+      console.error('Rebalance error', e);
+      setRebalanceResult({ success: false, error: e.message });
+    }
+    setRebalancing(false);
+  };
+
   const isSuzana = user?.email === SUZANA_EMAIL || user?.email === 'sauzana.cozmas@gmail.com';
 
   // Show own connection for admin/other users too
@@ -476,23 +496,57 @@ export default function OKXDashboard() {
             </h1>
             <p className="text-slate-400 text-sm mt-1">Live OKX пазар • Акаунт на Suzana</p>
           </div>
-          {/* Always visible balance badge */}
-          {suzanaConn && (
-            <div className="bg-slate-900/80 border border-yellow-500/30 rounded-xl px-5 py-3 text-right">
-              <div className="text-xs text-slate-400">Suzana — OKX Баланс</div>
-              <div className="text-2xl font-bold text-yellow-400">
-                {suzanaConn.loading && suzanaConn.balance_usdt === 0
-                  ? <span className="animate-pulse text-slate-400 text-lg">Зарежда...</span>
-                  : <>${suzanaConn.balance_usdt.toFixed(2)} <span className="text-sm text-slate-400">USDT</span></>
-                }
+          <div className="flex items-center gap-3 flex-wrap">
+            <button onClick={handleRebalance} disabled={rebalancing}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-xl text-white text-sm transition-colors border border-purple-500">
+              <ArrowUpDown className={`w-4 h-4 ${rebalancing ? 'animate-spin' : ''}`} />
+              Rebalance to USDT
+            </button>
+            {/* Always visible balance badge */}
+            {suzanaConn && (
+              <div className="bg-slate-900/80 border border-yellow-500/30 rounded-xl px-5 py-3 text-right">
+                <div className="text-xs text-slate-400">Suzana — OKX Баланс</div>
+                <div className="text-2xl font-bold text-yellow-400">
+                  {suzanaConn.loading && suzanaConn.balance_usdt === 0
+                    ? <span className="animate-pulse text-slate-400 text-lg">Зарежда...</span>
+                    : <>${suzanaConn.balance_usdt.toFixed(2)} <span className="text-sm text-slate-400">USDT</span></>
+                  }
+                </div>
+                <div className="flex items-center justify-end gap-1 mt-0.5">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                  <span className="text-xs text-emerald-400">Свързан</span>
+                </div>
               </div>
-              <div className="flex items-center justify-end gap-1 mt-0.5">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                <span className="text-xs text-emerald-400">Свързан</span>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
+
+        {/* Rebalance Result Alert */}
+        {rebalanceResult && (
+          <div className={`mb-6 rounded-xl border px-4 py-3 flex items-start gap-3 ${
+            rebalanceResult.success 
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+              : 'bg-red-500/10 border-red-500/30 text-red-400'
+          }`}>
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div className="text-sm flex-1">
+              <div className="font-semibold mb-1">
+                {rebalanceResult.success ? '✓ Rebalance Complete' : '✗ Rebalance Failed'}
+              </div>
+              {rebalanceResult.success ? (
+                <div className="space-y-1 text-xs">
+                  <div>Rebalanced: {rebalanceResult.rebalanced_count} assets</div>
+                  {rebalanceResult.results?.filter(r => r.status === 'SUCCESS').map(r => (
+                    <div key={r.asset}>{r.asset}: {r.quantity.toFixed(6)} → ${r.estimatedValue.toFixed(2)} USDT (#{r.orderId})</div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs">{rebalanceResult.error}</div>
+              )}
+            </div>
+            <button onClick={() => setRebalanceResult(null)} className="text-xs opacity-60 hover:opacity-100">✕</button>
+          </div>
+        )}
 
         {/* Suzana Account Panel — always shown */}
         <SuzanaAccountPanel
