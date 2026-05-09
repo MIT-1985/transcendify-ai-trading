@@ -163,8 +163,8 @@ export default function Dashboard() {
           </div>
           <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 border border-slate-700 rounded-xl p-4 sm:p-5 w-full sm:min-w-[200px] sm:w-auto">
             <div className="text-xs text-slate-400 mb-1">Total P&L</div>
-            <div className={`text-2xl sm:text-3xl font-bold ${unrealisedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {unrealisedPnL >= 0 ? '+' : ''}${unrealisedPnL.toFixed(2)}
+            <div className={`text-2xl sm:text-3xl font-bold ${unrealisedPnL > 0 ? 'text-emerald-400' : unrealisedPnL < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+              {unrealisedPnL > 0 ? '+' : ''}${unrealisedPnL.toFixed(2)}
             </div>
           </div>
         </div>
@@ -352,8 +352,8 @@ export default function Dashboard() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <div className="text-xs text-slate-500">Profit</div>
-                        <div className="text-emerald-400 font-semibold">
-                          +${sub.total_profit?.toLocaleString() || 0}
+                        <div className={`font-semibold ${(sub.total_profit || 0) > 0 ? 'text-emerald-400' : (sub.total_profit || 0) < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                          {(sub.total_profit || 0) > 0 ? '+' : ''}{(sub.total_profit || 0) === 0 ? '$0.00' : `$${(sub.total_profit || 0).toFixed(2)}`}
                         </div>
                       </div>
                       <div>
