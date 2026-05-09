@@ -1,251 +1,326 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
+import { AlertCircle, Database, TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function Robot1Monitor() {
-  const [data, setData] = useState({
-    freeUSDT: 0,
-    openPositions: {},
-    closedTradesToday: 0,
-    realizedPnlToday: 0,
-    skippedReasons: [],
-    lastOrderId: null,
-    lastOrderTime: null,
-    error: null,
-    ordersStatus: null
+  const [balance, setBalance] = useState({ usdt: 0, eth: 0, status: 'LOADING', error: null });
+  const [rawOrders, setRawOrders] = useState({ orders: [], count: 0, status: 'LOADING', error: null });
+  const [robot1, setRobot1] = useState({ 
+    activePosition: null, 
+    realizedPnL: 0, 
+    closedTrades: 0, 
+    status: 'LOADING', 
+    error: null 
   });
-  const [loading, setLoading] = useState(true);
 
+  // SECTION A: Live OKX Balance
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchBalance = async () => {
       try {
-        const user = await base44.auth.me();
-        if (!user) return;
-
-        // Try to fetch live OKX orders first
-        let liveOrders = [];
-        let ordersStatus = 'LOADING';
-        let ordersError = null;
-        
-        try {
-          const res = await base44.functions.invoke('getSuzanaOrders', {});
-          if (res.data?.success) {
-            liveOrders = res.data.orders || [];
-            ordersStatus = 'ACCESSIBLE';
-            console.log(`[Robot1Monitor] Got ${liveOrders.length} live orders from OKX`);
-          } else {
-            ordersStatus = res.data?.status || 'FAILED';
-            ordersError = res.data?.reason || res.data?.error;
-            console.log(`[Robot1Monitor] Orders fetch failed: ${ordersStatus} - ${ordersError}`);
-          }
-        } catch (err) {
-          ordersStatus = 'OKX_ORDERS_NOT_ACCESSIBLE';
-          ordersError = err.message || '403_forbidden';
-          console.log(`[Robot1Monitor] Exception calling getSuzanaOrders: ${err.message}`);
+        const res = await base44.functions.invoke('getSuzanaBalance', {});
+        if (res.data?.success) {
+          const details = res.data.details || {};
+          setBalance({
+            usdt: details.USDT || 0,
+            eth: details.ETH || 0,
+            status: 'OK',
+            error: null
+          });
+        } else {
+          setBalance(prev => ({
+            ...prev,
+            status: res.data?.status || 'FAILED',
+            error: res.data?.reason || 'Unknown error'
+          }));
         }
-
-        // Get all orders for today (fallback to local DB)
-        const today = new Date().toISOString().split('T')[0];
-        const orders = await base44.entities.Order.list();
-        
-        // Filter today's orders
-        const todayOrders = orders.filter(o => {
-          const orderDate = o.filled_at?.split('T')[0] || o.created_date?.split('T')[0];
-          return orderDate === today;
-        });
-
-        // Count closed trades (SELL orders)
-        const closedTrades = todayOrders.filter(o => o.side === 'SELL').length;
-
-        // Calculate realized P&L from FIFO matching
-        let realizedPnl = 0;
-        const positions = {};
-        
-        for (const order of todayOrders.sort((a, b) => 
-          new Date(a.filled_at) - new Date(b.filled_at)
-        )) {
-          const symbol = order.symbol;
-          if (!positions[symbol]) positions[symbol] = [];
-          
-          if (order.side === 'BUY') {
-            positions[symbol].push({
-              qty: order.quantity,
-              price: order.average_price,
-              fee: order.fee
-            });
-          } else {
-            // SELL - match with oldest BUY (FIFO)
-            while (positions[symbol]?.length > 0 && order.quantity > 0) {
-              const buy = positions[symbol][0];
-              const matchQty = Math.min(buy.qty, order.quantity);
-              realizedPnl += (order.average_price - buy.price) * matchQty - (buy.fee + order.fee);
-              buy.qty -= matchQty;
-              order.quantity -= matchQty;
-              if (buy.qty === 0) positions[symbol].shift();
-            }
-          }
-        }
-
-        // Get current open positions
-        const openPos = {};
-        for (const symbol in positions) {
-          const remaining = positions[symbol].reduce((sum, p) => sum + p.qty, 0);
-          if (remaining > 0.0001) {
-            openPos[symbol] = remaining;
-          }
-        }
-
-        // Get free USDT from OKX (approximate from first order's timestamp)
-        const firstOrder = todayOrders[0];
-        let freeUSDT = 0;
-        if (firstOrder) {
-          // Note: actual freeUSDT would come from OKX balance API
-          // For now, estimate from capital_allocated
-          const subs = await base44.entities.UserSubscription.list();
-          freeUSDT = subs.reduce((sum, s) => sum + (s.capital_allocated || 0), 0);
-        }
-
-        const lastOrder = todayOrders[todayOrders.length - 1];
-
-        setData({
-          freeUSDT,
-          openPositions: openPos,
-          closedTradesToday: closedTrades,
-          realizedPnlToday: Number(realizedPnl.toFixed(2)),
-          skippedReasons: [],
-          lastOrderId: lastOrder?.id,
-          lastOrderTime: lastOrder?.filled_at,
-          error: ordersStatus !== 'ACCESSIBLE' ? ordersError : null,
-          ordersStatus
-        });
       } catch (err) {
-        console.error('[Robot1Monitor] Error:', err);
-      } finally {
-        setLoading(false);
+        setBalance(prev => ({
+          ...prev,
+          status: 'ERROR',
+          error: err.message
+        }));
       }
     };
 
-    fetchData();
-    const interval = setInterval(fetchData, 30000); // Refresh every 30s
+    fetchBalance();
+    const interval = setInterval(fetchBalance, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) {
-    return <div className="text-center p-4 text-slate-400">Loading Robot 1 data...</div>;
-  }
+  // SECTION B: Raw OKX Orders (all instruments)
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const res = await base44.functions.invoke('getSuzanaOrders', {});
+        if (res.data?.success) {
+          const orders = res.data.orders || [];
+          setRawOrders({
+            orders: orders,
+            count: orders.length,
+            status: 'OK',
+            error: null
+          });
+        } else {
+          setRawOrders(prev => ({
+            ...prev,
+            status: res.data?.status || 'FAILED',
+            error: res.data?.reason || 'Cannot fetch OKX orders'
+          }));
+        }
+      } catch (err) {
+        setRawOrders(prev => ({
+          ...prev,
+          status: 'ERROR',
+          error: err.message
+        }));
+      }
+    };
 
-  if (data.ordersStatus !== 'ACCESSIBLE') {
-    return (
-      <Card className="border-red-700 bg-red-900/20 col-span-full">
-        <CardHeader>
-          <CardTitle className="text-red-400 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5" /> OKX ORDER STATUS
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <div className="text-sm"><span className="text-slate-400">Status:</span> <span className="text-red-400 font-mono">{data.ordersStatus}</span></div>
-            <div className="text-sm"><span className="text-slate-400">Reason:</span> <span className="text-red-300 font-mono">{data.error}</span></div>
-            <div className="text-xs text-slate-500 mt-3">Robot 1 cannot verify trading state without live OKX order history.</div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // SECTION C: Robot 1 Verified Strategy (ETH-USDT, SOL-USDT only)
+  useEffect(() => {
+    const fetchRobot1 = async () => {
+      try {
+        // Get all Robot 1 trades from database
+        const trades = await base44.entities.Trade.filter({
+          strategy_used: 'robot1',
+          execution_mode: 'MAINNET'
+        });
+
+        // Filter only ETH-USDT and SOL-USDT
+        const robot1Trades = trades.filter(t => 
+          t.symbol === 'ETH-USDT' || t.symbol === 'SOL-USDT'
+        );
+
+        // Find active position (BUY without exit_price)
+        const activePos = robot1Trades.find(t => t.side === 'BUY' && !t.exit_price);
+
+        // Calculate realized P&L only from completed BUY→SELL pairs
+        let realizedPnL = 0;
+        let closedCount = 0;
+
+        const buyTrades = robot1Trades.filter(t => t.side === 'BUY').sort((a, b) => 
+          new Date(a.created_date) - new Date(b.created_date)
+        );
+        const sellTrades = robot1Trades.filter(t => t.side === 'SELL').sort((a, b) => 
+          new Date(a.created_date) - new Date(b.created_date)
+        );
+
+        let buyIndex = 0;
+        for (const sell of sellTrades) {
+          if (buyIndex < buyTrades.length) {
+            const buy = buyTrades[buyIndex];
+            const buyValue = buy.entry_price * buy.quantity + (buy.fee || 0);
+            const sellValue = sell.exit_price * sell.quantity - (sell.fee || 0);
+            realizedPnL += sellValue - buyValue;
+            closedCount++;
+            buyIndex++;
+          }
+        }
+
+        setRobot1({
+          activePosition: activePos ? {
+            symbol: activePos.symbol,
+            qty: activePos.quantity,
+            entryPrice: activePos.entry_price,
+            entryTime: activePos.created_date
+          } : null,
+          realizedPnL: parseFloat(realizedPnL.toFixed(2)),
+          closedTrades: closedCount,
+          status: 'OK',
+          error: null
+        });
+      } catch (err) {
+        setRobot1(prev => ({
+          ...prev,
+          status: 'ERROR',
+          error: err.message
+        }));
+      }
+    };
+
+    fetchRobot1();
+    const interval = setInterval(fetchRobot1, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {/* Free USDT */}
-      <Card className="border-slate-700 bg-slate-900/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-slate-400">Free USDT</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold text-white">${data.freeUSDT.toFixed(2)}</div>
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* SECTION A: OKX LIVE BALANCE */}
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div>
+        <h3 className="text-lg font-semibold text-white mb-3">A) OKX Live Balance</h3>
+        {balance.status === 'LOADING' ? (
+          <Card className="border-slate-700 bg-slate-900/50">
+            <CardContent className="p-6">
+              <div className="text-slate-400">Loading balance...</div>
+            </CardContent>
+          </Card>
+        ) : balance.status !== 'OK' ? (
+          <Card className="border-red-700 bg-red-900/20">
+            <CardHeader>
+              <CardTitle className="text-red-400 flex items-center gap-2 text-sm">
+                <AlertCircle className="w-4 h-4" /> Balance Error
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-red-300">{balance.error}</div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="border-slate-700 bg-slate-900/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-slate-400">Free USDT</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white">${balance.usdt.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+            <Card className="border-slate-700 bg-slate-900/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-slate-400">ETH Held</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-400">{balance.eth.toFixed(6)}</div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
 
-      {/* Open Positions */}
-      <Card className="border-slate-700 bg-slate-900/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-slate-400">Open Positions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {Object.keys(data.openPositions).length === 0 ? (
-            <div className="text-slate-500 text-sm">None</div>
-          ) : (
-            <div className="space-y-1">
-              {Object.entries(data.openPositions).map(([symbol, qty]) => (
-                <div key={symbol} className="flex justify-between text-sm">
-                  <span className="text-blue-400">{symbol}</span>
-                  <span className="text-white">{qty.toFixed(6)}</span>
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* SECTION B: RAW OKX ORDERS (UNFILTERED) */}
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div>
+        <h3 className="text-lg font-semibold text-white mb-3">B) Raw OKX Orders</h3>
+        {rawOrders.status === 'LOADING' ? (
+          <Card className="border-slate-700 bg-slate-900/50">
+            <CardContent className="p-6">
+              <div className="text-slate-400">Loading orders...</div>
+            </CardContent>
+          </Card>
+        ) : rawOrders.status !== 'OK' ? (
+          <Card className="border-orange-700 bg-orange-900/20">
+            <CardHeader>
+              <CardTitle className="text-orange-400 flex items-center gap-2 text-sm">
+                <Database className="w-4 h-4" /> Orders Not Accessible
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-orange-300">{rawOrders.error}</div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-slate-700 bg-slate-900/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-400">
+                Total: <span className="text-white font-mono">{rawOrders.count}</span> orders
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xs text-slate-500">
+                All instruments, all fills. Raw OKX data - not Robot 1 filtered.
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* SECTION C: ROBOT 1 VERIFIED STRATEGY */}
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div>
+        <h3 className="text-lg font-semibold text-white mb-3">C) Robot 1 Strategy (ETH-USDT / SOL-USDT)</h3>
+        {robot1.status === 'LOADING' ? (
+          <Card className="border-slate-700 bg-slate-900/50">
+            <CardContent className="p-6">
+              <div className="text-slate-400">Loading strategy data...</div>
+            </CardContent>
+          </Card>
+        ) : robot1.status !== 'OK' ? (
+          <Card className="border-red-700 bg-red-900/20">
+            <CardHeader>
+              <CardTitle className="text-red-400 flex items-center gap-2 text-sm">
+                <AlertCircle className="w-4 h-4" /> Strategy Error
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-red-300">{robot1.error}</div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Active Position */}
+            <Card className={`border-slate-700 ${robot1.activePosition ? 'bg-blue-900/20' : 'bg-slate-900/50'}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-slate-400">Active Position</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {robot1.activePosition ? (
+                  <div className="space-y-1">
+                    <div className="text-sm font-mono text-blue-400">{robot1.activePosition.symbol}</div>
+                    <div className="text-lg font-bold text-white">{robot1.activePosition.qty.toFixed(6)}</div>
+                    <div className="text-xs text-slate-500">Entry: ${robot1.activePosition.entryPrice.toFixed(2)}</div>
+                  </div>
+                ) : (
+                  <div className="text-slate-500 text-sm">None</div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Realized P&L */}
+            <Card className={`border-slate-700 bg-slate-900/50`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-slate-400">Realized P&L</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${robot1.realizedPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  ${robot1.realizedPnL.toFixed(2)}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <div className="flex items-center gap-1 mt-1">
+                  {robot1.realizedPnL >= 0 ? (
+                    <TrendingUp className="w-3 h-3 text-green-400" />
+                  ) : (
+                    <TrendingDown className="w-3 h-3 text-red-400" />
+                  )}
+                  <span className="text-xs text-slate-500">BUY→SELL pairs</span>
+                </div>
+              </CardContent>
+            </Card>
 
-      {/* Closed Trades Today */}
-      <Card className="border-slate-700 bg-slate-900/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-slate-400">Closed Trades</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold text-white">{data.closedTradesToday}</div>
-        </CardContent>
-      </Card>
+            {/* Closed Trades */}
+            <Card className="border-slate-700 bg-slate-900/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-slate-400">Closed Trades</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white">{robot1.closedTrades}</div>
+                <div className="text-xs text-slate-500 mt-1">Matched pairs</div>
+              </CardContent>
+            </Card>
 
-      {/* Realized P&L */}
-      <Card className="border-slate-700 bg-slate-900/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-slate-400">Realized P&L (Today)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className={`text-3xl font-bold ${data.realizedPnlToday >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            ${data.realizedPnlToday.toFixed(2)}
+            {/* Status */}
+            <Card className="border-slate-700 bg-slate-900/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-slate-400">Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-green-400 text-sm font-mono">✓ ACTIVE</div>
+                <div className="text-xs text-slate-500 mt-2">
+                  Polygon Signal<br />+ OKX Execution
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <div className="flex items-center gap-2 mt-2">
-            {data.realizedPnlToday >= 0 ? (
-              <TrendingUp className="w-4 h-4 text-green-400" />
-            ) : (
-              <TrendingDown className="w-4 h-4 text-red-400" />
-            )}
-            <span className="text-xs text-slate-400">from FIFO matching</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Last Order */}
-      <Card className="border-slate-700 bg-slate-900/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-slate-400">Last Order</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {data.lastOrderId ? (
-            <div className="space-y-1">
-              <div className="text-xs font-mono text-blue-400 break-all">{data.lastOrderId}</div>
-              <div className="text-xs text-slate-500">{new Date(data.lastOrderTime).toLocaleTimeString()}</div>
-            </div>
-          ) : (
-            <div className="text-slate-500 text-sm">None yet</div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Status */}
-      <Card className="border-slate-700 bg-slate-900/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-slate-400 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" /> Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-sm text-green-400">✓ Robot 1 Active</div>
-          <div className="text-xs text-slate-500 mt-2">ETH-USDT, SOL-USDT only</div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
     </div>
   );
 }
