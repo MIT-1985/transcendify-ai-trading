@@ -10,6 +10,7 @@ import { TrendingUp, TrendingDown, RefreshCw, Link2, Activity, BarChart2, Wallet
 import { ScrollArea } from '@/components/ui/scroll-area';
 import RealTradesSummary from '@/components/dashboard/RealTradesSummary';
 import Robot1Monitor from '@/components/dashboard/Robot1Monitor.jsx';
+import Robot1Diagnostics from '@/components/dashboard/Robot1Diagnostics';
 import moment from 'moment';
 
 const OKX_SYMBOLS = [
@@ -629,13 +630,18 @@ export default function OKXDashboard() {
         />
 
         {/* Robot 1 Monitor */}
-        <div className="mb-6 mt-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Bot className="w-5 h-5 text-blue-400" />
-            <h2 className="text-lg font-semibold">Robot 1 — DCA Warrior</h2>
-          </div>
-          <Robot1Monitor />
-        </div>
+         <div className="mb-6 mt-6">
+           <div className="flex items-center gap-2 mb-3">
+             <Bot className="w-5 h-5 text-blue-400" />
+             <h2 className="text-lg font-semibold">Robot 1 — DCA Warrior</h2>
+           </div>
+           <Robot1Monitor />
+         </div>
+
+         {/* Robot 1 Diagnostics - Show why losses */}
+         <div className="mb-6 mt-6">
+           <Robot1Diagnostics orders={suzanaOrders} />
+         </div>
 
         {/* Real Trades Summary */}
         <RealTradesSummary orders={suzanaOrders} balance={suzanaConn.balance_usdt} />
