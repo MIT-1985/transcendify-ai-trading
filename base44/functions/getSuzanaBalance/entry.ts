@@ -55,12 +55,10 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Only admin can query Suzana's balance directly
   if (user.role !== 'admin' && user.email !== SUZANA_EMAIL) {
     return Response.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Find Suzana's connection
   const [byCreator, byEmail] = await Promise.all([
     base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: SUZANA_EMAIL, exchange: 'okx' }),
     base44.asServiceRole.entities.ExchangeConnection.filter({ user_email: SUZANA_EMAIL, exchange: 'okx' })
@@ -72,8 +70,6 @@ Deno.serve(async (req) => {
     seen.add(c.id);
     return true;
   });
-
-  console.log(`[getSuzanaBalance] Found ${connections.length} connections for ${SUZANA_EMAIL}`);
 
   if (!connections.length) {
     return Response.json({ error: 'No OKX connection found for Suzana' });
@@ -87,31 +83,42 @@ Deno.serve(async (req) => {
   // Try both endpoints
   let workingEndpoint = null;
   let tradingRes = null;
+  let fundingRes = null;
+  let subAccountRes = null;
+  let rawDebug = {};
+
   for (const endpoint of OKX_ENDPOINTS) {
     try {
       const r = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
-      console.log(`[getSuzanaBalance] Trading ${endpoint} code:${r.code}`);
+      console.log(`[getSuzanaBalance] Trading ${endpoint} code:${r.code} raw:${JSON.stringify(r).substring(0, 300)}`);
+      rawDebug[`trading_${endpoint}`] = { code: r.code, data: r.data };
       if (r.code === '0') { tradingRes = r; workingEndpoint = endpoint; break; }
-      if (r.code === '50102' || r.code === '50112' || r.code === '50113') { tradingRes = r; break; }
     } catch (e) { console.log(`[getSuzanaBalance] ${endpoint} error: ${e.message}`); }
   }
 
-  // Funding account
-  let fundingRes = null;
   if (workingEndpoint) {
+    // Funding
     try {
       fundingRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/asset/balances', '', workingEndpoint);
-      console.log(`[getSuzanaBalance] Funding code:${fundingRes.code} items:${fundingRes.data?.length}`);
+      console.log(`[getSuzanaBalance] Funding code:${fundingRes.code} raw:${JSON.stringify(fundingRes).substring(0, 300)}`);
+      rawDebug['funding'] = { code: fundingRes.code, data: fundingRes.data };
     } catch (e) { console.log(`[getSuzanaBalance] Funding error: ${e.message}`); }
+
+    // Sub-accounts list
+    try {
+      subAccountRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/users/subaccount/list', '', workingEndpoint);
+      console.log(`[getSuzanaBalance] SubAccounts code:${subAccountRes.code} raw:${JSON.stringify(subAccountRes).substring(0, 300)}`);
+      rawDebug['subaccounts'] = { code: subAccountRes.code, data: subAccountRes.data };
+    } catch (e) { console.log(`[getSuzanaBalance] SubAccounts error: ${e.message}`); }
   }
 
-  // Merge balances
+  // Merge balances (trading + funding)
   const balanceMap = {};
   if (tradingRes?.code === '0') {
     for (const d of (tradingRes.data?.[0]?.details || [])) {
       const total = parseFloat(d.cashBal || d.eq || 0);
       const avail = parseFloat(d.availBal || d.availEq || total);
-      if (total > 0.0001) {
+      if (total > 0.000001) {
         balanceMap[d.ccy] = { free: avail, locked: Math.max(0, total - avail) };
       }
     }
@@ -121,15 +128,21 @@ Deno.serve(async (req) => {
       const total = parseFloat(d.bal || 0);
       const avail = parseFloat(d.availBal || total);
       const frozen = parseFloat(d.frozenBal || 0);
-      if (total > 0.0001) {
+      if (total > 0.000001) {
         const ex = balanceMap[d.ccy] || { free: 0, locked: 0 };
-        balanceMap[d.ccy] = { free: Math.max(avail, ex.free), locked: Math.max(frozen, ex.locked) };
+        balanceMap[d.ccy] = {
+          free: (ex.free || 0) + avail,
+          locked: (ex.locked || 0) + frozen
+        };
       }
     }
   }
 
   const balances = Object.entries(balanceMap).map(([asset, b]) => ({ asset, free: b.free, locked: b.locked }));
-  const balanceUsdt = balances.filter(b => b.asset === 'USDT' || b.asset === 'USDC').reduce((s, b) => s + b.free + b.locked, 0);
+  const balanceUsdt = balances.reduce((s, b) => {
+    if (b.asset === 'USDT' || b.asset === 'USDC') return s + b.free + b.locked;
+    return s;
+  }, 0);
 
   console.log(`[getSuzanaBalance] Final: ${balances.length} assets, USDT=${balanceUsdt}`);
 
@@ -143,6 +156,7 @@ Deno.serve(async (req) => {
     balance_usdt: balanceUsdt,
     balances,
     endpoint: workingEndpoint,
-    connection_id: conn.id
+    connection_id: conn.id,
+    debug: rawDebug  // full raw data for diagnosis
   });
 });
