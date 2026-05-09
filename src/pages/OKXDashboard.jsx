@@ -180,18 +180,6 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
   const balance = connection?.balance_usdt ?? 0;
   const isLoadingBalance = connection?.loading && balance === 0;
   const totalTrades = Math.max(subscription?.total_trades || 0, trades.length);
-  
-  // Calculate initial deposit from subscription or trades
-  let initialDeposit = subscription?.capital_allocated || 0;
-  
-  if (initialDeposit === 0 && trades.length > 0) {
-    // Estimate from earliest trades if capital_allocated not set
-    const sortedByTime = [...trades].sort((a, b) => a.cTime - b.cTime);
-    initialDeposit = parseFloat(sortedByTime[0]?.notionalUsd) || 100;
-  }
-  
-  const realProfit = balance - (initialDeposit || 100); // Real P&L from OKX
-  const totalProfit = realProfit;
 
   return (
     <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-emerald-500/30 rounded-2xl p-6 mb-6">
@@ -246,29 +234,18 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
           )}
         </div>
 
-        {/* Total Profit */}
-        <div className={`bg-slate-800/70 rounded-xl p-4 border ${totalProfit < 0 ? 'border-red-500/30' : 'border-emerald-500/20'}`}>
-          <div className="text-xs text-slate-400 mb-1">P&L (Депозит $100)</div>
-          <div className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {totalProfit >= 0 ? '+' : ''}${totalProfit.toFixed(2)}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Баланс ${balance.toFixed(2)} - Депозит ${(initialDeposit || 100).toFixed(2)}
-          </div>
+        {/* 24h Volume */}
+        <div className="bg-slate-800/70 rounded-xl p-4 border border-purple-500/20">
+          <div className="text-xs text-slate-400 mb-1">Активни Трейдове</div>
+          <div className="text-2xl font-bold text-purple-400">{totalTrades}</div>
+          <div className="text-xs text-slate-500 mt-1">Всички позиции • OKX Live</div>
         </div>
       </div>
 
-      {/* Trade Counter + Active Bots */}
-      <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 flex items-center gap-5 flex-wrap">
-      <div>
-        <div className="text-xs text-slate-400 mb-2">Изпълнени Трейдове (всички ботове)</div>
-        <div className="flex gap-2 items-center">
-          <span className="text-4xl font-bold text-emerald-400 font-mono">{totalTrades}</span>
-        </div>
-      </div>
-
-      {/* Active Bots — all subs */}
-      <div className="ml-auto flex flex-wrap gap-2">
+      {/* Active Bots */}
+      <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+        <div className="text-xs text-slate-400 mb-3 uppercase tracking-wide">Активни Ботове</div>
+      <div className="flex flex-wrap gap-2">
         {subs && subs.length > 0 ? subs.map((s, i) => (
           <div key={s.id} className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2">
             <Bot className="w-4 h-4 text-emerald-400" />
