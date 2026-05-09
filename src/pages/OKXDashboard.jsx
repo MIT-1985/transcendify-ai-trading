@@ -171,17 +171,10 @@ function OKXChart() {
 }
 
 // ─── Suzana Account Card ────────────────────────────────────────────────────
-function SuzanaAccountPanel({ connection, subscription, bot, trades, refreshing, onRefresh }) {
+function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refreshing, onRefresh }) {
   const balance = connection?.balance_usdt || 0;
-  // Use actual loaded trades count if subscription counter is outdated
   const totalTrades = Math.max(subscription?.total_trades || 0, trades.length);
   const totalProfit = subscription?.total_profit || 0;
-
-  // Format 000 digits with green colour based on trades count
-  const t = String(totalTrades).padStart(3, '0');
-  const d0 = t[t.length - 3] || '0';
-  const d1 = t[t.length - 2] || '0';
-  const d2 = t[t.length - 1] || '0';
 
   return (
     <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-emerald-500/30 rounded-2xl p-6 mb-6">
@@ -210,7 +203,7 @@ function SuzanaAccountPanel({ connection, subscription, bot, trades, refreshing,
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         {/* USDT Balance */}
         <div className="bg-slate-800/70 rounded-xl p-4 border border-yellow-500/20">
-          <div className="text-xs text-slate-400 mb-1">Баланс USDT</div>
+          <div className="text-xs text-slate-400 mb-1">Общ Баланс (USD)</div>
           <div className="text-3xl font-bold text-yellow-400">${balance.toFixed(2)}</div>
           <div className="text-xs text-slate-500 mt-1">
             {connection?.last_sync ? `Обновено: ${moment(connection.last_sync).format('HH:mm:ss')}` : '—'}
@@ -244,22 +237,31 @@ function SuzanaAccountPanel({ connection, subscription, bot, trades, refreshing,
         </div>
       </div>
 
-      {/* Trade Counter with 3 green digits */}
+      {/* Trade Counter + Active Bots */}
       <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 flex items-center gap-5 flex-wrap">
-        <div>
-          <div className="text-xs text-slate-400 mb-2">Изпълнени Трейдове</div>
-          <div className="flex gap-2">
-            {[d0, d1, d2].map((digit, i) => (
-              <div key={i} className="w-12 h-14 bg-emerald-500/10 border-2 border-emerald-500/40 rounded-xl flex items-center justify-center">
-                <span className="text-3xl font-bold text-emerald-400 font-mono">{digit}</span>
-              </div>
-            ))}
-          </div>
+      <div>
+        <div className="text-xs text-slate-400 mb-2">Изпълнени Трейдове (всички ботове)</div>
+        <div className="flex gap-2 items-center">
+          <span className="text-4xl font-bold text-emerald-400 font-mono">{totalTrades}</span>
         </div>
+      </div>
 
-        {/* Active Bot */}
-        {bot && (
-          <div className="ml-auto flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3">
+      {/* Active Bots — all subs */}
+      <div className="ml-auto flex flex-wrap gap-2">
+        {subs && subs.length > 0 ? subs.map((s, i) => (
+          <div key={s.id} className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2">
+            <Bot className="w-4 h-4 text-emerald-400" />
+            <div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-slate-400 capitalize">{s.exchange?.toUpperCase()}</span>
+                <span className="px-1 py-0.5 bg-emerald-500 text-white text-[9px] font-bold rounded">LIVE</span>
+              </div>
+              <div className="text-xs font-bold text-white capitalize">{s.exchange} Bot #{i+1}</div>
+              <div className="text-[10px] text-emerald-400">{s.total_trades || 0} трейда</div>
+            </div>
+          </div>
+        )) : bot && (
+          <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3">
             <div className="w-9 h-9 rounded-lg bg-emerald-500/20 flex items-center justify-center">
               <Bot className="w-5 h-5 text-emerald-400" />
             </div>
@@ -274,6 +276,7 @@ function SuzanaAccountPanel({ connection, subscription, bot, trades, refreshing,
             <CheckCircle2 className="w-5 h-5 text-emerald-400 ml-2" />
           </div>
         )}
+      </div>
       </div>
 
       {/* Recent OKX Trades for Suzana */}
@@ -481,6 +484,7 @@ export default function OKXDashboard() {
         <SuzanaAccountPanel
           connection={suzanaConn}
           subscription={{ ...(sub || {}), total_trades: totalTradesAllBots, total_profit: totalProfitAllBots }}
+          subs={suzanaSubs}
           bot={bot}
           trades={suzanaTrades}
           refreshing={refreshing}
