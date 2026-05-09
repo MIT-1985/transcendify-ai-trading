@@ -391,8 +391,10 @@ Deno.serve(async (req) => {
           user_email: userEmail
         });
 
-        // Update subscription stats (only SIM profit is tracked instantly)
-        const newProfit = (sub.total_profit || 0) + profit;
+        // Update subscription stats — for live users only count real MAINNET trades
+        // SIM profits/losses for users with a live connection are NOT counted (they're not real)
+        const countProfit = isLive ? (executionMode === 'MAINNET' ? profit : 0) : profit;
+        const newProfit = (sub.total_profit || 0) + countProfit;
         const newTrades = (sub.total_trades || 0) + 1;
         await base44.asServiceRole.entities.UserSubscription.update(sub.id, {
           total_profit: Number(newProfit.toFixed(2)),
