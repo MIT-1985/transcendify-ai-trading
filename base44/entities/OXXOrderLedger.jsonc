@@ -1,0 +1,75 @@
+{
+  "name": "OXXOrderLedger",
+  "type": "object",
+  "properties": {
+    "ordId": {
+      "type": "string",
+      "description": "OKX order ID - unique"
+    },
+    "instId": {
+      "type": "string",
+      "description": "Trading pair (ETH-USDT, SOL-USDT, etc)"
+    },
+    "side": {
+      "type": "string",
+      "enum": [
+        "buy",
+        "sell"
+      ],
+      "description": "Order side"
+    },
+    "avgPx": {
+      "type": "number",
+      "description": "Average execution price"
+    },
+    "accFillSz": {
+      "type": "number",
+      "description": "Accumulated fill size"
+    },
+    "quoteUSDT": {
+      "type": "number",
+      "description": "Total value in USDT (accFillSz * avgPx)"
+    },
+    "fee": {
+      "type": "number",
+      "description": "Trading fee amount"
+    },
+    "feeCcy": {
+      "type": "string",
+      "description": "Fee currency (USDT, etc)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When order was filled"
+    },
+    "robotId": {
+      "type": "string",
+      "description": "Which robot/strategy executed (robot1, legacy, etc)"
+    },
+    "verified": {
+      "type": "boolean",
+      "default": true,
+      "description": "Verified against OKX API"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "filled",
+        "cancelled",
+        "pending"
+      ],
+      "default": "filled"
+    }
+  },
+  "required": [
+    "ordId",
+    "instId",
+    "side",
+    "avgPx",
+    "accFillSz",
+    "timestamp",
+    "robotId",
+    "verified"
+  ]
+}

@@ -14,6 +14,7 @@ import ConnectBinance from './pages/ConnectBinance';
 import ConnectOKX from './pages/ConnectOKX';
 import PaymentSuccess from './pages/PaymentSuccess';
 import OKXDashboard from './pages/OKXDashboard';
+import CleanDashboard from './components/dashboard/CleanDashboard';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -59,6 +60,11 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
+      <Route path="/clean-dashboard" element={
+        <LayoutWrapper currentPageName="CleanDashboard">
+          <CleanDashboard />
+        </LayoutWrapper>
+      } />
       <Route path="/" element={
         <LayoutWrapper currentPageName={mainPageKey}>
           <MainPage />

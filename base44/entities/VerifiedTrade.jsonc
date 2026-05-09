@@ -1,0 +1,81 @@
+{
+  "name": "VerifiedTrade",
+  "type": "object",
+  "properties": {
+    "robotId": {
+      "type": "string",
+      "description": "robot1 or legacy"
+    },
+    "instId": {
+      "type": "string",
+      "description": "Trading pair"
+    },
+    "buyOrdId": {
+      "type": "string",
+      "description": "Reference to OXXOrderLedger BUY order"
+    },
+    "sellOrdId": {
+      "type": "string",
+      "description": "Reference to OXXOrderLedger SELL order"
+    },
+    "buyPrice": {
+      "type": "number"
+    },
+    "buyQty": {
+      "type": "number"
+    },
+    "buyValue": {
+      "type": "number"
+    },
+    "buyFee": {
+      "type": "number"
+    },
+    "sellPrice": {
+      "type": "number"
+    },
+    "sellQty": {
+      "type": "number"
+    },
+    "sellValue": {
+      "type": "number"
+    },
+    "sellFee": {
+      "type": "number"
+    },
+    "realizedPnL": {
+      "type": "number",
+      "description": "sellValue - buyValue - (buyFee + sellFee)"
+    },
+    "realizedPnLPct": {
+      "type": "number",
+      "description": "Percentage return"
+    },
+    "buyTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sellTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "holdingMs": {
+      "type": "number",
+      "description": "Milliseconds held"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "closed",
+        "archived"
+      ],
+      "default": "closed"
+    }
+  },
+  "required": [
+    "robotId",
+    "instId",
+    "buyOrdId",
+    "sellOrdId",
+    "realizedPnL"
+  ]
+}
