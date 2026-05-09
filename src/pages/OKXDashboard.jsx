@@ -1,23 +1,20 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
+import { Wallet, Zap, Activity, BarChart2, RefreshCw, Link2, TrendingUp, Bot } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import moment from 'moment';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-import { TrendingUp, TrendingDown, RefreshCw, Link2, Activity, BarChart2, Wallet, ArrowUpDown, Bot, CheckCircle2, Zap, AlertCircle } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import RealTradesSummary from '@/components/dashboard/RealTradesSummary';
-import Robot1Monitor from '@/components/dashboard/Robot1Monitor.jsx';
-import Robot1Diagnostics from '@/components/dashboard/Robot1Diagnostics';
-import moment from 'moment';
 
 const OKX_SYMBOLS = [
   'BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'XRP-USDT', 'DOGE-USDT', 'ADA-USDT',
-  'BNB-USDT', 'AVAX-USDT', 'DOT-USDT', 'MATIC-USDT', 'LINK-USDT', 'LTC-USDT',
-  'ATOM-USDT', 'UNI-USDT', 'FIL-USDT', 'NEAR-USDT', 'APT-USDT', 'ARB-USDT',
-  'OP-USDT', 'SUI-USDT', 'TRX-USDT', 'TON-USDT', 'SHIB-USDT', 'BCH-USDT'
+  'BNB-USDT', 'AVAX-USDT', 'DOT-USDT', 'LINK-USDT', 'LTC-USDT',
+  'ATOM-USDT', 'UNI-USDT', 'ARB-USDT', 'SUI-USDT', 'TRX-USDT', 'TON-USDT'
 ];
 
 const TIMEFRAMES = [
@@ -27,14 +24,6 @@ const TIMEFRAMES = [
   { label: '1W', bar: '4H', limit: 42 },
   { label: '1M', bar: '1D', limit: 30 },
 ];
-
-// Suzana's email
-const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
-// DCA Warrior bot ID (Bot #1)
-const BOT1_ID = '69352a734b5108d3c7824639';
-// Suzana's subscription IDs (all active bots)
-const SUZANA_SUB_ID = '69e09f0e4d3cae70a455ca60';
-const SUZANA_SUB_IDS = ['69e09f0e4d3cae70a455ca60', '69fee8ff90408637f331ed69', '69fee8ff90408637f331ed6a'];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -178,257 +167,72 @@ function OKXChart() {
   );
 }
 
-// ─── Suzana Account Card ────────────────────────────────────────────────────
-function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refreshing, onRefresh }) {
-  const balance = connection?.balance_usdt ?? 0;
-  const isLoadingBalance = connection?.loading && balance === 0;
-  const totalTrades = Math.max(subscription?.total_trades || 0, trades.length);
-
-  return (
-    <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-emerald-500/30 rounded-2xl p-6 mb-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-            <Wallet className="w-6 h-6 text-emerald-400" />
-          </div>
-          <div>
-            <div className="text-lg font-bold text-white">Suzana — OKX Акаунт</div>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse inline-block" />
-              <span className="text-xs text-emerald-400 font-semibold">Свързан • eea.okx.com</span>
-            </div>
-          </div>
-        </div>
-        <button onClick={onRefresh} disabled={refreshing}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 text-sm transition-colors border border-slate-700">
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Обнови
-        </button>
-      </div>
-
-      {/* Balance + Stats row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-        {/* USDT Balance */}
-        <div className="bg-slate-800/70 rounded-xl p-4 border border-yellow-500/20">
-          <div className="text-xs text-slate-400 mb-1">Общ Баланс (USD)</div>
-          <div className="text-3xl font-bold text-yellow-400">
-            {isLoadingBalance ? <span className="animate-pulse text-slate-400">Зарежда...</span> : `$${balance.toFixed(2)}`}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-            {connection?.last_sync ? `Обновено: ${moment(connection.last_sync).format('HH:mm:ss')}` : '—'}
-          </div>
-        </div>
-
-        {/* Assets */}
-        <div className="bg-slate-800/70 rounded-xl p-4 border border-blue-500/20">
-          <div className="text-xs text-slate-400 mb-2">Активи</div>
-          {connection?.balances?.length > 0 ? (
-            <div className="space-y-1">
-              {connection.balances.filter(b => (b.free + b.locked) > 0).map(b => (
-                <div key={b.asset} className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-white">{b.asset}</span>
-                  <span className="text-sm text-slate-300 font-mono">{parseFloat(b.free).toFixed(b.asset === 'USDT' ? 2 : 6)}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-slate-500 text-sm">Няма активи</div>
-          )}
-        </div>
-
-        {/* 24h Volume */}
-        <div className="bg-slate-800/70 rounded-xl p-4 border border-purple-500/20">
-          <div className="text-xs text-slate-400 mb-1">Активни Трейдове</div>
-          <div className="text-2xl font-bold text-purple-400">{totalTrades}</div>
-          <div className="text-xs text-slate-500 mt-1">Всички позиции • OKX Live</div>
-        </div>
-      </div>
-
-      {/* Active Bots */}
-      <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-        <div className="text-xs text-slate-400 mb-3 uppercase tracking-wide">Активни Ботове</div>
-      <div className="flex flex-wrap gap-2">
-        {subs && subs.length > 0 ? subs.map((s, i) => (
-          <div key={s.id} className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2">
-            <Bot className="w-4 h-4 text-emerald-400" />
-            <div>
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-slate-400 capitalize">{s.exchange?.toUpperCase()}</span>
-                <span className="px-1 py-0.5 bg-emerald-500 text-white text-[9px] font-bold rounded">LIVE</span>
-              </div>
-              <div className="text-xs font-bold text-white capitalize">{s.exchange} Bot #{i+1}</div>
-              <div className="text-[10px] text-emerald-400">{s.total_trades || 0} трейда</div>
-            </div>
-          </div>
-        )) : bot && (
-          <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3">
-            <div className="w-9 h-9 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-              <Bot className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">Активен Робот</span>
-                <span className="px-1.5 py-0.5 bg-emerald-500 text-white text-[10px] font-bold rounded">LIVE</span>
-              </div>
-              <div className="font-bold text-white text-sm">{bot.name}</div>
-              <div className="text-xs text-emerald-400 capitalize">{bot.strategy} • {bot.risk_level} risk</div>
-            </div>
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 ml-2" />
-          </div>
-        )}
-      </div>
-      </div>
-
-      {/* Real OKX Orders */}
-      {trades.length > 0 && (
-        <div className="mt-5">
-          <div className="text-xs text-slate-400 font-semibold mb-2 uppercase tracking-wide">Последни Ордери (OKX Live)</div>
-          <div className="rounded-xl overflow-hidden border border-slate-700">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-800">
-                <tr className="text-slate-400">
-                  <th className="text-left px-3 py-2">Час</th>
-                  <th className="text-left px-3 py-2">Символ</th>
-                  <th className="text-left px-3 py-2">Посока</th>
-                  <th className="text-right px-3 py-2">Avg Цена</th>
-                  <th className="text-right px-3 py-2">Кол.</th>
-                  <th className="text-right px-3 py-2">P&L</th>
-                  <th className="text-right px-3 py-2">Статус</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trades.map(order => {
-                  const pnl = order.pnl || 0;
-                  const statusColors = { filled: 'text-emerald-400', canceled: 'text-slate-400', live: 'text-yellow-400', partially_filled: 'text-blue-400' };
-                  return (
-                    <tr key={order.ordId} className="border-t border-slate-700/50 hover:bg-slate-800/30">
-                      <td className="px-3 py-2 text-slate-400">{moment(order.cTime).format('MMM D HH:mm')}</td>
-                      <td className="px-3 py-2 font-semibold text-white">{order.instId}</td>
-                      <td className="px-3 py-2">
-                        <span className={`px-2 py-0.5 rounded font-bold ${order.side === 'BUY' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {order.side}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono text-white">
-                        {order.avgPx ? `$${order.avgPx.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono text-slate-300">
-                        {order.accFillSz > 0 ? order.accFillSz.toFixed(6) : order.sz.toFixed(6)}
-                      </td>
-                      <td className={`px-3 py-2 text-right font-bold ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {pnl !== 0 ? `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}` : '—'}
-                      </td>
-                      <td className={`px-3 py-2 text-right capitalize ${statusColors[order.state] || 'text-white'}`}>
-                        {order.state}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Main Dashboard ─────────────────────────────────────────────────────────
 export default function OKXDashboard() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const [tickers, setTickers] = useState([]);
   const [loadingTickers, setLoadingTickers] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [rebalancing, setRebalancing] = useState(false);
-  const [rebalancePreview, setRebalancePreview] = useState(null);
-  const [rebalanceResult, setRebalanceResult] = useState(null);
 
-  // Live balance from OKX for Suzana (via backend function)
-  const [liveBalance, setLiveBalance] = useState(0);
-  const [liveBalances, setLiveBalances] = useState([]);
-  const [lastSync, setLastSync] = useState(null);
-  const [balanceLoading, setBalanceLoading] = useState(true);
-
-  const fetchSuzanaBalance = async () => {
-    setBalanceLoading(true);
-    try {
-      const res = await base44.functions.invoke('getSuzanaBalance', {});
-      if (res.data?.success) {
-        setLiveBalance(res.data.balance_usdt);
-        setLiveBalances(res.data.balances || []);
-        setLastSync(new Date().toISOString());
-      }
-    } catch (e) { console.error('getSuzanaBalance error', e); }
-    setBalanceLoading(false);
-  };
-
-  useEffect(() => {
-    fetchSuzanaBalance();
-    const interval = setInterval(fetchSuzanaBalance, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Build suzanaConn from live data
-  const suzanaConn = useMemo(() => ({
-    balance_usdt: liveBalance,
-    balances: liveBalances,
-    last_sync: lastSync,
-    status: 'connected',
-    label: 'My OKX Account',
-    loading: balanceLoading
-  }), [liveBalance, liveBalances, lastSync, balanceLoading]);
-
-  // All OKX connections (for own user)
-  const { data: allOkxConns = [], refetch: refetchAll } = useQuery({
-    queryKey: ['all-okx-conns'],
-    queryFn: () => base44.entities.ExchangeConnection.filter({ exchange: 'okx' }),
-    staleTime: 30000,
-    retry: false
-  });
-
-  // All Suzana's subscriptions
-  const { data: suzanaSubs = [] } = useQuery({
-    queryKey: ['suzana-subs'],
-    queryFn: () => base44.entities.UserSubscription.filter({ user_email: SUZANA_EMAIL }),
-    staleTime: 30000,
-    retry: false
-  });
-  const sub = suzanaSubs.find(s => s.id === SUZANA_SUB_ID) || suzanaSubs[0] || null;
-  const totalTradesAllBots = suzanaSubs.reduce((s, sb) => s + (sb.total_trades || 0), 0);
-  const totalProfitAllBots = suzanaSubs.reduce((s, sb) => s + (sb.total_profit || 0), 0);
-
-  // Bot #1
-  const { data: bot1 } = useQuery({
-    queryKey: ['bot1'],
-    queryFn: () => base44.entities.TradingBot.filter({ id: BOT1_ID }),
-    staleTime: 60000,
-    retry: false
-  });
-  const bot = bot1?.[0] || null;
-
-  // Real OKX orders from exchange
-  const { data: suzanaOrders = [], refetch: refetchOrders } = useQuery({
-    queryKey: ['suzana-okx-orders'],
+  // Fetch live balance from OKX
+  const { data: balance = {}, isLoading: loadBalance, refetch: refetchBalance } = useQuery({
+    queryKey: ['okx-live-balance', user?.email],
     queryFn: async () => {
-      const res = await base44.functions.invoke('getSuzanaOrders', {});
-      return res.data?.orders || [];
+      try {
+        const res = await base44.functions.invoke('getSuzanaBalance', {});
+        return res.data || {};
+      } catch (e) {
+        return { error: e.message };
+      }
     },
-    staleTime: 20000,
-    retry: false
+    enabled: !!user,
+    staleTime: 30000
   });
 
-  // Current user's own connections (for non-Suzana users)
-  const { data: myConns = [] } = useQuery({
-    queryKey: ['my-okx-conns', user?.email],
-    queryFn: () => base44.entities.ExchangeConnection.filter({ created_by: user?.email, exchange: 'okx' }),
-    enabled: !!user && user.email !== SUZANA_EMAIL,
-    staleTime: 60000,
-    retry: false
+  // Fetch Robot 1 execution log
+  const { data: execution = {}, refetch: refetchExecution, isLoading: loadExecution } = useQuery({
+    queryKey: ['robot1-execution', user?.email],
+    queryFn: async () => {
+      try {
+        const logs = await base44.asServiceRole.entities.Robot1ExecutionLog.list();
+        return logs.length > 0 ? logs[0] : {};
+      } catch (e) {
+        return { error: e.message };
+      }
+    },
+    enabled: !!user,
+    staleTime: 20000
   });
 
-  // Tickers
+  // Fetch Robot 1 verified trades (only ETH-USDT / SOL-USDT)
+  const { data: robot1Trades = [], refetch: refetchVerified, isLoading: loadVerified } = useQuery({
+    queryKey: ['robot1-verified', user?.email],
+    queryFn: async () => {
+      try {
+        const all = await base44.asServiceRole.entities.VerifiedTrade.list();
+        return all.filter(t => t.robotId === 'robot1' && (t.instId === 'ETH-USDT' || t.instId === 'SOL-USDT'));
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: !!user,
+    staleTime: 30000
+  });
+
+  // Fetch OKX raw orders
+  const { data: ledger = [], refetch: refetchLedger, isLoading: loadLedger } = useQuery({
+    queryKey: ['oxx-ledger', user?.email],
+    queryFn: async () => {
+      try {
+        const all = await base44.asServiceRole.entities.OXXOrderLedger.list();
+        return all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: !!user,
+    staleTime: 30000
+  });
+
+  // Fetch live tickers
   useEffect(() => {
     const fetchTickers = async () => {
       setLoadingTickers(true);
@@ -443,214 +247,250 @@ export default function OKXDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-refresh Suzana balance every 60s
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetchAll();
-    }, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchSuzanaBalance();
-    await refetchAll();
-    await refetchOrders();
-    setRefreshing(false);
-  };
-
-  const handlePreviewRebalance = async () => {
-    setRebalancing(true);
-    setRebalancePreview(null);
-    setRebalanceResult(null);
+  const handleSync = async () => {
     try {
-      const res = await base44.functions.invoke('rebalancePortfolio', { dryRun: true });
-      setRebalancePreview(res.data);
+      await base44.functions.invoke('syncOKXOrderLedger', {});
+      refetchLedger();
+      refetchVerified();
+      refetchExecution();
     } catch (e) {
-      console.error('Preview error', e);
-      setRebalancePreview({ success: false, error: e.message });
+      console.error(e);
     }
-    setRebalancing(false);
   };
 
-  const handleConfirmRebalance = async () => {
-    setRebalancing(true);
-    setRebalanceResult(null);
-    try {
-      const res = await base44.functions.invoke('rebalancePortfolio', { dryRun: false });
-      setRebalanceResult(res.data);
-      setRebalancePreview(null);
-      // Refresh balance after rebalance
-      setTimeout(() => {
-        fetchSuzanaBalance();
-        refetchOrders();
-      }, 2000);
-    } catch (e) {
-      console.error('Execute error', e);
-      setRebalanceResult({ success: false, error: e.message });
-    }
-    setRebalancing(false);
-  };
-
-  const isSuzana = user?.email === SUZANA_EMAIL || user?.email === 'sauzana.cozmas@gmail.com';
-
-  // Show own connection for admin/other users too
-  const ownConn = isSuzana ? suzanaConn : (myConns.find(c => c.status === 'connected') || null);
-  const displayConn = isSuzana ? suzanaConn : ownConn;
-  const totalBalance = displayConn?.balance_usdt || (isSuzana ? (suzanaConn?.balance_usdt || 0) : 0);
+  const robot1PnL = robot1Trades.reduce((sum, t) => sum + (t.realizedPnL || 0), 0);
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 sm:p-6">
-      <div className="max-w-7xl mx-auto">
-
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex justify-between items-center flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+            <h1 className="text-3xl font-bold flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center">
                 <Link2 className="w-5 h-5 text-yellow-400" />
               </div>
               OKX Dashboard
             </h1>
-            <p className="text-slate-400 text-sm mt-1">Live OKX пазар • Акаунт на Suzana</p>
+            <p className="text-slate-400 text-sm mt-1">Live OKX Data • Robot 1 Only</p>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={handlePreviewRebalance} disabled={rebalancing}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm transition-colors">
-              <Zap className="w-4 h-4" />
-              {rebalancing ? 'Processing...' : 'Preview Rebalance'}
-            </button>
-            {/* Always visible balance badge */}
-            {suzanaConn && (
-              <div className="bg-slate-900/80 border border-yellow-500/30 rounded-xl px-5 py-3 text-right">
-                <div className="text-xs text-slate-400">Suzana — OKX Баланс</div>
-                <div className="text-2xl font-bold text-yellow-400">
-                  {suzanaConn.loading && suzanaConn.balance_usdt === 0
-                    ? <span className="animate-pulse text-slate-400 text-lg">Зарежда...</span>
-                    : <>${suzanaConn.balance_usdt.toFixed(2)} <span className="text-sm text-slate-400">USDT</span></>
-                  }
-                </div>
-                <div className="flex items-center justify-end gap-1 mt-0.5">
-                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                  <span className="text-xs text-emerald-400">Свързан</span>
-                </div>
-              </div>
-            )}
-          </div>
+          <Button 
+            onClick={handleSync}
+            className="gap-2 bg-blue-600"
+          >
+            <Activity className="w-4 h-4" />
+            Sync OKX
+          </Button>
         </div>
 
-        {/* Rebalance Preview Card */}
-        {rebalancePreview && rebalancePreview.success && rebalancePreview.mode === 'PREVIEW' && (
-          <div className="mb-6 rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertCircle className="w-5 h-5 text-blue-400" />
-              <h3 className="font-semibold text-blue-400">Rebalance Preview</h3>
-            </div>
-            <div className="space-y-3 text-sm">
-              <div>
-                <div className="text-slate-400 mb-2">Assets to Sell ({rebalancePreview.assetsToSell.length}):</div>
-                <div className="space-y-1 ml-2">
-                  {rebalancePreview.assetsToSell.map(item => (
-                    <div key={item.asset} className="flex justify-between text-xs font-mono">
-                      <span className="text-white">{item.asset}</span>
-                      <span className="text-slate-400">{item.quantity.toFixed(6)}</span>
-                      <span className="text-emerald-400">${item.estimatedUSDT.toFixed(2)}</span>
-                    </div>
-                  ))}
+        {/* 1. OKX LIVE BALANCE */}
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Wallet className="w-5 h-5 text-yellow-400" />
+            <h2 className="text-lg font-bold">1. OKX Live Balance</h2>
+          </div>
+          {loadBalance ? (
+            <Skeleton className="h-24" />
+          ) : balance.error ? (
+            <div className="text-red-400 text-sm">{balance.error}</div>
+          ) : (
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
+                <div className="text-xs text-slate-400">Total Equity</div>
+                <div className="text-2xl font-bold text-emerald-400">
+                  ${parseFloat(balance.totalEquity || 0).toFixed(2)}
                 </div>
               </div>
-              <div className="bg-slate-900/50 rounded-lg p-2 border border-slate-700">
-                <div className="text-slate-400 text-xs">Total Estimated USDT:</div>
-                <div className="text-lg font-bold text-emerald-400">${rebalancePreview.totalEstimatedUSDT.toFixed(2)}</div>
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
+                <div className="text-xs text-slate-400">Free USDT</div>
+                <div className="text-2xl font-bold text-white">
+                  ${parseFloat(balance.freeUSDT || 0).toFixed(2)}
+                </div>
               </div>
-              {rebalancePreview.skippedAssets.length > 0 && (
-                <div className="text-xs text-slate-400">
-                  <div className="mb-1">Skipped (open positions or below min):</div>
-                  <div>{rebalancePreview.skippedAssets.join(', ')}</div>
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
+                <div className="text-xs text-slate-400">ETH</div>
+                <div className="text-xl font-bold text-white">
+                  {parseFloat(balance.ETH || 0).toFixed(6)}
+                </div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
+                <div className="text-xs text-slate-400">SOL</div>
+                <div className="text-xl font-bold text-white">
+                  {parseFloat(balance.SOL || 0).toFixed(4)}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 2. ROBOT 1 LIVE STATUS */}
+        <div className="bg-blue-900/20 border border-blue-700 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Bot className="w-5 h-5 text-blue-400" />
+            <h2 className="text-lg font-bold">2. Robot 1 Live Status</h2>
+          </div>
+          {loadExecution ? (
+            <Skeleton className="h-32" />
+          ) : !execution.execution_time ? (
+            <div className="text-slate-400 text-sm">No execution log yet</div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-blue-700/30">
+                  <div className="text-xs text-slate-400">Last Run</div>
+                  <div className="text-sm font-mono text-blue-300">
+                    {new Date(execution.execution_time).toLocaleTimeString()}
+                  </div>
+                </div>
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-blue-700/30">
+                  <div className="text-xs text-slate-400">Decision</div>
+                  <div className={`text-sm font-bold ${
+                    execution.decision === 'BUY' ? 'text-emerald-400' : 
+                    execution.decision === 'SELL' ? 'text-red-400' : 
+                    'text-slate-400'
+                  }`}>
+                    {execution.decision || '—'}
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700">
+                <div className="text-xs text-slate-400 mb-1">Reason</div>
+                <div className="text-sm text-white">{execution.reason || '—'}</div>
+              </div>
+              {execution.active_position && (
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  <div className="bg-blue-800/30 rounded-lg p-3 border border-blue-700/30">
+                    <div className="text-xs text-slate-400">Active Position</div>
+                    <div className="text-sm font-bold text-blue-300">{execution.position_symbol}</div>
+                    <div className="text-xs text-slate-500 mt-1">{execution.position_qty?.toFixed(4) || '—'} qty</div>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                    <div className="text-xs text-slate-400">Last Order ID</div>
+                    <div className="text-xs font-mono text-cyan-400">{execution.last_order_id?.slice?.(-10) || '—'}</div>
+                  </div>
                 </div>
               )}
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => setRebalancePreview(null)} className="flex-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors">
-                  Cancel
-                </button>
-              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Rebalance Result Alert */}
-        {rebalanceResult && (
-          <div className={`mb-6 rounded-xl border px-4 py-4 ${
-            rebalanceResult.success 
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-              : 'bg-red-500/10 border-red-500/30 text-red-400'
-          }`}>
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <div className="text-sm flex-1">
-                <div className="font-semibold mb-2">
-                  {rebalanceResult.success ? '✓ Rebalance Executed' : '✗ Rebalance Failed'}
+        {/* 3. ROBOT 1 VERIFIED TRADES */}
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <TrendingUp className="w-5 h-5 text-emerald-400" />
+            <h2 className="text-lg font-bold">3. Robot 1 Verified Trades (ETH-USDT / SOL-USDT)</h2>
+          </div>
+          {loadVerified ? (
+            <Skeleton className="h-20" />
+          ) : robot1Trades.length === 0 ? (
+            <div className="text-slate-400 text-sm">No verified trades yet</div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-emerald-700/30">
+                  <div className="text-xs text-slate-400">Total Trades</div>
+                  <div className="text-2xl font-bold text-white">{robot1Trades.length}</div>
                 </div>
-                {rebalanceResult.success ? (
-                  <div className="space-y-2 text-xs">
-                    <div>Executed: {rebalanceResult.executed_count} assets</div>
-                    <div className="bg-black/30 rounded-lg p-2">
-                      <div className="text-slate-400 mb-1">Total USDT Converted:</div>
-                      <div className="text-lg font-bold text-emerald-300">${rebalanceResult.totalExecutedUSDT.toFixed(2)}</div>
-                    </div>
-                    {rebalanceResult.results?.filter(r => r.status === 'SUCCESS').map(r => (
-                      <div key={r.asset} className="border-t border-emerald-500/20 pt-1 mt-1">
-                        <div className="flex justify-between">
-                          <span>{r.asset}:</span>
-                          <span className="text-emerald-300">${r.estimatedUSDT.toFixed(2)}</span>
-                        </div>
-                        <div className="text-[10px] text-slate-400">Order #{r.orderId}</div>
-                      </div>
-                    ))}
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-emerald-700/30">
+                  <div className="text-xs text-slate-400">Closed</div>
+                  <div className="text-2xl font-bold text-white">{robot1Trades.filter(t => t.status === 'closed').length}</div>
+                </div>
+                <div className={`bg-slate-800/50 rounded-lg p-3 border ${robot1PnL >= 0 ? 'border-emerald-700/30' : 'border-red-700/30'}`}>
+                  <div className="text-xs text-slate-400">Total P&L</div>
+                  <div className={`text-2xl font-bold ${robot1PnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {robot1PnL >= 0 ? '+' : ''}{robot1PnL.toFixed(2)}
                   </div>
-                ) : (
-                  <div className="text-xs">{rebalanceResult.error}</div>
-                )}
+                </div>
               </div>
-              <button onClick={() => setRebalanceResult(null)} className="text-xs opacity-60 hover:opacity-100">✕</button>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="text-slate-400 border-b border-slate-700">
+                    <tr>
+                      <th className="text-left px-3 py-2">Pair</th>
+                      <th className="text-right px-3 py-2">Buy Qty</th>
+                      <th className="text-right px-3 py-2">Buy Price</th>
+                      <th className="text-right px-3 py-2">Sell Price</th>
+                      <th className="text-right px-3 py-2">P&L</th>
+                      <th className="text-right px-3 py-2">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {robot1Trades.slice(0, 8).map((t, i) => (
+                      <tr key={i} className="border-b border-slate-800 hover:bg-slate-800/30">
+                        <td className="px-3 py-2 font-bold">{t.instId}</td>
+                        <td className="px-3 py-2 text-right font-mono">{t.buyQty?.toFixed(4)}</td>
+                        <td className="px-3 py-2 text-right font-mono">${t.buyPrice?.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right font-mono">${t.sellPrice?.toFixed(2)}</td>
+                        <td className={`px-3 py-2 text-right font-mono ${t.realizedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {t.realizedPnL >= 0 ? '+' : ''}{t.realizedPnL?.toFixed(2)}
+                        </td>
+                        <td className={`px-3 py-2 text-right font-mono ${t.realizedPnLPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {t.realizedPnLPct?.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          )}
+        </div>
+
+        {/* 4. OKX RAW ORDERS */}
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Activity className="w-5 h-5 text-cyan-400" />
+            <h2 className="text-lg font-bold">4. OKX Raw Orders (Verified Fills Only)</h2>
           </div>
-        )}
+          {loadLedger ? (
+            <Skeleton className="h-40" />
+          ) : ledger.length === 0 ? (
+            <div className="text-slate-400 text-sm">No orders. Click "Sync OKX" above.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="text-slate-400 border-b border-slate-700">
+                  <tr>
+                    <th className="text-left px-3 py-2">Ord ID</th>
+                    <th className="text-left px-3 py-2">Pair</th>
+                    <th className="text-left px-3 py-2">Side</th>
+                    <th className="text-right px-3 py-2">Base Qty</th>
+                    <th className="text-right px-3 py-2">Quote USDT</th>
+                    <th className="text-right px-3 py-2">Fee</th>
+                    <th className="text-left px-3 py-2">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledger.slice(0, 20).map(ord => (
+                    <tr key={ord.ordId} className="border-b border-slate-800 hover:bg-slate-800/30">
+                      <td className="px-3 py-2 font-mono text-cyan-400">{ord.ordId.slice(-10)}</td>
+                      <td className="px-3 py-2 font-bold">{ord.instId}</td>
+                      <td className="px-3 py-2">
+                        <span className={ord.side === 'buy' ? 'text-emerald-400' : 'text-red-400'}>
+                          {ord.side.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono">{ord.accFillSz?.toFixed(4)}</td>
+                      <td className="px-3 py-2 text-right font-mono">${ord.quoteUSDT?.toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right font-mono text-red-400">{ord.fee?.toFixed(4)}</td>
+                      <td className="px-3 py-2 text-slate-500">
+                        {new Date(ord.timestamp).toLocaleTimeString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {ledger.length > 20 && (
+                <div className="text-xs text-slate-500 mt-2 text-center">... {ledger.length - 20} more</div>
+              )}
+            </div>
+          )}
+        </div>
 
-        {/* Suzana Account Panel — always shown */}
-        <SuzanaAccountPanel
-          connection={suzanaConn}
-          subscription={{ ...(sub || {}), total_trades: totalTradesAllBots, total_profit: totalProfitAllBots }}
-          subs={suzanaSubs}
-          bot={bot}
-          trades={suzanaOrders}
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-        />
-
-        {/* Robot 1 Monitor */}
-         <div className="mb-6 mt-6">
-           <div className="flex items-center gap-2 mb-3">
-             <Bot className="w-5 h-5 text-blue-400" />
-             <h2 className="text-lg font-semibold">Robot 1 — DCA Warrior</h2>
-           </div>
-           <Robot1Monitor />
-         </div>
-
-         {/* Robot 1 Diagnostics - Show why losses */}
-         <div className="mb-6 mt-6">
-           <Robot1Diagnostics orders={suzanaOrders} />
-         </div>
-
-        {/* Real Trades Summary */}
-        <RealTradesSummary orders={suzanaOrders} balance={suzanaConn.balance_usdt} />
-
-        {/* Live Prices */}
-        <div className="mb-6 mt-6">
+        {/* MARKET DATA */}
+        <div className="mt-6">
           <div className="flex items-center gap-2 mb-3">
             <Activity className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-lg font-semibold">Live OKX Цени</h2>
+            <h2 className="text-lg font-semibold">Live OKX Prices</h2>
             {loadingTickers && <RefreshCw className="w-4 h-4 text-slate-500 animate-spin" />}
             <span className="flex items-center gap-1 text-xs text-emerald-400 ml-1">
               <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />Live
@@ -664,11 +504,11 @@ export default function OKXDashboard() {
           </div>
         </div>
 
-        {/* Chart */}
-        <div className="mb-6">
+        {/* CHART */}
+        <div className="mt-6">
           <div className="flex items-center gap-2 mb-3">
             <BarChart2 className="w-5 h-5 text-blue-400" />
-            <h2 className="text-lg font-semibold">OKX График</h2>
+            <h2 className="text-lg font-semibold">OKX Chart</h2>
           </div>
           <OKXChart />
         </div>
