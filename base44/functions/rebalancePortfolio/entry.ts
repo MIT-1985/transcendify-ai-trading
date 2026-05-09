@@ -48,6 +48,35 @@ async function okxRequest(apiKey, secret, passphrase, method, path, bodyStr = ''
   return res.json();
 }
 
+async function fetchLiveBalance(apiKey, secret, passphrase, ccy = null) {
+  for (const endpoint of ['https://www.okx.com', 'https://eea.okx.com']) {
+    try {
+      const res = await okxRequest(apiKey, secret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
+      if (res.code === '0' && res.data?.[0]?.details) {
+        const details = res.data[0].details;
+        if (ccy) {
+          return details.find(d => d.ccy === ccy) || null;
+        }
+        return details;
+      }
+    } catch (e) {
+      console.log(`[REBALANCE] Balance fetch from ${endpoint} failed: ${e.message}`);
+    }
+  }
+  return ccy ? null : [];
+}
+
+async function calculateEquity(balances, tickerMap) {
+  let totalUSD = 0;
+  for (const balance of balances) {
+    const ccy = balance.ccy;
+    const qty = parseFloat(balance.availBal || 0);
+    const price = tickerMap[ccy] || 0;
+    totalUSD += qty * price;
+  }
+  return totalUSD;
+}
+
 // ---- Main handler ----
 Deno.serve(async (req) => {
   try {
@@ -77,7 +106,7 @@ Deno.serve(async (req) => {
     // Always use Suzana's connection for now
     const targetEmail = suzanaEmail;
 
-    // Get OKX connection - match getSuzanaBalance approach
+    // Get OKX connection
     const [byCreator, byEmail] = await Promise.all([
       base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: targetEmail, exchange: 'okx' }),
       base44.asServiceRole.entities.ExchangeConnection.filter({ user_email: targetEmail, exchange: 'okx' })
@@ -100,64 +129,15 @@ Deno.serve(async (req) => {
     const apiSecret = await decryptOkx(conn.api_secret_encrypted);
     const passphrase = await decryptOkx(conn.encryption_iv);
 
-    // Fetch live balances from OKX Trading account
-    let balances = [];
-    for (const endpoint of ['https://www.okx.com', 'https://eea.okx.com']) {
-      try {
-        console.log(`[${mode}] Fetching balances from ${endpoint}...`);
-        const res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
-        console.log(`[${mode}] Balance response code: ${res.code}`);
-        if (res.code === '0' && res.data?.[0]?.details) {
-          balances = res.data[0].details;
-          console.log(`[${mode}] Fetched balances from ${endpoint}: ${balances.length} assets`);
-          break;
-        }
-      } catch (e) {
-        console.log(`[${mode}] Balance fetch from ${endpoint} failed: ${e.message}`);
-      }
-    }
-
-    if (balances.length === 0) {
-      console.log(`[${mode}] Failed to fetch balances from either endpoint`);
+    // ─── STEP 1: Fetch initial balances ────────────────────────────────────
+    console.log(`[${mode}] Fetching live balances...`);
+    const initialBalances = await fetchLiveBalance(apiKey, apiSecret, passphrase);
+    
+    if (initialBalances.length === 0) {
       return Response.json({ error: 'Could not fetch OKX balances' }, { status: 500 });
     }
 
-    // Allowed strategy pairs
-    const ALLOWED_ASSETS = ['ETH', 'SOL', 'USDT'];
-    const OKX_MIN_NOTIONAL = 5; // $5 minimum
-
-    // Get open Robot 1 positions from live orders
-    const openAssets = new Set(['USDT']); // Always keep USDT
-    let todayOrders = [];
-    for (const endpoint of ['https://www.okx.com', 'https://eea.okx.com']) {
-      try {
-        const res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/trade/orders-history?instType=SPOT&limit=100', '', endpoint);
-        if (res.code === '0') {
-          todayOrders = res.data || [];
-          break;
-        }
-      } catch (e) {
-        console.log(`[REBALANCE] Order fetch failed: ${e.message}`);
-      }
-    }
-
-    // Check for open positions in ETH-USDT and SOL-USDT
-    const buyOrders = todayOrders.filter(o => o.side === 'buy' && (o.instId === 'ETH-USDT' || o.instId === 'SOL-USDT'));
-    const sellOrders = todayOrders.filter(o => o.side === 'sell' && (o.instId === 'ETH-USDT' || o.instId === 'SOL-USDT'));
-
-    // Simple FIFO: if any unfilled BUY, mark asset as open
-    for (const buy of buyOrders) {
-      const asset = buy.instId.split('-')[0];
-      const openQty = parseFloat(buy.accFillSz || 0) - sellOrders
-        .filter(s => s.instId === buy.instId)
-        .reduce((sum, s) => sum + parseFloat(s.accFillSz || 0), 0);
-      if (openQty > 0.0001) {
-        openAssets.add(asset);
-        console.log(`[REBALANCE] Open position found: ${asset} qty=${openQty.toFixed(6)}`);
-      }
-    }
-
-    // Fetch ticker data for valuation
+    // ─── STEP 2: Fetch live ticker data ────────────────────────────────────
     let tickerMap = {};
     try {
       const res = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT');
@@ -168,68 +148,74 @@ Deno.serve(async (req) => {
         }
       }
     } catch (e) {
-      console.log(`[REBALANCE] Ticker fetch failed: ${e.message}`);
+      console.log(`[${mode}] Ticker fetch failed: ${e.message}`);
     }
 
-    // Identify assets to sell
+    // ─── STEP 3: Calculate initial equity ──────────────────────────────────
+    const initialEquity = await calculateEquity(initialBalances, tickerMap);
+    const initialUSDT = parseFloat(initialBalances.find(b => b.ccy === 'USDT')?.availBal || 0);
+    console.log(`[${mode}] Initial state: Equity=$${initialEquity.toFixed(2)}, USDT=$${initialUSDT.toFixed(2)}`);
+
+    // ─── STEP 4: Identify assets to sell ───────────────────────────────────
+    const PROTECTED_ASSETS = new Set(['ETH', 'SOL', 'USDT']);
+    const OKX_MIN_NOTIONAL = 5; // $5 minimum
+    const SELL_RATIO = 0.95; // Sell 95% to avoid "insufficient balance"
+
     const toSell = [];
-    for (const asset of balances) {
+    for (const asset of initialBalances) {
       const ccy = asset.ccy;
       const availBal = parseFloat(asset.availBal || 0);
 
-      // Skip allowed assets or assets with no balance
-      if (ALLOWED_ASSETS.includes(ccy) || availBal < 0.00001) continue;
+      if (PROTECTED_ASSETS.has(ccy) || availBal < 0.00001) continue;
 
-      // Skip if open position exists
-      if (openAssets.has(ccy)) {
-        console.log(`[REBALANCE] SKIP ${ccy}: open position exists`);
-        continue;
-      }
-
-      // Check notional value
       const price = tickerMap[ccy] || 0;
       const value = availBal * price;
 
       if (value >= OKX_MIN_NOTIONAL) {
-        toSell.push({ ccy, qty: availBal, price, value });
-        console.log(`[REBALANCE_SELL] ${ccy} qty=${availBal.toFixed(6)} value=$${value.toFixed(2)}`);
+        const sellQty = (availBal * SELL_RATIO).toFixed(6);
+        toSell.push({ ccy, availBal, sellQty, price, value });
+        console.log(`[${mode}] ${ccy}: avail=${availBal.toFixed(6)} sell=${sellQty} value=$${value.toFixed(2)}`);
       } else {
-        console.log(`[REBALANCE] SKIP ${ccy}: value=$${value.toFixed(2)} < min=$${OKX_MIN_NOTIONAL}`);
+        console.log(`[${mode}] SKIP ${ccy}: value=$${value.toFixed(2)} < min=$${OKX_MIN_NOTIONAL}`);
       }
     }
 
-    // Preview mode: return what would be sold
+    // ─── STEP 5: Preview mode ─────────────────────────────────────────────
     if (dryRun) {
-      console.log(`[REBALANCE_PREVIEW] Assets to sell: ${toSell.length}`);
-      const totalEstimatedUsdt = toSell.reduce((sum, item) => sum + item.value, 0);
-      
       return Response.json({
         success: true,
         mode: 'PREVIEW',
         assetsToSell: toSell.map(item => ({
           asset: item.ccy,
-          quantity: item.qty,
+          availableBalance: item.availBal,
+          quantityToSell: parseFloat(item.sellQty),
           estimatedUSDT: item.value
         })),
-        totalEstimatedUSDT: totalEstimatedUsdt,
-        skippedAssets: Array.from(openAssets).filter(a => a !== 'USDT'),
+        totalEstimatedUSDT: toSell.reduce((sum, item) => sum + item.value, 0),
+        protectedAssets: Array.from(PROTECTED_ASSETS),
         timestamp: new Date().toISOString()
       });
     }
 
-    // Execute mode: place real SELL orders
+    // ─── STEP 6: Execute trades one by one ────────────────────────────────
     const results = [];
+    const tradeDetails = {}; // Track before/after for key assets
     let totalExecutedUSDT = 0;
-    
+
     for (const item of toSell) {
       try {
         const instId = `${item.ccy}-USDT`;
+        const sellQty = item.sellQty;
+        
+        console.log(`[REBALANCE_EXECUTE] Starting ${item.ccy} sell qty=${sellQty}`);
+
+        // Place market sell order
         const bodyStr = JSON.stringify({
           instId,
           tdMode: 'cash',
           side: 'sell',
           ordType: 'market',
-          sz: item.qty.toFixed(6)
+          sz: sellQty
         });
 
         let orderRes = null;
@@ -242,55 +228,92 @@ Deno.serve(async (req) => {
           }
         }
 
-        if (orderRes?.code === '0') {
-          const ordId = orderRes.data?.[0]?.ordId;
-          console.log(`[REBALANCE_EXECUTE] ${item.ccy} SELL SUCCESS ordId=${ordId} qty=${item.qty.toFixed(6)} value=$${item.value.toFixed(2)}`);
+        if (!orderRes || orderRes.code !== '0') {
+          console.error(`[REBALANCE_EXECUTE] ${item.ccy} FAILED: ${orderRes?.msg || 'Unknown error'}`);
+          // STOP immediately on failure
           results.push({
             asset: item.ccy,
-            quantity: item.qty,
-            estimatedUSDT: item.value,
-            orderId: ordId,
-            status: 'SUCCESS'
-          });
-          totalExecutedUSDT += item.value;
-        } else {
-          console.log(`[REBALANCE_EXECUTE] ${item.ccy} SELL FAILED code=${orderRes?.code} msg=${orderRes?.msg}`);
-          results.push({
-            asset: item.ccy,
-            quantity: item.qty,
-            estimatedUSDT: item.value,
             status: 'FAILED',
-            error: orderRes?.msg || 'Unknown error'
+            error: orderRes?.msg || 'Order placement failed'
           });
+          break; // Stop processing further assets
         }
-      } catch (err) {
-        console.error(`[REBALANCE_EXECUTE] Error selling ${item.ccy}:`, err.message);
+
+        const ordId = orderRes.data?.[0]?.ordId;
+        console.log(`[REBALANCE_EXECUTE] ${item.ccy} order placed ordId=${ordId}`);
+
+        // Wait 1 second for order to settle
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Refresh balance for this asset
+        const afterBalance = await fetchLiveBalance(apiKey, apiSecret, passphrase, item.ccy);
+        const qtyAfter = parseFloat(afterBalance?.availBal || 0);
+        const qtySold = item.availBal - qtyAfter;
+        const receivedUSDT = qtySold * item.price;
+
+        console.log(`[REBALANCE_EXECUTE] ${item.ccy} settled: sold=${qtySold.toFixed(6)}, after=${qtyAfter.toFixed(6)}`);
+
+        // Track key assets
+        if (['DOT', 'BTC', 'XRP'].includes(item.ccy)) {
+          tradeDetails[item.ccy] = {
+            qtyBefore: item.availBal,
+            qtySold: qtySold,
+            avgPrice: item.price,
+            receivedUSDT: receivedUSDT,
+            ordId: ordId,
+            qtyAfter: qtyAfter
+          };
+        }
+
         results.push({
           asset: item.ccy,
-          quantity: item.qty,
-          estimatedUSDT: item.value,
+          orderId: ordId,
+          qtyBefore: item.availBal,
+          qtySold: qtySold,
+          avgPrice: item.price,
+          receivedUSDT: receivedUSDT,
+          qtyAfter: qtyAfter,
+          status: 'SUCCESS'
+        });
+
+        totalExecutedUSDT += receivedUSDT;
+      } catch (err) {
+        console.error(`[REBALANCE_EXECUTE] Exception selling ${item.ccy}:`, err.message);
+        results.push({
+          asset: item.ccy,
           status: 'ERROR',
           error: err.message
         });
+        break; // Stop on error
       }
     }
 
-    // Trigger balance refresh (call okxBalanceRefresh function)
-    try {
-      const refreshRes = await base44.asServiceRole.functions.invoke('okxBalanceRefresh', {});
-      console.log(`[REBALANCE_EXECUTE] Balance refresh triggered: ${refreshRes.status}`);
-    } catch (e) {
-      console.log(`[REBALANCE_EXECUTE] Balance refresh failed: ${e.message}`);
-    }
+    // ─── STEP 7: Fetch final balances ────────────────────────────────────
+    console.log(`[REBALANCE_EXECUTE] Fetching final balances...`);
+    const finalBalances = await fetchLiveBalance(apiKey, apiSecret, passphrase);
+    const finalEquity = await calculateEquity(finalBalances, tickerMap);
+    const finalUSDT = parseFloat(finalBalances.find(b => b.ccy === 'USDT')?.availBal || 0);
 
-    console.log(`[REBALANCE_EXECUTE] Completed: ${results.length} assets, $${totalExecutedUSDT.toFixed(2)} converted to USDT`);
+    console.log(`[REBALANCE_EXECUTE] Final state: Equity=$${finalEquity.toFixed(2)}, USDT=$${finalUSDT.toFixed(2)}`);
 
+    const equityDelta = finalEquity - initialEquity;
+
+    // ─── STEP 8: Return full report ────────────────────────────────────────
     return Response.json({
       success: true,
       mode: 'EXECUTE',
-      executed_count: results.filter(r => r.status === 'SUCCESS').length,
-      totalExecutedUSDT,
-      results,
+      summary: {
+        totalEquityBefore: initialEquity,
+        totalEquityAfter: finalEquity,
+        freeUSDTBefore: initialUSDT,
+        freeUSDTAfter: finalUSDT,
+        equityDelta: equityDelta,
+        equityDeltaPct: ((equityDelta / initialEquity) * 100).toFixed(4) + '%'
+      },
+      executedCount: results.filter(r => r.status === 'SUCCESS').length,
+      totalExecutedUSDT: totalExecutedUSDT,
+      tradeDetails: tradeDetails, // DOT, BTC, XRP before/after
+      results: results,
       timestamp: new Date().toISOString()
     });
   } catch (err) {
