@@ -204,20 +204,34 @@ Deno.serve(async (req) => {
         const tradingPairs = sub.trading_pairs || ['X:BTCUSD'];
         const symbol = tradingPairs[Math.floor(Math.random() * tradingPairs.length)];
         const capital = sub.capital_allocated || 1000;
-        // Scalping: small position sizes for fast frequent trades ($5-$15)
+        // Scalping: small position sizes for fast frequent trades, min $5 (OKX minimum)
         const maxPos = bot.strategy === 'scalping' ? 0.05 : 0.10;
-        const positionSize = Math.min(capital * maxPos, 15); // max $15 per trade
+        const positionSize = Math.max(5, Math.min(capital * maxPos, 15)); // $5–$15 per trade
 
-        // Fetch price + candles
+        // Fetch real OKX price for the instrument
+        let instIdForPrice = symbol.replace('X:', '').replace('/', '-');
+        if (instIdForPrice.endsWith('USD') && !instIdForPrice.endsWith('USDT')) instIdForPrice = instIdForPrice.replace(/USD$/, 'USDT');
+        if (!instIdForPrice.includes('-')) instIdForPrice = instIdForPrice.replace(/([A-Z]{3,4})(USDT|USDC|BTC|ETH)$/, '$1-$2');
+        if (!instIdForPrice.includes('-')) instIdForPrice += '-USDT';
+
+        let currentPrice = 50000;
+        try {
+          const okxTickerRes = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${instIdForPrice}`);
+          const okxTickerData = await okxTickerRes.json();
+          if (okxTickerData.code === '0' && okxTickerData.data?.[0]?.last) {
+            currentPrice = parseFloat(okxTickerData.data[0].last);
+          }
+        } catch (e) {
+          console.log(`[runBotTrades] OKX price fetch failed for ${instIdForPrice}, using default`);
+        }
+
+        // Fetch candles from Polygon for technical analysis signals
         const polygonKey = Deno.env.get('POLYGON_API_KEY');
-        const priceRes = await fetch(`https://api.polygon.io/v2/last/trade/${symbol}?apiKey=${polygonKey}`);
-        const priceData = await priceRes.json();
-        const currentPrice = priceData.results?.p || 50000;
-
+        const polygonSymbol = symbol.startsWith('X:') ? symbol : `X:${instIdForPrice.replace('-', '')}`;
         const toDate = new Date();
         const fromDate = new Date(toDate.getTime() - 7 * 24 * 60 * 60 * 1000);
         const candlesRes = await fetch(
-          `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/1/hour/${fromDate.toISOString().split('T')[0]}/${toDate.toISOString().split('T')[0]}?adjusted=true&sort=asc&apiKey=${polygonKey}`
+          `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/1/hour/${fromDate.toISOString().split('T')[0]}/${toDate.toISOString().split('T')[0]}?adjusted=true&sort=asc&apiKey=${polygonKey}`
         );
         const candlesData = await candlesRes.json();
         const candles = candlesData.results || [];
