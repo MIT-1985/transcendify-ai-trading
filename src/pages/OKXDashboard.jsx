@@ -279,10 +279,10 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
       </div>
       </div>
 
-      {/* Recent OKX Trades for Suzana */}
+      {/* Real OKX Orders */}
       {trades.length > 0 && (
         <div className="mt-5">
-          <div className="text-xs text-slate-400 font-semibold mb-2 uppercase tracking-wide">Последни Транзакции (OKX)</div>
+          <div className="text-xs text-slate-400 font-semibold mb-2 uppercase tracking-wide">Последни Ордери (OKX Live)</div>
           <div className="rounded-xl overflow-hidden border border-slate-700">
             <table className="w-full text-xs">
               <thead className="bg-slate-800">
@@ -290,25 +290,36 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
                   <th className="text-left px-3 py-2">Час</th>
                   <th className="text-left px-3 py-2">Символ</th>
                   <th className="text-left px-3 py-2">Посока</th>
-                  <th className="text-right px-3 py-2">Цена</th>
+                  <th className="text-right px-3 py-2">Avg Цена</th>
+                  <th className="text-right px-3 py-2">Кол.</th>
                   <th className="text-right px-3 py-2">P&L</th>
+                  <th className="text-right px-3 py-2">Статус</th>
                 </tr>
               </thead>
               <tbody>
-                {trades.map(trade => {
-                  const pnl = trade.profit_loss || 0;
+                {trades.map(order => {
+                  const pnl = order.pnl || 0;
+                  const statusColors = { filled: 'text-emerald-400', canceled: 'text-slate-400', live: 'text-yellow-400', partially_filled: 'text-blue-400' };
                   return (
-                    <tr key={trade.id} className="border-t border-slate-700/50 hover:bg-slate-800/30">
-                      <td className="px-3 py-2 text-slate-400">{moment(trade.timestamp || trade.created_date).format('MMM D HH:mm')}</td>
-                      <td className="px-3 py-2 font-semibold text-white">{trade.symbol}</td>
+                    <tr key={order.ordId} className="border-t border-slate-700/50 hover:bg-slate-800/30">
+                      <td className="px-3 py-2 text-slate-400">{moment(order.cTime).format('MMM D HH:mm')}</td>
+                      <td className="px-3 py-2 font-semibold text-white">{order.instId}</td>
                       <td className="px-3 py-2">
-                        <span className={`px-2 py-0.5 rounded font-bold ${trade.side === 'BUY' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {trade.side}
+                        <span className={`px-2 py-0.5 rounded font-bold ${order.side === 'BUY' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {order.side}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right font-mono text-white">${trade.price?.toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right font-mono text-white">
+                        {order.avgPx ? `$${order.avgPx.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-slate-300">
+                        {order.accFillSz > 0 ? order.accFillSz.toFixed(6) : order.sz.toFixed(6)}
+                      </td>
                       <td className={`px-3 py-2 text-right font-bold ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                        {pnl !== 0 ? `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(4)}` : '—'}
+                      </td>
+                      <td className={`px-3 py-2 text-right capitalize ${statusColors[order.state] || 'text-white'}`}>
+                        {order.state}
                       </td>
                     </tr>
                   );
@@ -392,16 +403,12 @@ export default function OKXDashboard() {
   });
   const bot = bot1?.[0] || null;
 
-  // All Suzana's trades from all subscription IDs
-  const { data: suzanaTrades = [] } = useQuery({
-    queryKey: ['suzana-trades'],
+  // Real OKX orders from exchange
+  const { data: suzanaOrders = [], refetch: refetchOrders } = useQuery({
+    queryKey: ['suzana-okx-orders'],
     queryFn: async () => {
-      const results = await Promise.all(
-        SUZANA_SUB_IDS.map(id => base44.entities.Trade.filter({ subscription_id: id }))
-      );
-      const seen = new Set();
-      const all = results.flat().filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
-      return all.sort((a, b) => new Date(b.timestamp || b.created_date) - new Date(a.timestamp || a.created_date)).slice(0, 30);
+      const res = await base44.functions.invoke('getSuzanaOrders', {});
+      return res.data?.orders || [];
     },
     staleTime: 20000,
     retry: false
@@ -443,6 +450,7 @@ export default function OKXDashboard() {
     setRefreshing(true);
     await fetchSuzanaBalance();
     await refetchAll();
+    await refetchOrders();
     setRefreshing(false);
   };
 
@@ -486,7 +494,7 @@ export default function OKXDashboard() {
           subscription={{ ...(sub || {}), total_trades: totalTradesAllBots, total_profit: totalProfitAllBots }}
           subs={suzanaSubs}
           bot={bot}
-          trades={suzanaTrades}
+          trades={suzanaOrders}
           refreshing={refreshing}
           onRefresh={handleRefresh}
         />
