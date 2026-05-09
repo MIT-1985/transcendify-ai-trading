@@ -139,32 +139,32 @@ export default function Dashboard() {
   };
 
   const activeBots = subscriptions.filter(s => s.status === 'active').length;
-  
-  // Calculate today's metrics only (from midnight)
-  const getTodaysMetrics = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStart = today.getTime();
-    
-    let todaysProfit = 0;
-    let todaysTrades = 0;
 
-    for (const sub of subscriptions.filter(s => s.status === 'active')) {
-      // Count all profit and trades (same as all-time since we're showing today's totals)
-      todaysProfit += (sub.total_profit || 0);
-      todaysTrades += (sub.total_trades || 0);
-    }
+  // Fetch real today's trades from the Trade entity
+  const { data: allTrades = [] } = useQuery({
+    queryKey: ['trades-today', user?.email],
+    queryFn: async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStart = today.toISOString();
+      
+      // Get all trades and filter by today's date
+      const trades = await base44.entities.Trade.filter({ created_by: user?.email });
+      return trades.filter(t => new Date(t.timestamp || t.created_date) >= new Date(todayStart));
+    },
+    enabled: !!user,
+    staleTime: 10000,
+    refetchOnWindowFocus: false,
+    retry: false
+  });
 
-    return { todaysProfit, todaysTrades };
-  };
-
-  const { todaysProfit, todaysTrades } = getTodaysMetrics();
-  const totalProfit = todaysProfit;
-  const totalTrades = todaysTrades;
+  // Calculate real today's profit and trades from actual trade records
+  const totalProfit = allTrades.reduce((sum, t) => sum + (t.profit_loss || 0), 0);
+  const totalTrades = allTrades.length;
   
   useEffect(() => {
-    setUnrealisedPnL(todaysProfit);
-  }, [todaysProfit]);
+    setUnrealisedPnL(totalProfit);
+  }, [totalProfit]);
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-3 sm:p-6">
@@ -192,7 +192,7 @@ export default function Dashboard() {
         {/* Real-Time Earnings */}
         {activeBots > 0 && (
           <div className="mb-6 sm:mb-8">
-            <RealTimeEarnings subscriptions={subscriptions} />
+            <RealTimeEarnings subscriptions={subscriptions} trades={allTrades} />
           </div>
         )}
 

@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DollarSign, TrendingUp, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function RealTimeEarnings({ subscriptions = [] }) {
+export default function RealTimeEarnings({ subscriptions = [], trades = [] }) {
   const [sessionStart] = useState(() => {
     // Session starts from today's midnight
     const today = new Date();
@@ -14,23 +14,9 @@ export default function RealTimeEarnings({ subscriptions = [] }) {
 
   const activeSubscriptions = subscriptions.filter(s => s.status === 'active');
 
-  // Calculate today's profit and trades only
-  const getTodaysMetrics = () => {
-    let todaysProfit = 0;
-    let todaysTrades = 0;
-
-    for (const sub of activeSubscriptions) {
-      // Only count trades and profit that happened from today's midnight onwards
-      todaysProfit += (sub.total_profit || 0);
-      todaysTrades += (sub.total_trades || 0);
-    }
-
-    return { todaysProfit, todaysTrades };
-  };
-
-  const { todaysProfit, todaysTrades } = getTodaysMetrics();
-  const totalEarnings = todaysProfit;
-  const totalTrades = todaysTrades;
+  // Use real trade data passed from parent
+  const totalEarnings = trades.reduce((sum, t) => sum + (t.profit_loss || 0), 0);
+  const totalTrades = trades.length;
 
   useEffect(() => {
     const interval = setInterval(() => {
