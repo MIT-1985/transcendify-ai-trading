@@ -2,405 +2,311 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
-import { Activity, Bot, DollarSign, TrendingUp, Zap, BarChart3, Wallet, Link2, FlaskConical, AlertTriangle } from 'lucide-react';
-import StatsCard from '@/components/trading/StatsCard';
-import PriceCard from '@/components/trading/PriceCard';
-import OrderBook from '@/components/trading/OrderBook';
-import RealTimeEarnings from '@/components/dashboard/RealTimeEarnings';
-import CryptoChart from '@/components/dashboard/CryptoChart';
-import MarketMetrics from '@/components/dashboard/MarketMetrics';
-import RealTradesSummary from '@/components/dashboard/RealTradesSummary';
-import AutomationHealthPanel from '@/components/dashboard/AutomationHealthPanel';
-import Robot1ExecutionViewer from '@/components/dashboard/Robot1ExecutionViewer';
-import PositionManager from '@/components/dashboard/PositionManager';
-import { Button } from '@/components/ui/button';
+import { Wallet, Zap, TrendingUp, Activity } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { createPageUrl } from '../utils';
-import { defaultSafetyState, canRebalance, canRobot1Execute } from '@/lib/SafetyStates';
-
-const OKX_SYMBOLS = [
-  { instId: 'BTC-USDT', display: 'BTC/USDT' },
-  { instId: 'ETH-USDT', display: 'ETH/USDT' },
-  { instId: 'SOL-USDT', display: 'SOL/USDT' },
-  { instId: 'XRP-USDT', display: 'XRP/USDT' },
-  { instId: 'DOGE-USDT', display: 'DOGE/USDT' },
-  { instId: 'ADA-USDT', display: 'ADA/USDT' }
-];
+import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
-  const [prices, setPrices] = useState([]);
-  const [unrealisedPnL, setUnrealisedPnL] = useState(0);
-  const [safetyState, setSafetyState] = useState(defaultSafetyState);
   const { user } = useAuth();
-  
-  const { data: subscriptions = [], isLoading: loadingSubs } = useQuery({
-    queryKey: ['subscriptions', user?.email],
-    queryFn: async () => {
-      const [byCreator, byEmail] = await Promise.all([
-        base44.entities.UserSubscription.filter({ created_by: user?.email }),
-        base44.entities.UserSubscription.filter({ user_email: user?.email })
-      ]);
-      // Merge, deduplicate by id
-      const all = [...byCreator, ...byEmail];
-      const seen = new Set();
-      return all.filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
-    },
-    enabled: !!user,
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
-    retry: false
-  });
+  const [syncStatus, setSyncStatus] = useState('idle');
 
-  const { data: exchangeConnections = [], refetch: refetchConnections } = useQuery({
-    queryKey: ['all-connections', user?.email],
-    queryFn: async () => {
-      const [byCreator, byEmail] = await Promise.all([
-        base44.entities.ExchangeConnection.filter({ created_by: user?.email }),
-        base44.entities.ExchangeConnection.filter({ user_email: user?.email })
-      ]);
-      const all = [...byCreator, ...byEmail];
-      const seen = new Set();
-      return all.filter(c => { if (seen.has(c.id)) return false; seen.add(c.id); return true; });
-    },
-    enabled: !!user,
-    staleTime: 60000,
-    refetchOnWindowFocus: false,
-    retry: false
-  });
-
-  // Auto-refresh exchange balances on load
-  useEffect(() => {
-    if (!user?.email) return;
-    const refreshBalances = async () => {
-      try {
-        await base44.functions.invoke('binanceConnect', { action: 'test' });
-      } catch (e) {}
-      try {
-        await base44.functions.invoke('okxConnect', { action: 'balance' });
-      } catch (e) {}
-      refetchConnections();
-    };
-    refreshBalances();
-  }, [user?.email]);
-
-  const { data: bots = [] } = useQuery({
-    queryKey: ['bots', user?.email],
-    queryFn: () => base44.entities.TradingBot.list(),
-    enabled: !!user
-  });
-
-  // Bots run automatically via BotEngine in BotRunner page
-  // No need to call them from Dashboard
-
-  // Fetch real-time prices from OKX
-  useEffect(() => {
-    const fetchPrices = async () => {
-      try {
-        const response = await base44.functions.invoke('okxMarketData', {
-          action: 'tickers',
-          symbols: OKX_SYMBOLS.map(s => s.instId)
-        });
-        
-        if (response?.data?.success && response?.data?.data) {
-          const priceData = OKX_SYMBOLS.map(symbol => {
-            const ticker = response.data.data.find(t => t.instId === symbol.instId);
-            if (ticker) {
-              return {
-                symbol: symbol.display,
-                price: parseFloat(ticker.price),
-                change: parseFloat(ticker.change),
-                volume: parseFloat(ticker.volume) * parseFloat(ticker.price)
-              };
-            }
-            return null;
-          }).filter(p => p !== null);
-          
-          if (priceData.length > 0) {
-            setPrices(priceData);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching prices:', error);
-      }
-    };
-
-    fetchPrices();
-    const interval = setInterval(fetchPrices, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const [diagResult, setDiagResult] = useState(null);
-  const [diagLoading, setDiagLoading] = useState(false);
-
-  const runBinanceDiag = async () => {
-    setDiagLoading(true);
+  // Sync OKX ledger
+  const handleSync = async () => {
+    setSyncStatus('syncing');
     try {
-      const res = await base44.functions.invoke('binanceDiag', {});
-      setDiagResult(res.data);
-      console.log('Binance diag result:', res.data);
+      await base44.functions.invoke('syncOKXOrderLedger', {});
+      refetchLedger();
+      refetchVerified();
+      refetchExecution();
+      setSyncStatus('success');
+      setTimeout(() => setSyncStatus('idle'), 2000);
     } catch (e) {
-      setDiagResult({ error: e.message });
+      console.error(e);
+      setSyncStatus('error');
+      setTimeout(() => setSyncStatus('idle'), 2000);
     }
-    setDiagLoading(false);
   };
 
-  const activeBots = subscriptions.filter(s => s.status === 'active').length;
-  const rebalanceDisabled = !canRebalance(safetyState);
-  const robot1CanExecute = canRobot1Execute(safetyState);
-
-  // Fetch real orders from OKX/Binance via backend
-  const { data: ordersResponse = {} } = useQuery({
-    queryKey: ['live-orders-today'],
+  // === 1. OKX LIVE BALANCE ===
+  const { data: balance = {}, isLoading: loadBalance } = useQuery({
+    queryKey: ['okx-live-balance', user?.email],
     queryFn: async () => {
       try {
-        // Get Suzana's live OKX orders with calculated P&L
-        const res = await base44.functions.invoke('getSuzanaOrders', {});
-        const orders = res.data?.orders || [];
-        const totalRealizedPnl = res.data?.totalRealizedPnl || 0;
-        
-        // Filter for today's trades
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayStart = today.getTime();
-        
-        const todaysOrders = orders.filter(o => {
-          const orderTime = new Date(o.cTime).getTime();
-          return orderTime >= todayStart;
-        });
-        
-        return { orders: todaysOrders, totalRealizedPnl };
+        const res = await base44.functions.invoke('getSuzanaBalance', {});
+        return res.data || {};
       } catch (e) {
-        console.error('Failed to fetch live orders', e);
-        return { orders: [], totalRealizedPnl: 0 };
+        return { error: e.message };
       }
     },
-    staleTime: 15000,
-    refetchOnWindowFocus: false,
-    retry: false
+    enabled: !!user,
+    staleTime: 30000
   });
 
-  const liveOrders = ordersResponse.orders || [];
-  const totalProfit = ordersResponse.totalRealizedPnl || 0;
-  const totalTrades = liveOrders.filter(o => o.state === 'filled').length;
+  // === 2. ROBOT 1 LIVE STATUS ===
+  const { data: execution = {}, refetch: refetchExecution, isLoading: loadExecution } = useQuery({
+    queryKey: ['robot1-execution', user?.email],
+    queryFn: async () => {
+      try {
+        const logs = await base44.asServiceRole.entities.Robot1ExecutionLog.list();
+        return logs.length > 0 ? logs[0] : {};
+      } catch (e) {
+        return { error: e.message };
+      }
+    },
+    enabled: !!user,
+    staleTime: 20000
+  });
 
-  // Prepare trades for RealTimeEarnings with proper PnL calculation
-  const tradesForEarnings = liveOrders.map(o => ({
-    ...o,
-    pnl: parseFloat(o.pnl || 0)
-  }));
+  // === 3. ROBOT 1 VERIFIED TRADES ===
+  const { data: robot1Trades = [], refetch: refetchVerified, isLoading: loadVerified } = useQuery({
+    queryKey: ['robot1-verified', user?.email],
+    queryFn: async () => {
+      try {
+        const all = await base44.asServiceRole.entities.VerifiedTrade.list();
+        return all.filter(t => t.robotId === 'robot1' && (t.instId === 'ETH-USDT' || t.instId === 'SOL-USDT'));
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: !!user,
+    staleTime: 30000
+  });
 
-  useEffect(() => {
-    setUnrealisedPnL(totalProfit);
-  }, [totalProfit]);
+  // === 4. OKX RAW ORDERS ===
+  const { data: ledger = [], refetch: refetchLedger, isLoading: loadLedger } = useQuery({
+    queryKey: ['oxx-ledger', user?.email],
+    queryFn: async () => {
+      try {
+        const all = await base44.asServiceRole.entities.OXXOrderLedger.list();
+        return all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: !!user,
+    staleTime: 30000
+  });
+
+  const robot1PnL = robot1Trades.reduce((sum, t) => sum + (t.realizedPnL || 0), 0);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] text-white p-3 sm:p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Safety Banner - Rebalance Halted */}
-        {rebalanceDisabled && (
-          <div className="bg-orange-900/30 border border-orange-700 rounded-lg p-4 mb-6">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <h3 className="text-orange-400 font-semibold">Rebalance Halted</h3>
-                <p className="text-orange-300 text-sm mt-1">{safetyState.rebalance.reason || 'Invalid rebalance verification'}</p>
-                <p className="text-orange-300/70 text-xs mt-2">✓ Robot 1 verified trading available</p>
-              </div>
-            </div>
+    <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-slate-400 text-sm">OKX + Robot 1 Live Data</p>
           </div>
-        )}
-
-        {/* Header */}
-         <div className="flex flex-col sm:flex-row items-start justify-between gap-4 mb-6 sm:mb-8">
-           <div>
-             <h1 className="text-2xl sm:text-3xl font-bold mb-2">Dashboard</h1>
-             <p className="text-slate-400 text-sm sm:text-base">Monitor your trading bots and market performance</p>
-             {robot1CanExecute && (
-               <div className="mt-3 flex items-center gap-2">
-                 <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                 <span className="text-emerald-400 text-xs sm:text-sm font-semibold">Robot 1 Ready</span>
-               </div>
-             )}
-           </div>
-          <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 border border-slate-700 rounded-xl p-4 sm:p-5 w-full sm:min-w-[200px] sm:w-auto">
-            <div className="text-xs text-slate-400 mb-1">Total P&L</div>
-            <div className={`text-2xl sm:text-3xl font-bold ${unrealisedPnL > 0 ? 'text-emerald-400' : unrealisedPnL < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-              {unrealisedPnL > 0 ? '+' : ''}${unrealisedPnL.toFixed(2)}
-            </div>
-          </div>
-        </div>
-
-        {/* Real-Time Earnings */}
-        <div className="mb-6 sm:mb-8">
-          <RealTimeEarnings subscriptions={subscriptions} trades={tradesForEarnings} />
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatsCard
-            title="Active Bots"
-            value={activeBots}
-            subtitle={`of ${bots.length} available`}
-            icon={Bot}
-          />
-          <StatsCard
-            title="Total P&L"
-            value={`$${totalProfit.toFixed(2)}`}
-            subtitle={totalProfit >= 0 ? 'Profit' : 'Loss'}
-            icon={DollarSign}
-            trend={totalProfit >= 0 ? 'up' : 'down'}
-          />
-          <StatsCard
-            title="Total Trades"
-            value={totalTrades.toLocaleString()}
-            subtitle="Filled Today"
-            icon={Activity}
-          />
-          <StatsCard
-            title="Win Rate"
-            value={liveOrders.length > 0 ? `${(liveOrders.filter(o => (parseFloat(o.pnl || 0) > 0)).length / liveOrders.filter(o => o.side === 'sell' || o.side === 'SELL').length * 100).toFixed(1)}%` : '0%'}
-            subtitle="Sell Orders"
-            icon={TrendingUp}
-            trend="up"
-          />
-        </div>
-
-        {/* Market Prices */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="w-5 h-5 text-blue-400" />
-            <h2 className="text-xl font-semibold">Live Market Prices</h2>
-            <span className="flex items-center gap-1 text-xs text-emerald-400 ml-2">
-              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-              Live
-            </span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {prices.map((p, idx) => (
-              <PriceCard
-                key={idx}
-                symbol={p.symbol}
-                price={p.price}
-                change={p.change}
-                volume={p.volume}
-              />
-            ))}
-            </div>
-            </div>
-
-            {/* Interactive Chart */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              <div className="lg:col-span-2">
-                <CryptoChart />
-              </div>
-              <div>
-                <OrderBook symbol="X:BTCUSD" />
-              </div>
-            </div>
-
-            {/* Market Metrics */}
-            <div className="mb-8">
-              <div className="flex items-center gap-2 mb-4">
-                <Activity className="w-5 h-5 text-purple-400" />
-                <h2 className="text-xl font-semibold">Market Metrics</h2>
-              </div>
-              <MarketMetrics prices={prices} />
-            </div>
-
-            {/* Exchange Balances */}
-        {exchangeConnections.filter(c => c.status === 'connected').length > 0 && (
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <Wallet className="w-5 h-5 text-yellow-400" />
-              <h2 className="text-xl font-semibold">My Exchange Balances</h2>
-              <span className="flex items-center gap-1 text-xs text-emerald-400 ml-2">
-                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                Live
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {exchangeConnections.filter(c => c.status === 'connected').map(conn => (
-                <div key={conn.id} className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-                      <Link2 className="w-5 h-5 text-yellow-400" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold capitalize">{conn.exchange}</h4>
-                      <span className="text-xs text-emerald-400">● Connected</span>
-                    </div>
-                    <div className="ml-auto text-right">
-                      <div className="text-xs text-slate-500">Total USDC</div>
-                      <div className="text-yellow-400 font-bold">${(conn.balance_usdt || 0).toFixed(2)}</div>
-                    </div>
-                  </div>
-                  {conn.balances && conn.balances.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 mt-3">
-                      {conn.balances.filter(b => (b.free + b.locked) > 0).slice(0, 8).map(b => (
-                        <div key={b.asset} className="bg-slate-800/60 rounded-lg px-3 py-2 flex justify-between items-center">
-                          <span className="text-sm font-semibold text-white">{b.asset}</span>
-                          <div className="text-right">
-                            <div className="text-xs text-slate-300">{parseFloat(b.free).toFixed(4)}</div>
-                            {b.locked > 0 && <div className="text-xs text-slate-500">🔒 {parseFloat(b.locked).toFixed(4)}</div>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Binance Diag Test */}
-        <div className="mb-6 p-4 bg-slate-900/50 border border-slate-700 rounded-xl">
-          <div className="flex items-center gap-3 mb-3">
-            <FlaskConical className="w-5 h-5 text-purple-400" />
-            <span className="font-semibold text-purple-300">Binance IP Test (временен)</span>
-          </div>
-          <Button onClick={runBinanceDiag} disabled={diagLoading} className="bg-purple-700 hover:bg-purple-600 text-sm mb-3">
-            {diagLoading ? 'Тестване...' : 'Тествай Binance с моя IP'}
+          <Button 
+            onClick={handleSync} 
+            disabled={syncStatus === 'syncing'}
+            className={`gap-2 ${syncStatus === 'success' ? 'bg-emerald-600' : 'bg-blue-600'}`}
+          >
+            <Activity className="w-4 h-4" />
+            {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'success' ? '✓ Synced' : 'Sync OKX'}
           </Button>
-          {diagResult && (
-            <pre className="text-xs text-slate-300 bg-slate-950 rounded-lg p-3 overflow-auto max-h-48">
-              {JSON.stringify(diagResult, null, 2)}
-            </pre>
+        </div>
+
+        {/* 1. OKX LIVE BALANCE */}
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Wallet className="w-5 h-5 text-yellow-400" />
+            <h2 className="text-lg font-bold">1. OKX Live Balance</h2>
+          </div>
+          {loadBalance ? (
+            <Skeleton className="h-24" />
+          ) : balance.error ? (
+            <div className="text-red-400 text-sm">{balance.error}</div>
+          ) : (
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
+                <div className="text-xs text-slate-400">Total Equity</div>
+                <div className="text-2xl font-bold text-emerald-400">
+                  ${parseFloat(balance.totalEquity || 0).toFixed(2)}
+                </div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
+                <div className="text-xs text-slate-400">Free USDT</div>
+                <div className="text-2xl font-bold text-white">
+                  ${parseFloat(balance.freeUSDT || 0).toFixed(2)}
+                </div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
+                <div className="text-xs text-slate-400">ETH</div>
+                <div className="text-xl font-bold text-white">
+                  {parseFloat(balance.ETH || 0).toFixed(6)}
+                </div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
+                <div className="text-xs text-slate-400">SOL</div>
+                <div className="text-xl font-bold text-white">
+                  {parseFloat(balance.SOL || 0).toFixed(4)}
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Automation Health Panel */}
-        <div className="mb-8">
-          <AutomationHealthPanel />
-        </div>
-
-        {/* Robot 1 Execution Viewer */}
-        <div className="mb-8">
-          <Robot1ExecutionViewer />
-        </div>
-
-        {/* Position Manager - Separate Legacy from Robot 1 */}
-        <div className="mb-8">
-          <PositionManager orders={liveOrders} />
-        </div>
-
-        {/* Real Trading Summary - Only Real OKX Data */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Activity className="w-5 h-5 text-blue-400" />
-            <h2 className="text-xl font-semibold">Live Trading Activity</h2>
-            <span className="flex items-center gap-1 text-xs text-emerald-400 ml-2">
-              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-              OKX Connected
-            </span>
+        {/* 2. ROBOT 1 LIVE STATUS */}
+        <div className="bg-blue-900/20 border border-blue-700 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Zap className="w-5 h-5 text-blue-400" />
+            <h2 className="text-lg font-bold">2. Robot 1 Live Status</h2>
           </div>
-          {liveOrders.length > 0 ? (
-            <RealTradesSummary orders={liveOrders} balance={(exchangeConnections.find(c => c.exchange === 'okx')?.balance_usdt || 0)} />
+          {loadExecution ? (
+            <Skeleton className="h-32" />
+          ) : !execution.execution_time ? (
+            <div className="text-slate-400 text-sm">No execution log yet</div>
           ) : (
-            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 text-center">
-              <Activity className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Live Trades Today</h3>
-              <p className="text-slate-400 text-sm">Trading activity will appear here once orders are filled on OKX</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-blue-700/30">
+                  <div className="text-xs text-slate-400">Last Run</div>
+                  <div className="text-sm font-mono text-blue-300">
+                    {new Date(execution.execution_time).toLocaleTimeString()}
+                  </div>
+                </div>
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-blue-700/30">
+                  <div className="text-xs text-slate-400">Decision</div>
+                  <div className={`text-sm font-bold ${
+                    execution.decision === 'BUY' ? 'text-emerald-400' : 
+                    execution.decision === 'SELL' ? 'text-red-400' : 
+                    'text-slate-400'
+                  }`}>
+                    {execution.decision || '—'}
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700">
+                <div className="text-xs text-slate-400 mb-1">Reason</div>
+                <div className="text-sm text-white">{execution.reason || '—'}</div>
+              </div>
+              {execution.active_position && (
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  <div className="bg-blue-800/30 rounded-lg p-3 border border-blue-700/30">
+                    <div className="text-xs text-slate-400">Active Position</div>
+                    <div className="text-sm font-bold text-blue-300">{execution.position_symbol}</div>
+                    <div className="text-xs text-slate-500 mt-1">{execution.position_qty?.toFixed(4) || '—'} qty</div>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                    <div className="text-xs text-slate-400">Last Order ID</div>
+                    <div className="text-xs font-mono text-cyan-400">{execution.last_order_id?.slice?.(-10) || '—'}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 3. ROBOT 1 VERIFIED TRADES */}
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <TrendingUp className="w-5 h-5 text-emerald-400" />
+            <h2 className="text-lg font-bold">3. Robot 1 Verified Trades (ETH-USDT / SOL-USDT)</h2>
+          </div>
+          {loadVerified ? (
+            <Skeleton className="h-20" />
+          ) : robot1Trades.length === 0 ? (
+            <div className="text-slate-400 text-sm">No verified trades yet</div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-emerald-700/30">
+                  <div className="text-xs text-slate-400">Total Trades</div>
+                  <div className="text-2xl font-bold text-white">{robot1Trades.length}</div>
+                </div>
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-emerald-700/30">
+                  <div className="text-xs text-slate-400">Closed</div>
+                  <div className="text-2xl font-bold text-white">{robot1Trades.filter(t => t.status === 'closed').length}</div>
+                </div>
+                <div className={`bg-slate-800/50 rounded-lg p-3 border ${robot1PnL >= 0 ? 'border-emerald-700/30' : 'border-red-700/30'}`}>
+                  <div className="text-xs text-slate-400">Total P&L</div>
+                  <div className={`text-2xl font-bold ${robot1PnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {robot1PnL >= 0 ? '+' : ''}{robot1PnL.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="text-slate-400 border-b border-slate-700">
+                    <tr>
+                      <th className="text-left px-3 py-2">Pair</th>
+                      <th className="text-right px-3 py-2">Buy Qty</th>
+                      <th className="text-right px-3 py-2">Buy Price</th>
+                      <th className="text-right px-3 py-2">Sell Price</th>
+                      <th className="text-right px-3 py-2">P&L</th>
+                      <th className="text-right px-3 py-2">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {robot1Trades.slice(0, 8).map((t, i) => (
+                      <tr key={i} className="border-b border-slate-800 hover:bg-slate-800/30">
+                        <td className="px-3 py-2 font-bold">{t.instId}</td>
+                        <td className="px-3 py-2 text-right font-mono">{t.buyQty?.toFixed(4)}</td>
+                        <td className="px-3 py-2 text-right font-mono">${t.buyPrice?.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right font-mono">${t.sellPrice?.toFixed(2)}</td>
+                        <td className={`px-3 py-2 text-right font-mono ${t.realizedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {t.realizedPnL >= 0 ? '+' : ''}{t.realizedPnL?.toFixed(2)}
+                        </td>
+                        <td className={`px-3 py-2 text-right font-mono ${t.realizedPnLPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {t.realizedPnLPct?.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 4. OKX RAW ORDERS */}
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Activity className="w-5 h-5 text-cyan-400" />
+            <h2 className="text-lg font-bold">4. OKX Raw Orders (Verified Fills Only)</h2>
+          </div>
+          {loadLedger ? (
+            <Skeleton className="h-40" />
+          ) : ledger.length === 0 ? (
+            <div className="text-slate-400 text-sm">No orders. Click "Sync OKX" above.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="text-slate-400 border-b border-slate-700">
+                  <tr>
+                    <th className="text-left px-3 py-2">Ord ID</th>
+                    <th className="text-left px-3 py-2">Pair</th>
+                    <th className="text-left px-3 py-2">Side</th>
+                    <th className="text-right px-3 py-2">Base Qty</th>
+                    <th className="text-right px-3 py-2">Quote USDT</th>
+                    <th className="text-right px-3 py-2">Fee</th>
+                    <th className="text-left px-3 py-2">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledger.slice(0, 20).map(ord => (
+                    <tr key={ord.ordId} className="border-b border-slate-800 hover:bg-slate-800/30">
+                      <td className="px-3 py-2 font-mono text-cyan-400">{ord.ordId.slice(-10)}</td>
+                      <td className="px-3 py-2 font-bold">{ord.instId}</td>
+                      <td className="px-3 py-2">
+                        <span className={ord.side === 'buy' ? 'text-emerald-400' : 'text-red-400'}>
+                          {ord.side.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono">{ord.accFillSz?.toFixed(4)}</td>
+                      <td className="px-3 py-2 text-right font-mono">${ord.quoteUSDT?.toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right font-mono text-red-400">{ord.fee?.toFixed(4)}</td>
+                      <td className="px-3 py-2 text-slate-500">
+                        {new Date(ord.timestamp).toLocaleTimeString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {ledger.length > 20 && (
+                <div className="text-xs text-slate-500 mt-2 text-center">... {ledger.length - 20} more</div>
+              )}
             </div>
           )}
         </div>
