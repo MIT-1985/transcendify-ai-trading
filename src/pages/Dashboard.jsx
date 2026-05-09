@@ -9,6 +9,7 @@ import OrderBook from '@/components/trading/OrderBook';
 import RealTimeEarnings from '@/components/dashboard/RealTimeEarnings';
 import CryptoChart from '@/components/dashboard/CryptoChart';
 import MarketMetrics from '@/components/dashboard/MarketMetrics';
+import RealTradesSummary from '@/components/dashboard/RealTradesSummary';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createPageUrl } from '../utils';
@@ -365,69 +366,23 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Active Subscriptions */}
+        {/* Real Trading Summary - Only Real OKX Data */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <Zap className="w-5 h-5 text-amber-400" />
-            <h2 className="text-xl font-semibold">Your Active Bots</h2>
+            <Activity className="w-5 h-5 text-blue-400" />
+            <h2 className="text-xl font-semibold">Live Trading Activity</h2>
+            <span className="flex items-center gap-1 text-xs text-emerald-400 ml-2">
+              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+              OKX Connected
+            </span>
           </div>
-          
-          {loadingSubs ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3].map(i => (
-                <Skeleton key={i} className="h-48 bg-slate-800" />
-              ))}
-            </div>
-          ) : subscriptions.filter(s => s.status === 'active').length === 0 || rebalanceDisabled ? (
-            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 text-center">
-              <Bot className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">{rebalanceDisabled ? 'Bots Restricted' : 'No Active Bots'}</h3>
-              <p className="text-slate-400 text-sm">
-                {rebalanceDisabled ? 'Bots #2-#5 disabled during rebalance halt. Robot 1 strategy available.' : 'Subscribe to a trading bot to start automated trading'}
-              </p>
-            </div>
+          {liveOrders.length > 0 ? (
+            <RealTradesSummary orders={liveOrders} balance={(exchangeConnections.find(c => c.exchange === 'okx')?.balance_usdt || 0)} />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {subscriptions.filter(s => s.status === 'active').map((sub) => {
-                const bot = bots.find(b => b.id === sub.bot_id);
-                const isRobot1 = bot?.name?.includes('Robot') || bot?.id === 'robot1';
-                const disabled = !isRobot1 && rebalanceDisabled;
-
-                return (
-                  <div key={sub.id} className={`rounded-xl p-5 ${disabled ? 'bg-slate-900/20 border border-slate-700/50 opacity-50' : 'bg-slate-900/50 border border-slate-800'}`}>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${disabled ? 'bg-slate-600/20' : 'bg-emerald-500/20'}`}>
-                        <Bot className={`w-5 h-5 ${disabled ? 'text-slate-500' : 'text-emerald-400'}`} />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold">{bot?.name || 'Trading Bot'}</h4>
-                        <span className={`text-xs ${disabled ? 'text-slate-500' : 'text-emerald-400'}`}>
-                          {disabled ? '● Disabled' : '● Running'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <div className="text-xs text-slate-500">Profit</div>
-                        <div className={`font-semibold ${(sub.total_profit || 0) > 0 ? 'text-emerald-400' : (sub.total_profit || 0) < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                          {(sub.total_profit || 0) > 0 ? '+' : ''}{(sub.total_profit || 0) === 0 ? '$0.00' : `$${(sub.total_profit || 0).toFixed(2)}`}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-500">Trades</div>
-                        <div className="text-white font-semibold">{sub.total_trades || 0}</div>
-                      </div>
-                    </div>
-                    <Button
-                       onClick={() => window.location.href = createPageUrl('BotRunner') + '?id=' + sub.id}
-                       disabled={disabled}
-                       className={`w-full mt-4 ${disabled ? 'bg-slate-700 cursor-not-allowed text-slate-500' : 'bg-blue-600 hover:bg-blue-500'}`}
-                     >
-                       {disabled ? 'Disabled' : 'View Live Dashboard'}
-                     </Button>
-                  </div>
-                );
-              })}
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 text-center">
+              <Activity className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Live Trades Today</h3>
+              <p className="text-slate-400 text-sm">Trading activity will appear here once orders are filled on OKX</p>
             </div>
           )}
         </div>
