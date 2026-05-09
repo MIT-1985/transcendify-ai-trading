@@ -177,7 +177,8 @@ function OKXChart() {
 
 // ─── Suzana Account Card ────────────────────────────────────────────────────
 function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refreshing, onRefresh }) {
-  const balance = connection?.balance_usdt || 0;
+  const balance = connection?.balance_usdt ?? 0;
+  const isLoadingBalance = connection?.loading && balance === 0;
   const totalTrades = Math.max(subscription?.total_trades || 0, trades.length);
   const totalProfit = subscription?.total_profit || 0;
 
@@ -209,7 +210,9 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
         {/* USDT Balance */}
         <div className="bg-slate-800/70 rounded-xl p-4 border border-yellow-500/20">
           <div className="text-xs text-slate-400 mb-1">Общ Баланс (USD)</div>
-          <div className="text-3xl font-bold text-yellow-400">${balance.toFixed(2)}</div>
+          <div className="text-3xl font-bold text-yellow-400">
+            {isLoadingBalance ? <span className="animate-pulse text-slate-400">Зарежда...</span> : `$${balance.toFixed(2)}`}
+          </div>
           <div className="text-xs text-slate-500 mt-1">
             {connection?.last_sync ? `Обновено: ${moment(connection.last_sync).format('HH:mm:ss')}` : '—'}
           </div>
@@ -347,11 +350,13 @@ export default function OKXDashboard() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Live balance from OKX for Suzana (via backend function)
-  const [liveBalance, setLiveBalance] = useState(null);
+  const [liveBalance, setLiveBalance] = useState(0);
   const [liveBalances, setLiveBalances] = useState([]);
   const [lastSync, setLastSync] = useState(null);
+  const [balanceLoading, setBalanceLoading] = useState(true);
 
   const fetchSuzanaBalance = async () => {
+    setBalanceLoading(true);
     try {
       const res = await base44.functions.invoke('getSuzanaBalance', {});
       if (res.data?.success) {
@@ -360,6 +365,7 @@ export default function OKXDashboard() {
         setLastSync(new Date().toISOString());
       }
     } catch (e) { console.error('getSuzanaBalance error', e); }
+    setBalanceLoading(false);
   };
 
   useEffect(() => {
@@ -369,16 +375,14 @@ export default function OKXDashboard() {
   }, []);
 
   // Build suzanaConn from live data
-  const suzanaConn = useMemo(() => {
-    if (liveBalance === null) return null;
-    return {
-      balance_usdt: liveBalance,
-      balances: liveBalances,
-      last_sync: lastSync,
-      status: 'connected',
-      label: 'My OKX Account'
-    };
-  }, [liveBalance, liveBalances, lastSync]);
+  const suzanaConn = useMemo(() => ({
+    balance_usdt: liveBalance,
+    balances: liveBalances,
+    last_sync: lastSync,
+    status: 'connected',
+    label: 'My OKX Account',
+    loading: balanceLoading
+  }), [liveBalance, liveBalances, lastSync, balanceLoading]);
 
   // All OKX connections (for own user)
   const { data: allOkxConns = [], refetch: refetchAll } = useQuery({
@@ -484,7 +488,12 @@ export default function OKXDashboard() {
           {suzanaConn && (
             <div className="bg-slate-900/80 border border-yellow-500/30 rounded-xl px-5 py-3 text-right">
               <div className="text-xs text-slate-400">Suzana — OKX Баланс</div>
-              <div className="text-2xl font-bold text-yellow-400">${(suzanaConn.balance_usdt || 0).toFixed(2)} <span className="text-sm text-slate-400">USDT</span></div>
+              <div className="text-2xl font-bold text-yellow-400">
+                {suzanaConn.loading && suzanaConn.balance_usdt === 0
+                  ? <span className="animate-pulse text-slate-400 text-lg">Зарежда...</span>
+                  : <>${suzanaConn.balance_usdt.toFixed(2)} <span className="text-sm text-slate-400">USDT</span></>
+                }
+              </div>
               <div className="flex items-center justify-end gap-1 mt-0.5">
                 <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                 <span className="text-xs text-emerald-400">Свързан</span>
