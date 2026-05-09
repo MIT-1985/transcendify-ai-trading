@@ -51,8 +51,10 @@ export default function RealTradesSummary({ orders = [], balance = 0 }) {
       return sum + parseFloat(o.notional || o.sz * o.avgPx || 0);
     }, 0);
 
-    const winTrades = closedTrades.filter(o => (tradesPnl[o.ordId] || 0) > 0).length;
-    const winRate = closedTrades.length > 0 ? (winTrades / closedTrades.length * 100).toFixed(1) : 0;
+    // Win rate = closed SELL orders with positive P&L / total SELL orders
+    const closedSells = closedTrades.filter(o => o.side === 'SELL' || o.side === 'sell');
+    const winTrades = closedSells.filter(o => (tradesPnl[o.ordId] || 0) > 0).length;
+    const winRate = closedSells.length > 0 ? (winTrades / closedSells.length * 100).toFixed(1) : 0;
 
     return { openTrades, closedTrades, totalProfit, totalVolume, winRate, winTrades, tradesPnl };
   }, [orders]);
