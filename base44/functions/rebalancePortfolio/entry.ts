@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
 
     // ─── STEP 6: Execute trades one by one ────────────────────────────────
     const results = [];
-    const tradeDetails = {}; // Track before/after for key assets
+    const orderMap = []; // Track ordId -> instId mappings for verification
     let totalExecutedUSDT = 0;
 
     for (const item of toSell) {
@@ -230,49 +230,97 @@ Deno.serve(async (req) => {
 
         if (!orderRes || orderRes.code !== '0') {
           console.error(`[REBALANCE_EXECUTE] ${item.ccy} FAILED: ${orderRes?.msg || 'Unknown error'}`);
-          // STOP immediately on failure
           results.push({
             asset: item.ccy,
             status: 'FAILED',
-            error: orderRes?.msg || 'Order placement failed'
+            error: orderRes?.msg || 'Order placement failed',
+            instId: instId
           });
-          break; // Stop processing further assets
+          break;
         }
 
         const ordId = orderRes.data?.[0]?.ordId;
-        console.log(`[REBALANCE_EXECUTE] ${item.ccy} order placed ordId=${ordId}`);
+        console.log(`[REBALANCE_EXECUTE] ${item.ccy} order placed ordId=${ordId} instId=${instId}`);
 
-        // Wait 1 second for order to settle
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // ─── IMMEDIATE VERIFICATION ──────────────────────────────────────
+        // Verify order with exact instId immediately after placement
+        await new Promise(resolve => setTimeout(resolve, 500)); // Brief wait for order to register
+
+        let verifyRes = null;
+        let verificationEndpoint = null;
+        for (const endpoint of ['https://www.okx.com', 'https://eea.okx.com']) {
+          try {
+            verifyRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', `/api/v5/trade/order?instId=${instId}&ordId=${ordId}`, '', endpoint);
+            if (verifyRes.code === '0') {
+              verificationEndpoint = endpoint;
+              break;
+            }
+          } catch (e) {
+            console.log(`[REBALANCE_EXECUTE] Verify GET to ${endpoint} failed: ${e.message}`);
+          }
+        }
+
+        if (!verifyRes || verifyRes.code !== '0' || !verifyRes.data?.[0]) {
+          console.error(`[REBALANCE_EXECUTE] VERIFICATION FAILED for ${item.ccy} ordId=${ordId}: ${verifyRes?.msg || 'No data'}`);
+          results.push({
+            asset: item.ccy,
+            orderId: ordId,
+            instId: instId,
+            requestedQty: sellQty,
+            status: 'VERIFICATION_FAILED',
+            error: verifyRes?.msg || 'Order verification failed'
+          });
+          break;
+        }
+
+        const verifiedOrder = verifyRes.data[0];
+        const verifiedInstId = verifiedOrder.instId;
+        
+        // Cross-check: does verified instId match requested instId?
+        if (verifiedInstId !== instId) {
+          console.error(`[REBALANCE_EXECUTE] INSTID MISMATCH: requested=${instId} but verified=${verifiedInstId}`);
+          results.push({
+            asset: item.ccy,
+            orderId: ordId,
+            requestedInstId: instId,
+            verifiedInstId: verifiedInstId,
+            status: 'INSTID_MISMATCH',
+            error: `InstId mismatch: expected ${instId}, got ${verifiedInstId}`
+          });
+          break;
+        }
+
+        // Save to map for later verification
+        orderMap.push({
+          ordId: ordId,
+          instId: instId,
+          ccy: item.ccy,
+          requestedQty: parseFloat(sellQty),
+          state: verifiedOrder.state,
+          accFillSz: parseFloat(verifiedOrder.accFillSz || 0),
+          avgPx: parseFloat(verifiedOrder.avgPx || 0),
+          timestamp: new Date().toISOString()
+        });
+
+        console.log(`[REBALANCE_EXECUTE] ${item.ccy} verified: ordId=${ordId} instId=${verifiedInstId} state=${verifiedOrder.state}`);
 
         // Refresh balance for this asset
+        await new Promise(resolve => setTimeout(resolve, 500));
         const afterBalance = await fetchLiveBalance(apiKey, apiSecret, passphrase, item.ccy);
         const qtyAfter = parseFloat(afterBalance?.availBal || 0);
         const qtySold = item.availBal - qtyAfter;
         const receivedUSDT = qtySold * item.price;
 
-        console.log(`[REBALANCE_EXECUTE] ${item.ccy} settled: sold=${qtySold.toFixed(6)}, after=${qtyAfter.toFixed(6)}`);
-
-        // Track key assets
-        if (['DOT', 'BTC', 'XRP'].includes(item.ccy)) {
-          tradeDetails[item.ccy] = {
-            qtyBefore: item.availBal,
-            qtySold: qtySold,
-            avgPrice: item.price,
-            receivedUSDT: receivedUSDT,
-            ordId: ordId,
-            qtyAfter: qtyAfter
-          };
-        }
-
         results.push({
           asset: item.ccy,
           orderId: ordId,
+          instId: instId,
           qtyBefore: item.availBal,
           qtySold: qtySold,
           avgPrice: item.price,
           receivedUSDT: receivedUSDT,
           qtyAfter: qtyAfter,
+          state: verifiedOrder.state,
           status: 'SUCCESS'
         });
 
@@ -284,7 +332,7 @@ Deno.serve(async (req) => {
           status: 'ERROR',
           error: err.message
         });
-        break; // Stop on error
+        break;
       }
     }
 
@@ -312,9 +360,10 @@ Deno.serve(async (req) => {
       },
       executedCount: results.filter(r => r.status === 'SUCCESS').length,
       totalExecutedUSDT: totalExecutedUSDT,
-      tradeDetails: tradeDetails, // DOT, BTC, XRP before/after
+      orderMap: orderMap, // Verified ordId -> instId mappings
       results: results,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      NOTE: 'For verification, pass orderMap to verifyRebalanceFills as orderMappings parameter'
     });
   } catch (err) {
     console.error(`[REBALANCE] Fatal error:`, err.message);
