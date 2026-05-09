@@ -180,9 +180,9 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
   const balance = connection?.balance_usdt ?? 0;
   const isLoadingBalance = connection?.loading && balance === 0;
   const totalTrades = Math.max(subscription?.total_trades || 0, trades.length);
-  // Real profit = current OKX balance (this IS the real balance, no calculations)
-  const realProfit = balance;
-  const totalProfit = balance;
+  const initialDeposit = 100; // Suzana's initial deposit
+  const realProfit = balance - initialDeposit; // Real P&L from OKX
+  const totalProfit = realProfit;
 
   return (
     <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-emerald-500/30 rounded-2xl p-6 mb-6">
@@ -238,13 +238,13 @@ function SuzanaAccountPanel({ connection, subscription, subs, bot, trades, refre
         </div>
 
         {/* Total Profit */}
-        <div className="bg-slate-800/70 rounded-xl p-4 border border-emerald-500/20">
-          <div className="text-xs text-slate-400 mb-1">Реален OKX Баланс</div>
-          <div className={`text-2xl font-bold text-emerald-400`}>
-            ${totalProfit.toFixed(2)}
+        <div className={`bg-slate-800/70 rounded-xl p-4 border ${totalProfit < 0 ? 'border-red-500/30' : 'border-emerald-500/20'}`}>
+          <div className="text-xs text-slate-400 mb-1">P&L (Депозит $100)</div>
+          <div className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            {totalProfit >= 0 ? '+' : ''}${totalProfit.toFixed(2)}
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            от OKX акаунта
+            Баланс $12.10 - Депозит $100
           </div>
         </div>
       </div>
