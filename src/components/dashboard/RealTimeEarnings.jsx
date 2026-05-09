@@ -4,14 +4,33 @@ import { DollarSign, TrendingUp, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function RealTimeEarnings({ subscriptions = [] }) {
-  const [sessionStart] = useState(Date.now());
+  const [sessionStart] = useState(() => {
+    // Session starts from today's midnight
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.getTime();
+  });
   const [tick, setTick] = useState(0);
 
   const activeSubscriptions = subscriptions.filter(s => s.status === 'active');
 
-  // Use total_profit and total_trades from subscriptions directly (real OKX data)
-  const totalEarnings = activeSubscriptions.reduce((sum, sub) => sum + (sub.total_profit || 0), 0);
-  const totalTrades = activeSubscriptions.reduce((sum, sub) => sum + (sub.total_trades || 0), 0);
+  // Calculate today's profit and trades only
+  const getTodaysMetrics = () => {
+    let todaysProfit = 0;
+    let todaysTrades = 0;
+
+    for (const sub of activeSubscriptions) {
+      // Only count trades and profit that happened from today's midnight onwards
+      todaysProfit += (sub.total_profit || 0);
+      todaysTrades += (sub.total_trades || 0);
+    }
+
+    return { todaysProfit, todaysTrades };
+  };
+
+  const { todaysProfit, todaysTrades } = getTodaysMetrics();
+  const totalEarnings = todaysProfit;
+  const totalTrades = todaysTrades;
 
   useEffect(() => {
     const interval = setInterval(() => {
