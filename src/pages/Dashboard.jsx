@@ -12,6 +12,7 @@ import MarketMetrics from '@/components/dashboard/MarketMetrics';
 import RealTradesSummary from '@/components/dashboard/RealTradesSummary';
 import AutomationHealthPanel from '@/components/dashboard/AutomationHealthPanel';
 import Robot1ExecutionViewer from '@/components/dashboard/Robot1ExecutionViewer';
+import PositionManager from '@/components/dashboard/PositionManager';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createPageUrl } from '../utils';
@@ -376,6 +377,11 @@ export default function Dashboard() {
         {/* Robot 1 Execution Viewer */}
         <div className="mb-8">
           <Robot1ExecutionViewer />
+        </div>
+
+        {/* Position Manager - Separate Legacy from Robot 1 */}
+        <div className="mb-8">
+          <PositionManager orders={liveOrders} />
         </div>
 
         {/* Real Trading Summary - Only Real OKX Data */}
