@@ -116,6 +116,31 @@ function validatePriceDifference(polygonPrice, okxPrice, maxDiffPct = 0.15) {
   };
 }
 
+async function logExecution(base44, decision, reason, data = {}) {
+  try {
+    const balanceRes = await fetch('https://www.okx.com/api/v5/account/balance', {
+      headers: { 'OK-ACCESS-KEY': '' }
+    }).catch(() => ({}));
+    
+    await base44.asServiceRole.entities.Robot1ExecutionLog.create({
+      execution_time: new Date().toISOString(),
+      decision,
+      reason,
+      active_position: data.activePosition || false,
+      position_symbol: data.positionSymbol || null,
+      position_qty: data.positionQty || null,
+      last_order_id: data.orderId || null,
+      okx_status: data.okxStatus || 'OK',
+      polygon_status: data.polygonStatus || 'OK',
+      free_usdt: data.freeUsdt || 0,
+      signal_data: data.signalData || null,
+      error_message: data.errorMessage || null
+    });
+  } catch (err) {
+    console.error(`[ROBOT1] Log creation failed: ${err.message}`);
+  }
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -139,6 +164,10 @@ Deno.serve(async (req) => {
       console.log(`[ROBOT1] Polygon signal: ${JSON.stringify(polygonSignal)}`);
     } catch (err) {
       console.error(`[ROBOT1] Polygon fetch failed: ${err.message}`);
+      await logExecution(base44, 'ERROR', `Polygon unavailable: ${err.message}`, {
+        polygonStatus: 'UNAVAILABLE',
+        errorMessage: err.message
+      });
       return Response.json({
         error: 'Polygon signal unavailable',
         reason: err.message
@@ -159,6 +188,7 @@ Deno.serve(async (req) => {
     });
 
     if (conns.length === 0) {
+      await logExecution(base44, 'ERROR', 'No OKX connection found', { okxStatus: 'FAILED' });
       return Response.json({ error: 'No OKX connection' }, { status: 400 });
     }
 
@@ -188,6 +218,10 @@ Deno.serve(async (req) => {
 
     if (!priceCheck.valid) {
       console.log(`[ROBOT1] PRICE MISMATCH: Polygon=${polygonSignal.polygonPrice} OKX=${okxPrice} diff=${priceCheck.diff}%`);
+      await logExecution(base44, 'WAIT', `Price skew ${priceCheck.diff}% (spread too high)`, {
+        freeUsdt: usdtBalance,
+        signalData: polygonSignal
+      });
       return Response.json({
         status: 'PRICE_SKEW',
         polygonSignal: polygonSignal,
@@ -221,18 +255,25 @@ Deno.serve(async (req) => {
       const shouldSell = sellGain || sellLoss || polygonSellSignal;
 
       if (!shouldSell) {
-        console.log(`[ROBOT1] Holding: P&L=${unrealizedPnLPct}%, Polygon=${polygonSignal.signal}`);
-        return Response.json({
-          status: 'HOLDING',
-          polygonSignal: polygonSignal,
-          okxPrice: okxPrice,
-          priceDifference: priceCheck.diff,
-          decision: 'HOLD',
-          reason: `P&L=${unrealizedPnLPct}%, need +2% or -1%, Polygon=${polygonSignal.signal}`,
-          ordId: null,
-          verifiedFill: null
-        });
-      }
+         console.log(`[ROBOT1] Holding: P&L=${unrealizedPnLPct}%, Polygon=${polygonSignal.signal}`);
+         await logExecution(base44, 'WAIT', `Active position waiting (P&L=${unrealizedPnLPct}%, trend=${polygonSignal.trend})`, {
+           activePosition: true,
+           positionSymbol: 'ETH-USDT',
+           positionQty: qty,
+           freeUsdt: usdtBalance,
+           signalData: polygonSignal
+         });
+         return Response.json({
+           status: 'HOLDING',
+           polygonSignal: polygonSignal,
+           okxPrice: okxPrice,
+           priceDifference: priceCheck.diff,
+           decision: 'HOLD',
+           reason: `P&L=${unrealizedPnLPct}%, need +2% or -1%, Polygon=${polygonSignal.signal}`,
+           ordId: null,
+           verifiedFill: null
+         });
+       }
 
       // Execute SELL
       console.log(`[ROBOT1] SELL SIGNAL: gain=${sellGain}, loss=${sellLoss}, polygon=${polygonSellSignal}`);
@@ -248,17 +289,25 @@ Deno.serve(async (req) => {
       const sellRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST', '/api/v5/trade/order', sellOrderBody);
 
       if (sellRes.code !== '0') {
-        console.error(`[ROBOT1] SELL FAILED: ${sellRes.msg}`);
-        return Response.json({
-          status: 'SELL_ERROR',
-          polygonSignal: polygonSignal,
-          okxPrice: okxPrice,
-          priceDifference: priceCheck.diff,
-          decision: 'SELL_FAILED',
-          reason: sellRes.msg,
-          ordId: null
-        }, { status: 400 });
-      }
+         console.error(`[ROBOT1] SELL FAILED: ${sellRes.msg}`);
+         await logExecution(base44, 'ERROR', `OKX verification failed: ${sellRes.msg}`, {
+           okxStatus: 'FAILED',
+           activePosition: true,
+           positionSymbol: 'ETH-USDT',
+           positionQty: qty,
+           freeUsdt: usdtBalance,
+           errorMessage: sellRes.msg
+         });
+         return Response.json({
+           status: 'SELL_ERROR',
+           polygonSignal: polygonSignal,
+           okxPrice: okxPrice,
+           priceDifference: priceCheck.diff,
+           decision: 'SELL_FAILED',
+           reason: sellRes.msg,
+           ordId: null
+         }, { status: 400 });
+       }
 
       const ordId = sellRes.data?.[0]?.ordId;
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -298,13 +347,20 @@ Deno.serve(async (req) => {
 
       console.log(`[ROBOT1] SOLD: ordId=${ordId}, realized=${realizedPnL.toFixed(2)} USDT`);
 
+      const sellReason = sellGain ? 'Profit +2%' : sellLoss ? 'Loss -1%' : 'Polygon reversal';
+      await logExecution(base44, 'SELL', sellReason, {
+        orderId: ordId,
+        freeUsdt: usdtBalance,
+        signalData: polygonSignal
+      });
+
       return Response.json({
         status: 'SOLD',
         polygonSignal: polygonSignal,
         okxPrice: okxPrice,
         priceDifference: priceCheck.diff,
         decision: 'SELL_EXECUTED',
-        reason: sellGain ? 'Profit +2%' : sellLoss ? 'Loss -1%' : 'Polygon reversal',
+        reason: sellReason,
         ordId: ordId,
         verifiedFill: {
           fillSz: fillSz,
@@ -314,12 +370,16 @@ Deno.serve(async (req) => {
           realizedPnLPct: realizedPnLPct
         }
       });
-    }
+      }
 
     // ─── CASE B: NO POSITION → CHECK BUY ────────────────────────────────
     console.log(`[ROBOT1] No position. Polygon signal: ${polygonSignal.signal}`);
 
     if (!polygonSignal.signal || polygonSignal.signal !== 'BUY') {
+      await logExecution(base44, 'WAIT', `No BUY signal (Polygon signal=${polygonSignal.signal}, trend=${polygonSignal.trend})`, {
+        freeUsdt: usdtBalance,
+        signalData: polygonSignal
+      });
       return Response.json({
         status: 'READY_NO_BUY',
         polygonSignal: polygonSignal,
@@ -337,6 +397,12 @@ Deno.serve(async (req) => {
 
     // Check resources
     if (ethBalance > 0 || usdtBalance < 10) {
+      const insuffReason = ethBalance > 0 ? `ETH=${ethBalance} (must be 0)` : `USDT=${usdtBalance} (need >10)`;
+      await logExecution(base44, 'WAIT', `Insufficient USDT: ${insuffReason}`, {
+        freeUsdt: usdtBalance,
+        signalData: polygonSignal,
+        errorMessage: insuffReason
+      });
       return Response.json({
         status: 'READY_NO_BUY',
         polygonSignal: polygonSignal,
@@ -366,6 +432,12 @@ Deno.serve(async (req) => {
 
     if (buyRes.code !== '0') {
       console.error(`[ROBOT1] BUY FAILED: ${buyRes.msg}`);
+      await logExecution(base44, 'ERROR', `OKX verification failed: ${buyRes.msg}`, {
+        okxStatus: 'FAILED',
+        freeUsdt: usdtBalance,
+        signalData: polygonSignal,
+        errorMessage: buyRes.msg
+      });
       return Response.json({
         status: 'BUY_ERROR',
         polygonSignal: polygonSignal,
@@ -418,6 +490,15 @@ Deno.serve(async (req) => {
 
     console.log(`[ROBOT1] BUY EXECUTED: ordId=${buyOrdId}, qty=${buyFillSz}, px=${buyFillPx}`);
 
+    await logExecution(base44, 'BUY', `Polygon BUY signal (trend=${polygonSignal.trend})`, {
+      orderId: buyOrdId,
+      activePosition: true,
+      positionSymbol: 'ETH-USDT',
+      positionQty: buyFillSz,
+      freeUsdt: usdtBalance,
+      signalData: polygonSignal
+    });
+
     return Response.json({
       status: 'BOUGHT',
       polygonSignal: polygonSignal,
@@ -432,8 +513,9 @@ Deno.serve(async (req) => {
         fee: buyFee
       }
     });
-  } catch (err) {
+    } catch (err) {
     console.error(`[ROBOT1] Exception: ${err.message}`);
+    await logExecution(base44, 'ERROR', `Exception: ${err.message}`, { errorMessage: err.message });
     return Response.json({ error: err.message }, { status: 500 });
-  }
-});
+    }
+    });

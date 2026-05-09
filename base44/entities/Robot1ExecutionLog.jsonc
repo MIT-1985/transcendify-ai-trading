@@ -1,0 +1,75 @@
+{
+  "name": "Robot1ExecutionLog",
+  "type": "object",
+  "properties": {
+    "execution_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When robot1Execute ran"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "BUY",
+        "SELL",
+        "WAIT",
+        "ERROR"
+      ],
+      "description": "Trading decision made"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Why this decision was made"
+    },
+    "active_position": {
+      "type": "boolean",
+      "description": "Is there an open position"
+    },
+    "position_symbol": {
+      "type": "string",
+      "description": "Symbol of active position (ETH-USDT or SOL-USDT)"
+    },
+    "position_qty": {
+      "type": "number",
+      "description": "Quantity in active position"
+    },
+    "last_order_id": {
+      "type": "string",
+      "description": "OKX order ID from this execution"
+    },
+    "okx_status": {
+      "type": "string",
+      "enum": [
+        "OK",
+        "FAILED",
+        "NOT_VERIFIED"
+      ],
+      "description": "OKX API verification status"
+    },
+    "polygon_status": {
+      "type": "string",
+      "enum": [
+        "OK",
+        "UNAVAILABLE",
+        "NO_SIGNAL"
+      ],
+      "description": "Polygon.io signal status"
+    },
+    "free_usdt": {
+      "type": "number",
+      "description": "Free USDT balance at time of execution"
+    },
+    "signal_data": {
+      "type": "object",
+      "description": "Raw signal from Polygon (trend, momentum, etc)"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error details if decision is ERROR"
+    }
+  },
+  "required": [
+    "execution_time",
+    "decision"
+  ]
+}

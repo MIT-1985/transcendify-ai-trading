@@ -10,6 +10,7 @@ import RealTimeEarnings from '@/components/dashboard/RealTimeEarnings';
 import CryptoChart from '@/components/dashboard/CryptoChart';
 import MarketMetrics from '@/components/dashboard/MarketMetrics';
 import RealTradesSummary from '@/components/dashboard/RealTradesSummary';
+import AutomationHealthPanel from '@/components/dashboard/AutomationHealthPanel';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createPageUrl } from '../utils';
@@ -365,6 +366,9 @@ export default function Dashboard() {
             </pre>
           )}
         </div>
+
+        {/* Automation Health Panel */}
+        <AutomationHealthPanel />
 
         {/* Real Trading Summary - Only Real OKX Data */}
         <div>
