@@ -74,20 +74,28 @@ Deno.serve(async (req) => {
     const mode = dryRun ? 'REBALANCE_PREVIEW' : 'REBALANCE_EXECUTE';
     console.log(`[${mode}] Starting by ${user.email}`);
 
-    const userEmail = isSuzana ? suzanaEmail : user.email;
+    // Always use Suzana's connection for now
+    const targetEmail = suzanaEmail;
 
-    // Get OKX connection
-    const conns = await base44.asServiceRole.entities.ExchangeConnection.filter({
-      exchange: 'okx',
-      status: 'connected',
-      $or: [{ created_by: userEmail }, { user_email: userEmail }]
+    // Get OKX connection - match getSuzanaBalance approach
+    const [byCreator, byEmail] = await Promise.all([
+      base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: targetEmail, exchange: 'okx' }),
+      base44.asServiceRole.entities.ExchangeConnection.filter({ user_email: targetEmail, exchange: 'okx' })
+    ]);
+
+    const seen = new Set();
+    let conns = [...byCreator, ...byEmail].filter(c => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
     });
 
     if (conns.length === 0) {
-      return Response.json({ error: 'No OKX connection found' }, { status: 400 });
+      return Response.json({ error: 'No OKX connection found for Suzana' }, { status: 400 });
     }
 
     const conn = conns[0];
+    
     const apiKey = await decryptOkx(conn.api_key_encrypted);
     const apiSecret = await decryptOkx(conn.api_secret_encrypted);
     const passphrase = await decryptOkx(conn.encryption_iv);
@@ -96,18 +104,21 @@ Deno.serve(async (req) => {
     let balances = [];
     for (const endpoint of ['https://www.okx.com', 'https://eea.okx.com']) {
       try {
+        console.log(`[${mode}] Fetching balances from ${endpoint}...`);
         const res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance', '', endpoint);
+        console.log(`[${mode}] Balance response code: ${res.code}`);
         if (res.code === '0' && res.data?.[0]?.details) {
           balances = res.data[0].details;
-          console.log(`[REBALANCE] Fetched balances from ${endpoint}: ${balances.length} assets`);
+          console.log(`[${mode}] Fetched balances from ${endpoint}: ${balances.length} assets`);
           break;
         }
       } catch (e) {
-        console.log(`[REBALANCE] Balance fetch from ${endpoint} failed: ${e.message}`);
+        console.log(`[${mode}] Balance fetch from ${endpoint} failed: ${e.message}`);
       }
     }
 
     if (balances.length === 0) {
+      console.log(`[${mode}] Failed to fetch balances from either endpoint`);
       return Response.json({ error: 'Could not fetch OKX balances' }, { status: 500 });
     }
 
