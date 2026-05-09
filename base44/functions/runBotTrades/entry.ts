@@ -234,17 +234,11 @@ Deno.serve(async (req) => {
         const vipBoost = vipBoosts[vipLevel] || 0;
         const feeDiscount = feeDiscounts[vipLevel] || 0;
 
-        // Robot 1: Trade max 1-2 pairs only
-        const tradingPairs = (sub.trading_pairs || ['BTC-USDT']).slice(0, 2);
-        const symbol = tradingPairs[Math.floor(Math.random() * tradingPairs.length)];
-        // Position size based on FREE USDT available, not total capital
-        // Robot 1: Conservative $5-10 per trade
-        const freeUsdt = hasUsdt ? usdtTotal : 0;
-        const positionSize = Math.min(10, freeUsdt * 0.5); // max 50% of free USDT, max $10
-        if (positionSize < 5) {
-          console.log(`[SKIP] Insufficient free USDT: ${freeUsdt.toFixed(2)}`);
-          continue;
-        }
+        // ---- ROBOT 1: ONLY ETH-USDT OR SOL-USDT ----
+        const ALLOWED_PAIRS = ['ETH-USDT', 'SOL-USDT'];
+        const symbol = ALLOWED_PAIRS[Math.floor(Math.random() * ALLOWED_PAIRS.length)];
+        
+        console.log(`[BOT_DECISION] User=${userEmail} pair=${symbol} freeUSDT=${freeUsdt.toFixed(2)}`);
 
         // Fetch real OKX price for the instrument
         let instIdForPrice = symbol.replace('X:', '').replace('/', '-');
@@ -274,29 +268,71 @@ Deno.serve(async (req) => {
         const candlesData = await candlesRes.json();
         const candles = candlesData.results || [];
 
-        // Check for open POSITION for this instId from real OKX balance
-        // openPosition = any asset balance > 0.0001
-        const instIdAsset = instIdForPrice.split('-')[0];
-        const assetBal = balanceDetails?.find(d => d.ccy === instIdAsset);
-        const hasOpenPos = assetBal && parseFloat(assetBal.availBal || 0) > 0.0001;
-
-        // Robot 1 decision: BUY only if no open position, SELL only if position exists
-        const { signal, confidence } = calcSignal(candles, currentPrice, sub.stop_loss, sub.take_profit);
-        const isBuy = !hasOpenPos; // BUY only if NO open position for this asset
+        // ---- CRITICAL: Build openPositions from live filled OKX orders (FIFO) ----
+        const instIdAsset = symbol.split('-')[0]; // ETH or SOL
+        let openPositions = {}; // { 'ETH': { qty: 1.5, cost: 5000 }, ... }
         
-        // If trying to BUY but already have open position → SKIP this pair
+        try {
+          // Fetch filled orders from getSuzanaOrders (live OKX data)
+          const filledOrdersRes = await base44.asServiceRole.functions.invoke('getSuzanaOrders', { userEmail });
+          const filledOrders = filledOrdersRes.data?.orders || [];
+          
+          // Build FIFO positions
+          for (const order of filledOrders) {
+            if (order.instId === symbol) {
+              const asset = order.instId.split('-')[0];
+              if (!openPositions[asset]) openPositions[asset] = { qty: 0, cost: 0 };
+              
+              if (order.side === 'BUY') {
+                openPositions[asset].qty += order.filledQty;
+                openPositions[asset].cost += order.filledQty * order.filledPrice;
+              } else {
+                openPositions[asset].qty -= order.filledQty;
+                if (openPositions[asset].qty < 0) openPositions[asset].qty = 0;
+              }
+            }
+          }
+        } catch (e) {
+          console.log(`[SKIP_REASON] Could not fetch live orders: ${e.message}`);
+          continue;
+        }
+        
+        const assetOpenQty = openPositions[instIdAsset]?.qty || 0;
+        const hasOpenPos = assetOpenQty > 0.0001;
+        
+        // ---- POSITION SIZE: min(freeUSDT * 0.15, $20) ----
+        const positionSize = Math.min(freeUsdt * 0.15, 20);
+        const OKX_MIN_NOTIONAL = 5; // OKX min $5
+        if (positionSize < OKX_MIN_NOTIONAL) {
+          console.log(`[SKIP_REASON] positionSize=${positionSize.toFixed(2)} < OKX_MIN=${OKX_MIN_NOTIONAL}`);
+          continue;
+        }
+        
+        // ---- DECISION: BUY only if NO open position, SELL only if position exists ----
+        const isBuy = !hasOpenPos;
+        
         if (isBuy && hasOpenPos) {
-          console.log(`[ROBOT-1] SKIP ${instIdAsset}: already has open position`);
+          console.log(`[SKIP_REASON] ${instIdAsset} has open qty=${assetOpenQty.toFixed(6)}, cannot BUY`);
           continue;
         }
         
-        // If trying to SELL but no position → SKIP
         if (!isBuy && !hasOpenPos) {
-          console.log(`[ROBOT-1] SKIP ${instIdAsset}: no open position to SELL`);
+          console.log(`[SKIP_REASON] ${instIdAsset} no open position, cannot SELL`);
           continue;
         }
         
-        console.log(`[ROBOT-1] ACTION: ${finalIsBuy ? 'BUY' : 'SELL'} ${instIdAsset} amount=${positionSize.toFixed(2)} USDT`);
+        // ---- FOR SELL: check live OKX balance ----
+        if (!isBuy) {
+          const assetBal = balanceDetails?.find(d => d.ccy === instIdAsset);
+          const assetAvail = assetBal ? parseFloat(assetBal.availBal || 0) : 0;
+          if (assetAvail < 0.0001) {
+            console.log(`[SKIP_REASON] ${instIdAsset} balance=${assetAvail.toFixed(6)} below min size`);
+            continue;
+          }
+        }
+        
+        const finalIsBuy = isBuy;
+        console.log(`[BOT_DECISION] ${finalIsBuy ? 'BUY' : 'SELL'} ${symbol} size=${positionSize.toFixed(2)} USDT openQty=${assetOpenQty.toFixed(6)}`);
         
         const isWin = Math.random() < confidence;
 
@@ -355,61 +391,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        // ---- CHECK REAL BALANCE FOR ADAPTIVE BUY/SELL ----
-        let hasUsdt = false;
-        let hasAsset = false;
-        let adaptiveIsBuy = isBuy; // Default to the calculated isBuy
-        
-        if (isSuzana && isLive && exchange?.toLowerCase() === 'okx' && conn) {
-          try {
-            const apiKey = await decryptOkx(conn.api_key_encrypted);
-            const apiSecret = await decryptOkx(conn.api_secret_encrypted);
-            const passphrase = await decryptOkx(conn.encryption_iv);
-            
-            // Get account balance from OKX - structure: {data: [{details: [{ccy, availBal, frozenBal}]}]}
-            const balResPath = '/api/v5/account/balance';
-            let balanceDetails = null;
-            for (const ep of ['https://www.okx.com', 'https://eea.okx.com']) {
-              try {
-                const br = await okxRequest(apiKey, apiSecret, passphrase, 'GET', balResPath, '', ep);
-                if (br.code === '0' && br.data?.[0]?.details) { 
-                  balanceDetails = br.data[0].details; // Extract the details array
-                  break; 
-                }
-              } catch (e) {}
-            }
-            
-            if (balanceDetails) {
-              // Check USDT balance from details array
-              const usdtBal = balanceDetails.find(d => d.ccy === 'USDT');
-              const usdtTotal = usdtBal ? (parseFloat(usdtBal.availBal) || 0) + (parseFloat(usdtBal.frozenBal) || 0) : 0;
-              hasUsdt = usdtTotal > positionSize;
-              
-              // Check asset balance from details array
-              const assetCode = instIdForPrice.split('-')[0];
-              const assetBal = balanceDetails.find(d => d.ccy === assetCode);
-              const assetAvail = assetBal ? parseFloat(assetBal.availBal) || 0 : 0;
-              hasAsset = assetAvail > 0.0001;
-              
-              // Adaptive decision: if have asset AND open position → SELL, else if have USDT → BUY
-              if (hasAsset && openPosition) {
-                adaptiveIsBuy = false; // Sell the asset to close position
-              } else if (hasUsdt) {
-                adaptiveIsBuy = true;  // Buy more
-              } else {
-                console.log(`[SKIP-TRADE] Insufficient balance: USDT=${usdtTotal.toFixed(2)}, ${assetCode}=${assetAvail.toFixed(6)}`);
-                continue;
-              }
-              
-              console.log(`[ADAPTIVE] ${assetCode}: adapt=${!adaptiveIsBuy ? 'SELL' : 'BUY'} | USDT=${usdtTotal.toFixed(2)} | Asset=${assetAvail.toFixed(6)}`);
-            }
-          } catch (e) {
-            console.log(`[BALANCE-CHECK] Error: ${e.message}`);
-          }
-        }
-        
-        // Use adaptive isBuy for OKX live, else use calculated
-        const finalIsBuy = (isSuzana && isLive && exchange?.toLowerCase() === 'okx') ? adaptiveIsBuy : isBuy;
+
 
         // ---- LIVE EXECUTION ----
         if (isLive && conn) {
