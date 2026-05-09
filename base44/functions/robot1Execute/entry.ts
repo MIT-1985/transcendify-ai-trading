@@ -87,7 +87,6 @@ Deno.serve(async (req) => {
 
     // ─── Check if we have an active BUY waiting for SELL ─────────────────
     const activeBuys = await base44.asServiceRole.entities.Trade.filter({
-      created_by: suzanaEmail,
       symbol: 'ETH-USDT',
       side: 'BUY',
       execution_mode: 'MAINNET',
@@ -95,103 +94,205 @@ Deno.serve(async (req) => {
     });
 
     const pendingBuy = activeBuys.find(t => !t.exit_price); // No exit_price = still open
-    if (pendingBuy) {
-      console.log(`[ROBOT1] Active BUY found (entry at ${pendingBuy.entry_price}), waiting for SELL condition`);
+    
+    const body = await req.json().catch(() => ({}));
+    const decisionOnly = body.decisionOnly === true;
+    
+    if (!pendingBuy && decisionOnly) {
+      console.log(`[ROBOT1] DECISION: No active BUY position`);
       return Response.json({
-        status: 'WAITING_FOR_SELL',
-        message: 'Active BUY position exists, waiting for SELL signal',
-        pendingBuyId: pendingBuy.id,
-        entryPrice: pendingBuy.entry_price,
-        quantity: pendingBuy.quantity
+        status: 'NO_POSITION',
+        message: 'No active BUY position. Ready for next BUY.',
+        activeBuyCount: activeBuys.length
+      });
+    }
+    
+    if (!pendingBuy) {
+      // Auto-create BUY if no position exists
+      console.log(`[ROBOT1] No active position, creating new BUY order`);
+      
+      const buySize = (Math.random() * 5 + 5).toFixed(2); // 5-10
+      const orderBody = JSON.stringify({
+        instId: 'ETH-USDT',
+        tdMode: 'cash',
+        side: 'buy',
+        ordType: 'market',
+        sz: buySize,
+        tgtCcy: 'quote_ccy'
+      });
+
+      const orderRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST', '/api/v5/trade/order', orderBody);
+      
+      if (orderRes.code !== '0') {
+        console.error(`[ROBOT1] BUY FAILED: ${orderRes.msg}`);
+        return Response.json({
+          status: 'ERROR',
+          okxCode: orderRes.code,
+          errorMessage: orderRes.msg
+        }, { status: 400 });
+      }
+
+      const ordId = orderRes.data?.[0]?.ordId;
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const verifyRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', `/api/v5/trade/order?instId=ETH-USDT&ordId=${ordId}`);
+      
+      if (verifyRes.code !== '0' || !verifyRes.data?.[0]) {
+        return Response.json({
+          status: 'VERIFY_FAILED',
+          okxCode: verifyRes.code,
+          errorMessage: verifyRes.msg
+        }, { status: 400 });
+      }
+
+      const verified = verifyRes.data[0];
+      
+      if (verified.state !== 'filled' && verified.state !== 'part_filled') {
+        return Response.json({
+          status: 'NOT_FILLED_YET',
+          ordId: ordId,
+          state: verified.state
+        });
+      }
+
+      const filledQty = parseFloat(verified.accFillSz || 0);
+      const avgPrice = parseFloat(verified.avgPx || 0);
+
+      const tradeRecord = await base44.asServiceRole.entities.Trade.create({
+        subscription_id: 'robot1',
+        symbol: 'ETH-USDT',
+        side: 'BUY',
+        quantity: filledQty,
+        price: avgPrice,
+        entry_price: avgPrice,
+        total_value: filledQty * avgPrice,
+        fee: parseFloat(verified.fee || 0),
+        execution_mode: 'MAINNET',
+        strategy_used: 'robot1',
+        timestamp: new Date(parseInt(verified.cTime)).toISOString(),
+        profit_loss: 0
+      });
+
+      console.log(`[ROBOT1] BUY created. Continuing to DECISION mode...`);
+      // Now fetch fresh activeBuys and continue to decision
+      const freshBuys = await base44.asServiceRole.entities.Trade.filter({
+        symbol: 'ETH-USDT',
+        side: 'BUY',
+        execution_mode: 'MAINNET',
+        strategy_used: 'robot1'
+      });
+      
+      const newPending = freshBuys.find(t => !t.exit_price);
+      if (!newPending) {
+        return Response.json({ status: 'ERROR', message: 'Created BUY but could not fetch it' }, { status: 500 });
+      }
+      
+      // Continue with decision logic below using newPending
+      const entryPrice = newPending.entry_price;
+      const quantity = newPending.quantity;
+      
+      const tickerRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/market/ticker?instId=ETH-USDT');
+      const currentPrice = parseFloat(tickerRes.data?.[0]?.last || 0);
+
+      const unrealizedPnL = (currentPrice - entryPrice) * quantity;
+      const unrealizedPnLPct = ((currentPrice - entryPrice) / entryPrice * 100).toFixed(2);
+
+      const sellConditionGain = currentPrice >= entryPrice * 1.02;
+      const sellConditionLoss = currentPrice <= entryPrice * 0.99;
+      const sellConditionMet = sellConditionGain || sellConditionLoss;
+
+      let reason = 'None yet';
+      if (sellConditionGain) {
+        reason = `Gain reached: +${unrealizedPnLPct}%`;
+      } else if (sellConditionLoss) {
+        reason = `Loss reached: ${unrealizedPnLPct}%`;
+      } else {
+        const nextGain = (entryPrice * 1.02 - currentPrice).toFixed(2);
+        const nextLoss = (currentPrice - entryPrice * 0.99).toFixed(2);
+        reason = `Waiting: +${nextGain} USDT for gain, or -${nextLoss} USDT for loss stop`;
+      }
+
+      return Response.json({
+        status: 'DECISION_MADE',
+        mode: 'AUTO_BUY_THEN_DECISION',
+        activePosition: {
+          tradeId: newPending.id,
+          quantity: quantity,
+          entryPrice: entryPrice,
+          currentPrice: currentPrice,
+          unrealizedPnL: parseFloat(unrealizedPnL.toFixed(2)),
+          unrealizedPnLPct: parseFloat(unrealizedPnLPct),
+          totalValue: parseFloat((currentPrice * quantity).toFixed(2))
+        },
+        sellCondition: {
+          conditionMet: sellConditionMet,
+          gainTarget: entryPrice * 1.02,
+          lossStop: entryPrice * 0.99,
+          reason: reason
+        },
+        lastVerifiedOrdId: ordId,
+        message: sellConditionMet ? 'SELL CONDITION MET' : 'WAITING FOR SELL CONDITION'
       });
     }
 
-    // ─── Place market BUY 5–10 USDT (random in range) ─────────────────────
-    const buySize = (Math.random() * 5 + 5).toFixed(2); // 5-10
-    console.log(`[ROBOT1] Placing BUY order sz=${buySize} USDT`);
+    // ─── Decision mode: analyze active position ──────────────────────────
+    console.log(`[ROBOT1] DECISION MODE: Analyzing position (entry=${pendingBuy.entry_price})`);
 
-    const orderBody = JSON.stringify({
-      instId: 'ETH-USDT',
-      tdMode: 'cash',
-      side: 'buy',
-      ordType: 'market',
-      sz: buySize,
-      tgtCcy: 'quote_ccy'
-    });
+    // Fetch current ETH price
+    const tickerRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/market/ticker?instId=ETH-USDT');
+    const currentPrice = parseFloat(tickerRes.data?.[0]?.last || 0);
 
-    const orderRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST', '/api/v5/trade/order', orderBody);
-    
-    if (orderRes.code !== '0') {
-      console.error(`[ROBOT1] BUY FAILED: ${orderRes.msg}`);
+    if (currentPrice === 0) {
       return Response.json({
-        status: 'ERROR',
-        okxCode: orderRes.code,
-        errorMessage: orderRes.msg
-      }, { status: 400 });
+        status: 'PRICE_FETCH_FAILED',
+        message: 'Could not fetch current ETH price'
+      }, { status: 500 });
     }
 
-    const ordId = orderRes.data?.[0]?.ordId;
-    if (!ordId) {
-      return Response.json({ status: 'ERROR', errorMessage: 'No ordId returned' }, { status: 500 });
+    // Calculate unrealized P&L
+    const entryPrice = pendingBuy.entry_price;
+    const quantity = pendingBuy.quantity;
+    const unrealizedPnL = (currentPrice - entryPrice) * quantity;
+    const unrealizedPnLPct = ((currentPrice - entryPrice) / entryPrice * 100).toFixed(2);
+
+    // SELL condition: +2% gain OR -1% loss (simple rules)
+    const sellConditionGain = currentPrice >= entryPrice * 1.02; // +2%
+    const sellConditionLoss = currentPrice <= entryPrice * 0.99; // -1%
+    const sellConditionMet = sellConditionGain || sellConditionLoss;
+
+    let reason = 'None yet';
+    if (sellConditionGain) {
+      reason = `Gain reached: +${unrealizedPnLPct}%`;
+    } else if (sellConditionLoss) {
+      reason = `Loss reached: ${unrealizedPnLPct}%`;
+    } else {
+      const nextGain = (entryPrice * 1.02 - currentPrice).toFixed(2);
+      const nextLoss = (currentPrice - entryPrice * 0.99).toFixed(2);
+      reason = `Waiting: +${nextGain} USDT for gain target, or -${nextLoss} USDT for loss stop`;
     }
 
-    // ─── Verify order immediately ────────────────────────────────────────
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const verifyRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', `/api/v5/trade/order?instId=ETH-USDT&ordId=${ordId}`);
-    
-    if (verifyRes.code !== '0' || !verifyRes.data?.[0]) {
-      console.error(`[ROBOT1] VERIFY FAILED: ${verifyRes.msg}`);
-      return Response.json({
-        status: 'VERIFY_FAILED',
-        okxCode: verifyRes.code,
-        errorMessage: verifyRes.msg
-      }, { status: 400 });
-    }
-
-    const verified = verifyRes.data[0];
-    
-    // Only save if FILLED or PARTIALLY_FILLED
-    if (verified.state !== 'filled' && verified.state !== 'part_filled') {
-      console.log(`[ROBOT1] Order not filled yet, state=${verified.state}`);
-      return Response.json({
-        status: 'NOT_FILLED_YET',
-        ordId: ordId,
-        state: verified.state
-      });
-    }
-
-    // ─── Save verified order to Trade entity ─────────────────────────────
-    const filledQty = parseFloat(verified.accFillSz || 0);
-    const avgPrice = parseFloat(verified.avgPx || 0);
-
-    const tradeRecord = await base44.asServiceRole.entities.Trade.create({
-      subscription_id: 'robot1', // Placeholder
-      symbol: 'ETH-USDT',
-      side: 'BUY',
-      quantity: filledQty,
-      price: avgPrice,
-      entry_price: avgPrice,
-      total_value: filledQty * avgPrice,
-      fee: parseFloat(verified.fee || 0),
-      execution_mode: 'MAINNET',
-      strategy_used: 'robot1',
-      timestamp: new Date(parseInt(verified.cTime)).toISOString(),
-      profit_loss: 0 // Not set until SELL
-    });
-
-    console.log(`[ROBOT1] BUY verified and saved. ordId=${ordId} tradeId=${tradeRecord.id} qty=${filledQty} avgPx=${avgPrice}`);
+    console.log(`[ROBOT1] DECISION: Price=${currentPrice} Entry=${entryPrice} PnL=${unrealizedPnLPct}% SellMet=${sellConditionMet}`);
 
     return Response.json({
-      status: 'BUY_VERIFIED',
-      ordId: ordId,
-      tradeId: tradeRecord.id,
-      state: verified.state,
-      quantity: filledQty,
-      avgPrice: avgPrice,
-      totalValue: filledQty * avgPrice,
-      fee: parseFloat(verified.fee || 0),
-      message: 'BUY filled and verified. Waiting for SELL condition.'
+      status: 'DECISION_MADE',
+      mode: 'DECISION_ONLY',
+      activePosition: {
+        tradeId: pendingBuy.id,
+        quantity: quantity,
+        entryPrice: entryPrice,
+        currentPrice: currentPrice,
+        unrealizedPnL: parseFloat(unrealizedPnL.toFixed(2)),
+        unrealizedPnLPct: parseFloat(unrealizedPnLPct),
+        totalValue: parseFloat((currentPrice * quantity).toFixed(2))
+      },
+      sellCondition: {
+        conditionMet: sellConditionMet,
+        gainTarget: entryPrice * 1.02,
+        lossStop: entryPrice * 0.99,
+        reason: reason
+      },
+      lastVerifiedOrdId: pendingBuy.id,
+      message: sellConditionMet ? 'SELL CONDITION MET' : 'WAITING FOR SELL CONDITION'
     });
   } catch (err) {
     console.error(`[ROBOT1] Exception: ${err.message}`);
