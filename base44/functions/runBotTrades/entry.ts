@@ -220,8 +220,13 @@ Deno.serve(async (req) => {
         const candlesData = await candlesRes.json();
         const candles = candlesData.results || [];
 
+        // Check for open BUY position (last trade for this sub with no exit_price)
+        const recentTrades = await base44.asServiceRole.entities.Trade.filter({ subscription_id: sub.id });
+        const openPosition = recentTrades.find(t => t.side === 'BUY' && !t.exit_price && t.execution_mode === 'MAINNET');
+
+        // If open position exists → SELL to close it, otherwise BUY
         const { signal, confidence } = calcSignal(candles, currentPrice, sub.stop_loss, sub.take_profit);
-        const isBuy = signal === 'BUY';
+        const isBuy = openPosition ? false : (signal === 'BUY');
         const isWin = Math.random() < confidence;
 
         // Profit simulation (used for SIM mode and for recording)
@@ -317,9 +322,16 @@ Deno.serve(async (req) => {
           }
         }
 
-        const profit = executionMode === 'MAINNET'
-          ? 0 // real P&L tracked separately when position closes
-          : Number(((positionSize * profitPct) / 100 - fee).toFixed(2));
+        // Calculate profit: for MAINNET SELL closing a position, use real entry vs exit price
+        let profit;
+        if (executionMode === 'MAINNET' && !isBuy && openPosition) {
+          const realPnl = (realAvgPrice - openPosition.entry_price) * openPosition.quantity;
+          profit = Number(realPnl.toFixed(2));
+        } else if (executionMode === 'MAINNET') {
+          profit = 0; // BUY opens a position, P&L is 0 until closed
+        } else {
+          profit = Number(((positionSize * profitPct) / 100 - fee).toFixed(2));
+        }
 
         // Record order
         await base44.asServiceRole.entities.Order.create({
@@ -332,6 +344,15 @@ Deno.serve(async (req) => {
           created_by: userEmail,
           user_email: userEmail
         });
+
+        // If closing a position (MAINNET SELL), update the original BUY trade with exit info
+        if (executionMode === 'MAINNET' && !isBuy && openPosition) {
+          await base44.asServiceRole.entities.Trade.update(openPosition.id, {
+            exit_price: realAvgPrice,
+            profit_loss: profit
+          });
+          console.log(`[CLOSE-POSITION] Updated BUY trade ${openPosition.id} with exit=${realAvgPrice} P&L=${profit}`);
+        }
 
         // Record trade
         await base44.asServiceRole.entities.Trade.create({
