@@ -51,6 +51,9 @@ async function okxRequest(apiKey, secret, passphrase, method, path, bodyStr = ''
 // ---- Main handler ----
 Deno.serve(async (req) => {
   try {
+    const body = await req.json().catch(() => ({}));
+    const dryRun = body.dryRun !== false; // Default to true (preview mode)
+    
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
 
@@ -67,6 +70,9 @@ Deno.serve(async (req) => {
     if (!isSuzana && !isAdmin) {
       return Response.json({ error: 'Forbidden: Only Suzana or admin can rebalance' }, { status: 403 });
     }
+    
+    const mode = dryRun ? 'REBALANCE_PREVIEW' : 'REBALANCE_EXECUTE';
+    console.log(`[${mode}] Starting by ${user.email}`);
 
     const userEmail = isSuzana ? suzanaEmail : user.email;
 
@@ -181,8 +187,29 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Place SELL orders
+    // Preview mode: return what would be sold
+    if (dryRun) {
+      console.log(`[REBALANCE_PREVIEW] Assets to sell: ${toSell.length}`);
+      const totalEstimatedUsdt = toSell.reduce((sum, item) => sum + item.value, 0);
+      
+      return Response.json({
+        success: true,
+        mode: 'PREVIEW',
+        assetsToSell: toSell.map(item => ({
+          asset: item.ccy,
+          quantity: item.qty,
+          estimatedUSDT: item.value
+        })),
+        totalEstimatedUSDT: totalEstimatedUsdt,
+        skippedAssets: Array.from(openAssets).filter(a => a !== 'USDT'),
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Execute mode: place real SELL orders
     const results = [];
+    let totalExecutedUSDT = 0;
+    
     for (const item of toSell) {
       try {
         const instId = `${item.ccy}-USDT`;
@@ -200,36 +227,37 @@ Deno.serve(async (req) => {
             orderRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST', '/api/v5/trade/order', bodyStr, endpoint);
             if (orderRes.code === '0') break;
           } catch (e) {
-            console.log(`[REBALANCE] Order POST to ${endpoint} failed: ${e.message}`);
+            console.log(`[REBALANCE_EXECUTE] Order POST to ${endpoint} failed: ${e.message}`);
           }
         }
 
         if (orderRes?.code === '0') {
           const ordId = orderRes.data?.[0]?.ordId;
-          console.log(`[REBALANCE_SELL] ${item.ccy} SELL SUCCESS ordId=${ordId}`);
+          console.log(`[REBALANCE_EXECUTE] ${item.ccy} SELL SUCCESS ordId=${ordId} qty=${item.qty.toFixed(6)} value=$${item.value.toFixed(2)}`);
           results.push({
             asset: item.ccy,
             quantity: item.qty,
-            estimatedValue: item.value,
+            estimatedUSDT: item.value,
             orderId: ordId,
             status: 'SUCCESS'
           });
+          totalExecutedUSDT += item.value;
         } else {
-          console.log(`[REBALANCE_SELL] ${item.ccy} SELL FAILED code=${orderRes?.code} msg=${orderRes?.msg}`);
+          console.log(`[REBALANCE_EXECUTE] ${item.ccy} SELL FAILED code=${orderRes?.code} msg=${orderRes?.msg}`);
           results.push({
             asset: item.ccy,
             quantity: item.qty,
-            estimatedValue: item.value,
+            estimatedUSDT: item.value,
             status: 'FAILED',
             error: orderRes?.msg || 'Unknown error'
           });
         }
       } catch (err) {
-        console.error(`[REBALANCE] Error selling ${item.ccy}:`, err.message);
+        console.error(`[REBALANCE_EXECUTE] Error selling ${item.ccy}:`, err.message);
         results.push({
           asset: item.ccy,
           quantity: item.qty,
-          estimatedValue: item.value,
+          estimatedUSDT: item.value,
           status: 'ERROR',
           error: err.message
         });
@@ -239,18 +267,19 @@ Deno.serve(async (req) => {
     // Trigger balance refresh (call okxBalanceRefresh function)
     try {
       const refreshRes = await base44.asServiceRole.functions.invoke('okxBalanceRefresh', {});
-      console.log(`[REBALANCE] Balance refresh triggered: ${refreshRes.status}`);
+      console.log(`[REBALANCE_EXECUTE] Balance refresh triggered: ${refreshRes.status}`);
     } catch (e) {
-      console.log(`[REBALANCE] Balance refresh failed: ${e.message}`);
+      console.log(`[REBALANCE_EXECUTE] Balance refresh failed: ${e.message}`);
     }
 
-    console.log(`[REBALANCE] Completed: ${results.length} assets sold`);
+    console.log(`[REBALANCE_EXECUTE] Completed: ${results.length} assets, $${totalExecutedUSDT.toFixed(2)} converted to USDT`);
 
     return Response.json({
       success: true,
-      rebalanced_count: results.length,
+      mode: 'EXECUTE',
+      executed_count: results.filter(r => r.status === 'SUCCESS').length,
+      totalExecutedUSDT,
       results,
-      open_assets: Array.from(openAssets),
       timestamp: new Date().toISOString()
     });
   } catch (err) {

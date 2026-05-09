@@ -341,6 +341,7 @@ export default function OKXDashboard() {
   const [loadingTickers, setLoadingTickers] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [rebalancing, setRebalancing] = useState(false);
+  const [rebalancePreview, setRebalancePreview] = useState(null);
   const [rebalanceResult, setRebalanceResult] = useState(null);
 
   // Live balance from OKX for Suzana (via backend function)
@@ -457,19 +458,34 @@ export default function OKXDashboard() {
     setRefreshing(false);
   };
 
-  const handleRebalance = async () => {
+  const handlePreviewRebalance = async () => {
+    setRebalancing(true);
+    setRebalancePreview(null);
+    setRebalanceResult(null);
+    try {
+      const res = await base44.functions.invoke('rebalancePortfolio', { dryRun: true });
+      setRebalancePreview(res.data);
+    } catch (e) {
+      console.error('Preview error', e);
+      setRebalancePreview({ success: false, error: e.message });
+    }
+    setRebalancing(false);
+  };
+
+  const handleConfirmRebalance = async () => {
     setRebalancing(true);
     setRebalanceResult(null);
     try {
-      const res = await base44.functions.invoke('rebalancePortfolio', {});
+      const res = await base44.functions.invoke('rebalancePortfolio', { dryRun: false });
       setRebalanceResult(res.data);
+      setRebalancePreview(null);
       // Refresh balance after rebalance
       setTimeout(() => {
         fetchSuzanaBalance();
         refetchOrders();
       }, 2000);
     } catch (e) {
-      console.error('Rebalance error', e);
+      console.error('Execute error', e);
       setRebalanceResult({ success: false, error: e.message });
     }
     setRebalancing(false);
@@ -497,11 +513,19 @@ export default function OKXDashboard() {
             <p className="text-slate-400 text-sm mt-1">Live OKX пазар • Акаунт на Suzana</p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={handleRebalance} disabled={rebalancing}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-xl text-white text-sm transition-colors border border-purple-500">
-              <ArrowUpDown className={`w-4 h-4 ${rebalancing ? 'animate-spin' : ''}`} />
-              Rebalance to USDT
-            </button>
+            {!rebalancePreview ? (
+              <button onClick={handlePreviewRebalance} disabled={rebalancing}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-xl text-white text-sm transition-colors border border-purple-500">
+                <ArrowUpDown className={`w-4 h-4 ${rebalancing ? 'animate-spin' : ''}`} />
+                Preview Rebalance
+              </button>
+            ) : (
+              <button onClick={handleConfirmRebalance} disabled={rebalancing}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-xl text-white text-sm transition-colors border border-emerald-500">
+                <CheckCircle2 className={`w-4 h-4 ${rebalancing ? 'animate-spin' : ''}`} />
+                Confirm Rebalance
+              </button>
+            )}
             {/* Always visible balance badge */}
             {suzanaConn && (
               <div className="bg-slate-900/80 border border-yellow-500/30 rounded-xl px-5 py-3 text-right">
@@ -521,30 +545,81 @@ export default function OKXDashboard() {
           </div>
         </div>
 
+        {/* Rebalance Preview Card */}
+        {rebalancePreview && rebalancePreview.success && rebalancePreview.mode === 'PREVIEW' && (
+          <div className="mb-6 rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle className="w-5 h-5 text-blue-400" />
+              <h3 className="font-semibold text-blue-400">Rebalance Preview</h3>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="text-slate-400 mb-2">Assets to Sell ({rebalancePreview.assetsToSell.length}):</div>
+                <div className="space-y-1 ml-2">
+                  {rebalancePreview.assetsToSell.map(item => (
+                    <div key={item.asset} className="flex justify-between text-xs font-mono">
+                      <span className="text-white">{item.asset}</span>
+                      <span className="text-slate-400">{item.quantity.toFixed(6)}</span>
+                      <span className="text-emerald-400">${item.estimatedUSDT.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-slate-900/50 rounded-lg p-2 border border-slate-700">
+                <div className="text-slate-400 text-xs">Total Estimated USDT:</div>
+                <div className="text-lg font-bold text-emerald-400">${rebalancePreview.totalEstimatedUSDT.toFixed(2)}</div>
+              </div>
+              {rebalancePreview.skippedAssets.length > 0 && (
+                <div className="text-xs text-slate-400">
+                  <div className="mb-1">Skipped (open positions or below min):</div>
+                  <div>{rebalancePreview.skippedAssets.join(', ')}</div>
+                </div>
+              )}
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setRebalancePreview(null)} className="flex-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Rebalance Result Alert */}
         {rebalanceResult && (
-          <div className={`mb-6 rounded-xl border px-4 py-3 flex items-start gap-3 ${
+          <div className={`mb-6 rounded-xl border px-4 py-4 ${
             rebalanceResult.success 
               ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
               : 'bg-red-500/10 border-red-500/30 text-red-400'
           }`}>
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div className="text-sm flex-1">
-              <div className="font-semibold mb-1">
-                {rebalanceResult.success ? '✓ Rebalance Complete' : '✗ Rebalance Failed'}
-              </div>
-              {rebalanceResult.success ? (
-                <div className="space-y-1 text-xs">
-                  <div>Rebalanced: {rebalanceResult.rebalanced_count} assets</div>
-                  {rebalanceResult.results?.filter(r => r.status === 'SUCCESS').map(r => (
-                    <div key={r.asset}>{r.asset}: {r.quantity.toFixed(6)} → ${r.estimatedValue.toFixed(2)} USDT (#{r.orderId})</div>
-                  ))}
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div className="text-sm flex-1">
+                <div className="font-semibold mb-2">
+                  {rebalanceResult.success ? '✓ Rebalance Executed' : '✗ Rebalance Failed'}
                 </div>
-              ) : (
-                <div className="text-xs">{rebalanceResult.error}</div>
-              )}
+                {rebalanceResult.success ? (
+                  <div className="space-y-2 text-xs">
+                    <div>Executed: {rebalanceResult.executed_count} assets</div>
+                    <div className="bg-black/30 rounded-lg p-2">
+                      <div className="text-slate-400 mb-1">Total USDT Converted:</div>
+                      <div className="text-lg font-bold text-emerald-300">${rebalanceResult.totalExecutedUSDT.toFixed(2)}</div>
+                    </div>
+                    {rebalanceResult.results?.filter(r => r.status === 'SUCCESS').map(r => (
+                      <div key={r.asset} className="border-t border-emerald-500/20 pt-1 mt-1">
+                        <div className="flex justify-between">
+                          <span>{r.asset}:</span>
+                          <span className="text-emerald-300">${r.estimatedUSDT.toFixed(2)}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400">Order #{r.orderId}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs">{rebalanceResult.error}</div>
+                )}
+              </div>
+              <button onClick={() => setRebalanceResult(null)} className="text-xs opacity-60 hover:opacity-100">✕</button>
             </div>
-            <button onClick={() => setRebalanceResult(null)} className="text-xs opacity-60 hover:opacity-100">✕</button>
           </div>
         )}
 
