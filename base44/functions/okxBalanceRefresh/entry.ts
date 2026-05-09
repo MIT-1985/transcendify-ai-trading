@@ -113,10 +113,31 @@ Deno.serve(async (req) => {
       }
 
       const balances = Object.entries(balanceMap).map(([asset, b]) => ({ asset, free: b.free, locked: b.locked }));
-      const balanceUsdt = balances.filter(b => b.asset === 'USDT' || b.asset === 'USDC').reduce((s, b) => s + b.free + b.locked, 0);
+
+      // Fetch prices for non-stablecoin assets
+      const priceMap = {};
+      for (const b of balances) {
+        if (b.asset === 'USDT' || b.asset === 'USDC' || b.asset === 'BUSD') continue;
+        try {
+          const tickerRes = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${b.asset}-USDT`);
+          const tickerData = await tickerRes.json();
+          if (tickerData.code === '0' && tickerData.data?.[0]?.last) {
+            priceMap[b.asset] = parseFloat(tickerData.data[0].last);
+          }
+        } catch (e) { /* skip */ }
+      }
+
+      const balancesWithValue = balances.map(b => ({
+        ...b,
+        usd_value: (b.asset === 'USDT' || b.asset === 'USDC' || b.asset === 'BUSD')
+          ? b.free + b.locked
+          : (priceMap[b.asset] || 0) * (b.free + b.locked)
+      }));
+
+      const balanceUsdt = balancesWithValue.reduce((s, b) => s + (b.usd_value || 0), 0);
 
       await base44.asServiceRole.entities.ExchangeConnection.update(conn.id, {
-        balances,
+        balances: balancesWithValue,
         balance_usdt: balanceUsdt,
         last_sync: new Date().toISOString()
       });
