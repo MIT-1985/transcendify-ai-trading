@@ -192,6 +192,15 @@ Deno.serve(async (req) => {
         const bots = await base44.asServiceRole.entities.TradingBot.filter({ id: sub.bot_id });
         const bot = bots[0];
         if (!bot) continue;
+        
+        // CRITICAL: Stop all bots except Robot 1 (DCA Warrior)
+        const BOT1_ID = '69352a734b5108d3c7824639';
+        if (bot.id !== BOT1_ID) {
+          console.log(`[ROBOT-1] SKIP: ${bot.name} - only Robot 1 enabled`);
+          continue;
+        }
+        
+        console.log(`[ROBOT-1] Starting execution for ${bot.name}`);
 
         // Get user's exchange connection (search by both created_by and user_email)
         let exchange = sub.exchange || 'binance';
@@ -225,12 +234,17 @@ Deno.serve(async (req) => {
         const vipBoost = vipBoosts[vipLevel] || 0;
         const feeDiscount = feeDiscounts[vipLevel] || 0;
 
-        const tradingPairs = sub.trading_pairs || ['X:BTCUSD'];
+        // Robot 1: Trade max 1-2 pairs only
+        const tradingPairs = (sub.trading_pairs || ['BTC-USDT']).slice(0, 2);
         const symbol = tradingPairs[Math.floor(Math.random() * tradingPairs.length)];
-        const capital = sub.capital_allocated || 1000;
-        // Scalping: small position sizes for fast frequent trades, min $5 (OKX minimum)
-        const maxPos = bot.strategy === 'scalping' ? 0.05 : 0.10;
-        const positionSize = Math.max(5, Math.min(capital * maxPos, 15)); // $5–$15 per trade
+        // Position size based on FREE USDT available, not total capital
+        // Robot 1: Conservative $5-10 per trade
+        const freeUsdt = hasUsdt ? usdtTotal : 0;
+        const positionSize = Math.min(10, freeUsdt * 0.5); // max 50% of free USDT, max $10
+        if (positionSize < 5) {
+          console.log(`[SKIP] Insufficient free USDT: ${freeUsdt.toFixed(2)}`);
+          continue;
+        }
 
         // Fetch real OKX price for the instrument
         let instIdForPrice = symbol.replace('X:', '').replace('/', '-');
@@ -260,18 +274,31 @@ Deno.serve(async (req) => {
         const candlesData = await candlesRes.json();
         const candles = candlesData.results || [];
 
-        // Check for open BUY position (last trade for this sub with no exit_price)
-        const recentTrades = await base44.asServiceRole.entities.Trade.filter({ subscription_id: sub.id });
-        const openPositions = recentTrades.filter(t => t.side === 'BUY' && !t.exit_price && t.execution_mode === 'MAINNET');
-        const openPosition = openPositions[0] || null;
+        // Check for open POSITION for this instId from real OKX balance
+        // openPosition = any asset balance > 0.0001
+        const instIdAsset = instIdForPrice.split('-')[0];
+        const assetBal = balanceDetails?.find(d => d.ccy === instIdAsset);
+        const hasOpenPos = assetBal && parseFloat(assetBal.availBal || 0) > 0.0001;
 
-        // Scalping: alternate BUY/SELL rapidly. If open position → SELL, else BUY
+        // Robot 1 decision: BUY only if no open position, SELL only if position exists
         const { signal, confidence } = calcSignal(candles, currentPrice, sub.stop_loss, sub.take_profit);
-        // Force more trades: if last trade was BUY (SIM), flip to SELL
-        const lastTrade = recentTrades[0];
-        const lastWasBuy = lastTrade?.side === 'BUY';
-        const isBuy = (exchange?.toLowerCase() === 'okx' && isLive) ? true : (openPosition ? false : (lastWasBuy ? false : true));
-        const isWin = Math.random() < confidence; // base signal confidence
+        const isBuy = !hasOpenPos; // BUY only if NO open position for this asset
+        
+        // If trying to BUY but already have open position → SKIP this pair
+        if (isBuy && hasOpenPos) {
+          console.log(`[ROBOT-1] SKIP ${instIdAsset}: already has open position`);
+          continue;
+        }
+        
+        // If trying to SELL but no position → SKIP
+        if (!isBuy && !hasOpenPos) {
+          console.log(`[ROBOT-1] SKIP ${instIdAsset}: no open position to SELL`);
+          continue;
+        }
+        
+        console.log(`[ROBOT-1] ACTION: ${finalIsBuy ? 'BUY' : 'SELL'} ${instIdAsset} amount=${positionSize.toFixed(2)} USDT`);
+        
+        const isWin = Math.random() < confidence;
 
         // Profit simulation: win rate ~70%, losses capped so max loss per trade ≤ $2
         // isWin is already biased by confidence (from technical analysis)
@@ -437,13 +464,13 @@ Deno.serve(async (req) => {
                 }
               }
 
-              console.log(`[LIVE-OKX] ${userEmail} | ${finalIsBuy ? 'buy' : 'sell'} ${instId} usdtAmt=${positionSize.toFixed(2)}`);
+              console.log(`[ROBOT-1] OKX_REQUEST: ${finalIsBuy ? 'BUY' : 'SELL'} ${instId} amount=${positionSize.toFixed(2)} USDT`);
               const orderRes = await okxPlaceOrder(apiKey, apiSecret, passphrase, instId, finalIsBuy ? 'buy' : 'sell', positionSize, currentPrice);
 
               if (orderRes.code === '0') {
                 executionMode = 'MAINNET';
                 realOrderId = orderRes.data?.[0]?.ordId;
-                console.log(`[LIVE-OKX] Placed ordId=${realOrderId}`);
+                console.log(`[ROBOT-1] OKX_SUCCESS: ordId=${realOrderId} code=${orderRes.code}`);
 
                 // Fetch order details to get actual fill info (try both endpoints)
                 if (realOrderId) {
@@ -470,7 +497,7 @@ Deno.serve(async (req) => {
                   }
                 }
               } else {
-                console.error(`[LIVE-OKX] Order failed: ${orderRes.msg}`);
+                console.log(`[ROBOT-1] OKX_FAILED: code=${orderRes.code} msg=${orderRes.msg}`);
                 executionMode = 'SIM';
               }
             }
@@ -512,32 +539,9 @@ Deno.serve(async (req) => {
           console.log(`[CLOSE-POSITION] Updated BUY trade ${openPosition.id} with exit=${realAvgPrice} P&L=${profit}`);
         }
 
-        // Record trade
-        await base44.asServiceRole.entities.Trade.create({
-          subscription_id: sub.id,
-          symbol, side: finalIsBuy ? 'BUY' : 'SELL',
-          quantity: realQty, price: realAvgPrice,
-          total_value: Number(positionSize.toFixed(2)),
-          fee: realFee,
-          profit_loss: profit,
-          entry_price: realAvgPrice,
-          exit_price: executionMode === 'SIM' ? exitPrice : null,
-          execution_mode: executionMode,
-          strategy_used: `${bot.strategy} (${exchange.toUpperCase()}, Conf:${(confidence * 100).toFixed(0)}%)`,
-          timestamp: new Date().toISOString(),
-          created_by: userEmail,
-          user_email: userEmail
-        });
-
-        // Update subscription stats — for live users only count real MAINNET trades
-        // SIM profits/losses for users with a live connection are NOT counted (they're not real)
-        const countProfit = isLive ? (executionMode === 'MAINNET' ? profit : 0) : profit;
-        const newProfit = (sub.total_profit || 0) + countProfit;
-        const newTrades = (sub.total_trades || 0) + 1;
-        await base44.asServiceRole.entities.UserSubscription.update(sub.id, {
-          total_profit: Number(newProfit.toFixed(2)),
-          total_trades: newTrades
-        });
+        // DO NOT write to Trade entity or update subscription stats
+        // Use only real OKX filled orders from getSuzanaOrders function
+        // P&L will be calculated by RealTradesSummary from BUY/SELL matching
 
         results.push({
           user: sub.created_by,
