@@ -24,8 +24,9 @@ const TIMEFRAMES = [
 const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
 // DCA Warrior bot ID (Bot #1)
 const BOT1_ID = '69352a734b5108d3c7824639';
-// Suzana's subscription ID
+// Suzana's subscription IDs (all active bots)
 const SUZANA_SUB_ID = '69e09f0e4d3cae70a455ca60';
+const SUZANA_SUB_IDS = ['69e09f0e4d3cae70a455ca60', '69fee8ff90408637f331ed69', '69fee8ff90408637f331ed6a'];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -368,21 +369,16 @@ export default function OKXDashboard() {
     retry: false
   });
 
-  // Suzana's subscription — try both emails
-  const { data: suzanaSub } = useQuery({
-    queryKey: ['suzana-sub'],
-    queryFn: async () => {
-      const [byId, byEmail1, byEmail2] = await Promise.all([
-        base44.entities.UserSubscription.filter({ id: SUZANA_SUB_ID }),
-        base44.entities.UserSubscription.filter({ created_by: SUZANA_EMAIL }),
-        base44.entities.UserSubscription.filter({ created_by: 'sauzana.cozmas@gmail.com' }),
-      ]);
-      return [...byId, ...byEmail1, ...byEmail2];
-    },
+  // All Suzana's subscriptions
+  const { data: suzanaSubs = [] } = useQuery({
+    queryKey: ['suzana-subs'],
+    queryFn: () => base44.entities.UserSubscription.filter({ user_email: SUZANA_EMAIL }),
     staleTime: 30000,
     retry: false
   });
-  const sub = suzanaSub?.[0] || null;
+  const sub = suzanaSubs.find(s => s.id === SUZANA_SUB_ID) || suzanaSubs[0] || null;
+  const totalTradesAllBots = suzanaSubs.reduce((s, sb) => s + (sb.total_trades || 0), 0);
+  const totalProfitAllBots = suzanaSubs.reduce((s, sb) => s + (sb.total_profit || 0), 0);
 
   // Bot #1
   const { data: bot1 } = useQuery({
@@ -393,22 +389,16 @@ export default function OKXDashboard() {
   });
   const bot = bot1?.[0] || null;
 
-  // Suzana's trades — search by subscription ID AND by both emails
+  // All Suzana's trades from all subscription IDs
   const { data: suzanaTrades = [] } = useQuery({
     queryKey: ['suzana-trades'],
     queryFn: async () => {
-      const [bySubId, byEmail1, byEmail2] = await Promise.all([
-        base44.entities.Trade.filter({ subscription_id: SUZANA_SUB_ID }),
-        base44.entities.Trade.filter({ created_by: SUZANA_EMAIL }),
-        base44.entities.Trade.filter({ created_by: 'sauzana.cozmas@gmail.com' }),
-      ]);
+      const results = await Promise.all(
+        SUZANA_SUB_IDS.map(id => base44.entities.Trade.filter({ subscription_id: id }))
+      );
       const seen = new Set();
-      const all = [...bySubId, ...byEmail1, ...byEmail2].filter(t => {
-        if (seen.has(t.id)) return false;
-        seen.add(t.id);
-        return true;
-      });
-      return all.sort((a, b) => new Date(b.timestamp || b.created_date) - new Date(a.timestamp || a.created_date)).slice(0, 20);
+      const all = results.flat().filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
+      return all.sort((a, b) => new Date(b.timestamp || b.created_date) - new Date(a.timestamp || a.created_date)).slice(0, 30);
     },
     staleTime: 20000,
     retry: false
@@ -490,7 +480,7 @@ export default function OKXDashboard() {
         {/* Suzana Account Panel — always shown */}
         <SuzanaAccountPanel
           connection={suzanaConn}
-          subscription={sub}
+          subscription={{ ...(sub || {}), total_trades: totalTradesAllBots, total_profit: totalProfitAllBots }}
           bot={bot}
           trades={suzanaTrades}
           refreshing={refreshing}
