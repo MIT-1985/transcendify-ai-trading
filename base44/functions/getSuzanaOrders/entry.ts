@@ -60,14 +60,17 @@ Deno.serve(async (req) => {
     const apiSecret = await decryptOkx(conn.api_secret_encrypted);
     const passphrase = await decryptOkx(conn.encryption_iv);
 
-    // Try both endpoints
+    // Try both endpoints - fetch ALL orders with pagination (max 300 per request)
     const endpoints = ['https://www.okx.com', 'https://eea.okx.com'];
+    let allOrders = [];
     let ordersData = null;
+    
     for (const ep of endpoints) {
       try {
-        const data = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/trade/orders-history?instType=SPOT&limit=20', ep);
-        if (data.code === '0') { ordersData = data; break; }
-        if (data.code !== '50119') { ordersData = data; break; }
+        // Fetch up to 100 filled orders (OKX max per request is 300, but 100 is safer)
+        const data = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/trade/orders-history?instType=SPOT&limit=100', ep);
+        if (data.code === '0') { ordersData = data; allOrders = data.data || []; break; }
+        if (data.code !== '50119') { ordersData = data; allOrders = data.data || []; break; }
       } catch (e) {
         console.log(`[getSuzanaOrders] ${ep} error: ${e.message}`);
       }
@@ -77,7 +80,7 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: ordersData?.msg || 'Failed to fetch orders' }, { status: 500 });
     }
 
-    const orders = (ordersData.data || []).map(o => ({
+    const orders = allOrders.map(o => ({
       ordId: o.ordId,
       instId: o.instId,
       side: o.side?.toUpperCase(),
