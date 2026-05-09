@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
 import { Card, CardContent } from '@/components/ui/card';
 import { DollarSign, TrendingUp, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
 
 export default function RealTimeEarnings({ subscriptions = [] }) {
   const [sessionStart] = useState(Date.now());
@@ -11,29 +9,9 @@ export default function RealTimeEarnings({ subscriptions = [] }) {
 
   const activeSubscriptions = subscriptions.filter(s => s.status === 'active');
 
-  // Fetch all trades for active subscriptions
-  const { data: allTrades = [] } = useQuery({
-    queryKey: ['dashboard-trades', activeSubscriptions.map(s => s.id).join(',')],
-    queryFn: async () => {
-      if (activeSubscriptions.length === 0) return [];
-      
-      const tradePromises = activeSubscriptions.map(sub =>
-        base44.entities.Trade.filter({ subscription_id: sub.id })
-      );
-      const results = await Promise.all(tradePromises);
-      return results.flat();
-    },
-    enabled: activeSubscriptions.length > 0,
-    refetchInterval: 1000
-  });
-
-  // Calculate real earnings from trades
-  const sessionTrades = allTrades.filter(trade => {
-    const tradeTime = new Date(trade.timestamp || trade.created_date).getTime();
-    return tradeTime >= sessionStart;
-  });
-
-  const totalEarnings = sessionTrades.reduce((sum, trade) => sum + (trade.profit_loss || 0), 0);
+  // Use total_profit and total_trades from subscriptions directly (real OKX data)
+  const totalEarnings = activeSubscriptions.reduce((sum, sub) => sum + (sub.total_profit || 0), 0);
+  const totalTrades = activeSubscriptions.reduce((sum, sub) => sum + (sub.total_trades || 0), 0);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -93,8 +71,8 @@ export default function RealTimeEarnings({ subscriptions = [] }) {
           <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-400" />
           <span className="text-slate-400">
             <span className={`font-semibold ${totalEarnings >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {sessionTrades.length} trades
-            </span> this session
+              {totalTrades} trades
+            </span> total
           </span>
         </div>
 
