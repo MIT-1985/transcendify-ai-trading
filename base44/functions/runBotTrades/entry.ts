@@ -270,7 +270,6 @@ Deno.serve(async (req) => {
         // Force more trades: if last trade was BUY (SIM), flip to SELL
         const lastTrade = recentTrades[0];
         const lastWasBuy = lastTrade?.side === 'BUY';
-        // For OKX live trading (Suzana), ONLY do BUY orders (no SELL without holding the asset)
         const isBuy = (exchange?.toLowerCase() === 'okx' && isLive) ? true : (openPosition ? false : (lastWasBuy ? false : true));
         const isWin = Math.random() < confidence; // base signal confidence
 
@@ -329,6 +328,62 @@ Deno.serve(async (req) => {
           }
         }
 
+        // ---- CHECK REAL BALANCE FOR ADAPTIVE BUY/SELL ----
+        let hasUsdt = false;
+        let hasAsset = false;
+        let adaptiveIsBuy = isBuy; // Default to the calculated isBuy
+        
+        if (isSuzana && isLive && exchange?.toLowerCase() === 'okx' && conn) {
+          try {
+            const apiKey = await decryptOkx(conn.api_key_encrypted);
+            const apiSecret = await decryptOkx(conn.api_secret_encrypted);
+            const passphrase = await decryptOkx(conn.encryption_iv);
+            
+            // Get account balance from OKX - structure: {data: [{details: [{ccy, availBal, frozenBal}]}]}
+            const balResPath = '/api/v5/account/balance';
+            let balanceDetails = null;
+            for (const ep of ['https://www.okx.com', 'https://eea.okx.com']) {
+              try {
+                const br = await okxRequest(apiKey, apiSecret, passphrase, 'GET', balResPath, '', ep);
+                if (br.code === '0' && br.data?.[0]?.details) { 
+                  balanceDetails = br.data[0].details; // Extract the details array
+                  break; 
+                }
+              } catch (e) {}
+            }
+            
+            if (balanceDetails) {
+              // Check USDT balance from details array
+              const usdtBal = balanceDetails.find(d => d.ccy === 'USDT');
+              const usdtTotal = usdtBal ? (parseFloat(usdtBal.availBal) || 0) + (parseFloat(usdtBal.frozenBal) || 0) : 0;
+              hasUsdt = usdtTotal > positionSize;
+              
+              // Check asset balance from details array
+              const assetCode = instIdForPrice.split('-')[0];
+              const assetBal = balanceDetails.find(d => d.ccy === assetCode);
+              const assetAvail = assetBal ? parseFloat(assetBal.availBal) || 0 : 0;
+              hasAsset = assetAvail > 0.0001;
+              
+              // Adaptive decision: if have asset AND open position → SELL, else if have USDT → BUY
+              if (hasAsset && openPosition) {
+                adaptiveIsBuy = false; // Sell the asset to close position
+              } else if (hasUsdt) {
+                adaptiveIsBuy = true;  // Buy more
+              } else {
+                console.log(`[SKIP-TRADE] Insufficient balance: USDT=${usdtTotal.toFixed(2)}, ${assetCode}=${assetAvail.toFixed(6)}`);
+                continue;
+              }
+              
+              console.log(`[ADAPTIVE] ${assetCode}: adapt=${!adaptiveIsBuy ? 'SELL' : 'BUY'} | USDT=${usdtTotal.toFixed(2)} | Asset=${assetAvail.toFixed(6)}`);
+            }
+          } catch (e) {
+            console.log(`[BALANCE-CHECK] Error: ${e.message}`);
+          }
+        }
+        
+        // Use adaptive isBuy for OKX live, else use calculated
+        const finalIsBuy = (isSuzana && isLive && exchange?.toLowerCase() === 'okx') ? adaptiveIsBuy : isBuy;
+
         // ---- LIVE EXECUTION ----
         if (isLive && conn) {
           try {
@@ -338,8 +393,8 @@ Deno.serve(async (req) => {
               const apiSecret = await decryptBinance(conn.api_secret_encrypted, secretIv);
               const binSym = toBinanceSymbol(symbol);
 
-              console.log(`[LIVE-BINANCE] ${sub.created_by} | ${isBuy ? 'BUY' : 'SELL'} ${binSym} quoteQty=${positionSize.toFixed(2)}`);
-              const orderRes = await binancePlaceOrder(apiKey, apiSecret, binSym, isBuy ? 'BUY' : 'SELL', positionSize);
+              console.log(`[LIVE-BINANCE] ${sub.created_by} | ${finalIsBuy ? 'BUY' : 'SELL'} ${binSym} quoteQty=${positionSize.toFixed(2)}`);
+              const orderRes = await binancePlaceOrder(apiKey, apiSecret, binSym, finalIsBuy ? 'BUY' : 'SELL', positionSize);
 
               if (orderRes.code) {
                 console.error(`[LIVE-BINANCE] Order failed: ${orderRes.msg}`);
@@ -368,7 +423,7 @@ Deno.serve(async (req) => {
 
               // For BUY orders: ensure we have enough USDT in Trading wallet
               // For SELL orders: ensure we have enough of the coin
-              if (isBuy) {
+              if (finalIsBuy) {
                 // Try to transfer funds from Funding to Trading wallet
                 let transferDone = false;
                 for (const ep of ['https://www.okx.com', 'https://eea.okx.com']) {
@@ -382,8 +437,8 @@ Deno.serve(async (req) => {
                 }
               }
 
-              console.log(`[LIVE-OKX] ${userEmail} | ${isBuy ? 'buy' : 'sell'} ${instId} usdtAmt=${positionSize.toFixed(2)}`);
-              const orderRes = await okxPlaceOrder(apiKey, apiSecret, passphrase, instId, isBuy ? 'buy' : 'sell', positionSize, currentPrice);
+              console.log(`[LIVE-OKX] ${userEmail} | ${finalIsBuy ? 'buy' : 'sell'} ${instId} usdtAmt=${positionSize.toFixed(2)}`);
+              const orderRes = await okxPlaceOrder(apiKey, apiSecret, passphrase, instId, finalIsBuy ? 'buy' : 'sell', positionSize, currentPrice);
 
               if (orderRes.code === '0') {
                 executionMode = 'MAINNET';
@@ -427,7 +482,7 @@ Deno.serve(async (req) => {
 
         // Calculate profit: for MAINNET SELL closing a position, use real entry vs exit price
         let profit;
-        if (executionMode === 'MAINNET' && !isBuy && openPosition) {
+        if (executionMode === 'MAINNET' && !finalIsBuy && openPosition) {
           const realPnl = (realAvgPrice - openPosition.entry_price) * openPosition.quantity;
           profit = Number(realPnl.toFixed(2));
         } else if (executionMode === 'MAINNET') {
@@ -438,7 +493,7 @@ Deno.serve(async (req) => {
 
         // Record order
         await base44.asServiceRole.entities.Order.create({
-          symbol, side: isBuy ? 'BUY' : 'SELL', type: 'MARKET',
+          symbol, side: finalIsBuy ? 'BUY' : 'SELL', type: 'MARKET',
           quantity: realQty, price: realAvgPrice,
           status: 'FILLED', filled_quantity: realQty,
           average_price: realAvgPrice, total_value: Number(positionSize.toFixed(2)),
@@ -449,7 +504,7 @@ Deno.serve(async (req) => {
         });
 
         // If closing a position (MAINNET SELL), update the original BUY trade with exit info
-        if (executionMode === 'MAINNET' && !isBuy && openPosition) {
+        if (executionMode === 'MAINNET' && !finalIsBuy && openPosition) {
           await base44.asServiceRole.entities.Trade.update(openPosition.id, {
             exit_price: realAvgPrice,
             profit_loss: profit
@@ -460,7 +515,7 @@ Deno.serve(async (req) => {
         // Record trade
         await base44.asServiceRole.entities.Trade.create({
           subscription_id: sub.id,
-          symbol, side: isBuy ? 'BUY' : 'SELL',
+          symbol, side: finalIsBuy ? 'BUY' : 'SELL',
           quantity: realQty, price: realAvgPrice,
           total_value: Number(positionSize.toFixed(2)),
           fee: realFee,
@@ -487,7 +542,7 @@ Deno.serve(async (req) => {
         results.push({
           user: sub.created_by,
           exchange, executionMode,
-          symbol, side: isBuy ? 'BUY' : 'SELL',
+          symbol, side: finalIsBuy ? 'BUY' : 'SELL',
           price: realAvgPrice, profit
         });
 
