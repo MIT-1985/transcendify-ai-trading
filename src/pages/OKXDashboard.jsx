@@ -172,7 +172,8 @@ function OKXChart() {
 // ─── Suzana Account Card ────────────────────────────────────────────────────
 function SuzanaAccountPanel({ connection, subscription, bot, trades, refreshing, onRefresh }) {
   const balance = connection?.balance_usdt || 0;
-  const totalTrades = subscription?.total_trades || 0;
+  // Use actual loaded trades count if subscription counter is outdated
+  const totalTrades = Math.max(subscription?.total_trades || 0, trades.length);
   const totalProfit = subscription?.total_profit || 0;
 
   // Format 000 digits with green colour based on trades count
@@ -294,7 +295,7 @@ function SuzanaAccountPanel({ connection, subscription, bot, trades, refreshing,
                   const pnl = trade.profit_loss || 0;
                   return (
                     <tr key={trade.id} className="border-t border-slate-700/50 hover:bg-slate-800/30">
-                      <td className="px-3 py-2 text-slate-400">{moment(trade.timestamp || trade.created_date).format('Apr D HH:mm')}</td>
+                      <td className="px-3 py-2 text-slate-400">{moment(trade.timestamp || trade.created_date).format('MMM D HH:mm')}</td>
                       <td className="px-3 py-2 font-semibold text-white">{trade.symbol}</td>
                       <td className="px-3 py-2">
                         <span className={`px-2 py-0.5 rounded font-bold ${trade.side === 'BUY' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
@@ -367,10 +368,17 @@ export default function OKXDashboard() {
     retry: false
   });
 
-  // Suzana's subscription
+  // Suzana's subscription — try both emails
   const { data: suzanaSub } = useQuery({
     queryKey: ['suzana-sub'],
-    queryFn: () => base44.entities.UserSubscription.filter({ user_email: 'sauzana.cozmas@gmail.com' }),
+    queryFn: async () => {
+      const [byId, byEmail1, byEmail2] = await Promise.all([
+        base44.entities.UserSubscription.filter({ id: SUZANA_SUB_ID }),
+        base44.entities.UserSubscription.filter({ created_by: SUZANA_EMAIL }),
+        base44.entities.UserSubscription.filter({ created_by: 'sauzana.cozmas@gmail.com' }),
+      ]);
+      return [...byId, ...byEmail1, ...byEmail2];
+    },
     staleTime: 30000,
     retry: false
   });
@@ -385,12 +393,22 @@ export default function OKXDashboard() {
   });
   const bot = bot1?.[0] || null;
 
-  // Suzana's trades (by subscription)
+  // Suzana's trades — search by subscription ID AND by both emails
   const { data: suzanaTrades = [] } = useQuery({
     queryKey: ['suzana-trades'],
     queryFn: async () => {
-      const all = await base44.entities.Trade.filter({ subscription_id: SUZANA_SUB_ID });
-      return all.sort((a, b) => new Date(b.timestamp || b.created_date) - new Date(a.timestamp || a.created_date)).slice(0, 10);
+      const [bySubId, byEmail1, byEmail2] = await Promise.all([
+        base44.entities.Trade.filter({ subscription_id: SUZANA_SUB_ID }),
+        base44.entities.Trade.filter({ created_by: SUZANA_EMAIL }),
+        base44.entities.Trade.filter({ created_by: 'sauzana.cozmas@gmail.com' }),
+      ]);
+      const seen = new Set();
+      const all = [...bySubId, ...byEmail1, ...byEmail2].filter(t => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
+      return all.sort((a, b) => new Date(b.timestamp || b.created_date) - new Date(a.timestamp || a.created_date)).slice(0, 20);
     },
     staleTime: 20000,
     retry: false
