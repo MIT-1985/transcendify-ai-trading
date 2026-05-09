@@ -127,24 +127,26 @@ Deno.serve(async (req) => {
 
     // ─── If no SELL condition, return decision status ────────────────────
     if (!sellConditionMet) {
-      console.log(`[ROBOT1] WAITING: P&L=${unrealizedPnLPct}% (need +2% or -1%)`);
+      const executionLog = {
+        entryPx: parseFloat(entryPrice.toFixed(2)),
+        currentPx: parseFloat(currentPrice.toFixed(2)),
+        pnlPercent: unrealizedPnLPct,
+        action: 'WAIT',
+        ordId: null,
+        realizedPnL: 0
+      };
+      console.log(`[ROBOT1] EXECUTION LOG: ${JSON.stringify(executionLog)}`);
+      
       return Response.json({
         status: 'WAITING',
-        mode: 'DECISION_ONLY',
+        executionLog: executionLog,
         activePosition: {
           tradeId: pendingBuy.id,
           quantity: quantity,
           entryPrice: entryPrice,
           currentPrice: currentPrice,
           unrealizedPnL: parseFloat(unrealizedPnL.toFixed(2)),
-          unrealizedPnLPct: unrealizedPnLPct,
-          totalValue: parseFloat((currentPrice * quantity).toFixed(2))
-        },
-        sellCondition: {
-          conditionMet: false,
-          gainTarget: entryPrice * 1.02,
-          lossStop: entryPrice * 0.99,
-          reason: `Current P&L: ${unrealizedPnLPct}% (need +2% or -1%)`
+          unrealizedPnLPct: unrealizedPnLPct
         }
       });
     }
@@ -220,21 +222,29 @@ Deno.serve(async (req) => {
       timestamp: new Date().toISOString()
     });
 
+    const executionLog = {
+      entryPx: parseFloat(entryPrice.toFixed(2)),
+      currentPx: parseFloat(currentPrice.toFixed(2)),
+      sellPx: parseFloat(sellAvgPrice.toFixed(2)),
+      pnlPercent: unrealizedPnLPct,
+      action: 'SELL',
+      ordId: sellOrdId,
+      realizedPnL: parseFloat(realizedPnL.toFixed(2))
+    };
+
+    console.log(`[ROBOT1] EXECUTION LOG: ${JSON.stringify(executionLog)}`);
+
     return Response.json({
       status: 'SOLD',
-      mode: 'DECISION_EXECUTED',
+      executionLog: executionLog,
       soldPosition: {
         tradeId: pendingBuy.id,
         entryPrice: entryPrice,
         sellPrice: sellAvgPrice,
         quantity: sellFilledQty,
-        buyValue: parseFloat(buyValue.toFixed(2)),
-        sellValue: parseFloat(sellValue.toFixed(2)),
-        totalFees: parseFloat((buyFee + sellFee).toFixed(2)),
         realizedPnL: parseFloat(realizedPnL.toFixed(2)),
         realizedPnLPct: realizedPnLPct
-      },
-      sellOrdId: sellOrdId
+      }
     });
   } catch (err) {
     console.error(`[ROBOT1] Exception: ${err.message}`);
