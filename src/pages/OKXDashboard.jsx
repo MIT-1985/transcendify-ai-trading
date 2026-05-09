@@ -10,7 +10,12 @@ import { TrendingUp, TrendingDown, RefreshCw, Link2, Activity, BarChart2, Wallet
 import { ScrollArea } from '@/components/ui/scroll-area';
 import moment from 'moment';
 
-const OKX_SYMBOLS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'XRP-USDT', 'DOGE-USDT', 'ADA-USDT'];
+const OKX_SYMBOLS = [
+  'BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'XRP-USDT', 'DOGE-USDT', 'ADA-USDT',
+  'BNB-USDT', 'AVAX-USDT', 'DOT-USDT', 'MATIC-USDT', 'LINK-USDT', 'LTC-USDT',
+  'ATOM-USDT', 'UNI-USDT', 'FIL-USDT', 'NEAR-USDT', 'APT-USDT', 'ARB-USDT',
+  'OP-USDT', 'SUI-USDT', 'TRX-USDT', 'TON-USDT', 'SHIB-USDT', 'BCH-USDT'
+];
 
 const TIMEFRAMES = [
   { label: '1H', bar: '5m', limit: 12 },
