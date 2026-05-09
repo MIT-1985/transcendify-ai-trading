@@ -247,24 +247,33 @@ Deno.serve(async (req) => {
         const lastTrade = recentTrades[0];
         const lastWasBuy = lastTrade?.side === 'BUY';
         const isBuy = openPosition ? false : (lastWasBuy ? false : true);
-        const isWin = Math.random() < confidence;
+        const isWin = Math.random() < confidence; // base signal confidence
 
-        // Profit simulation (used for SIM mode and for recording)
+        // Profit simulation: win rate ~70%, losses capped so max loss per trade ≤ $2
+        // isWin is already biased by confidence (from technical analysis)
+        const forceWin = Math.random() < 0.70; // at least 70% win rate regardless of signal
+        const isWinFinal = forceWin || isWin;
         let profitPct = 0;
         switch (bot.strategy) {
-          case 'scalping': profitPct = isWin ? (0.5 + Math.random()) : -(0.3 + Math.random() * 0.6); break;
-          case 'swing': profitPct = isWin ? (2 + Math.random() * 4) : -(1 + Math.random() * 2.5); break;
-          case 'arbitrage': profitPct = isWin ? (0.2 + Math.random() * 0.5) : -(0.1 + Math.random() * 0.3); break;
-          case 'grid': profitPct = isWin ? (0.8 + Math.random() * 1.5) : -(0.4 + Math.random() * 0.8); break;
-          case 'dca': profitPct = isWin ? (1 + Math.random() * 2.5) : -(0.6 + Math.random() * 1.5); break;
-          case 'momentum': profitPct = isWin ? (2.5 + Math.random() * 5) : -(1.5 + Math.random() * 4); break;
-          default: profitPct = isWin ? 1 : -0.5;
+          case 'scalping':   profitPct = isWinFinal ? (0.4 + Math.random() * 0.8) : -(0.1 + Math.random() * 0.2); break;
+          case 'swing':      profitPct = isWinFinal ? (1.5 + Math.random() * 3)   : -(0.2 + Math.random() * 0.5); break;
+          case 'arbitrage':  profitPct = isWinFinal ? (0.2 + Math.random() * 0.4) : -(0.05 + Math.random() * 0.1); break;
+          case 'grid':       profitPct = isWinFinal ? (0.6 + Math.random() * 1.2) : -(0.1 + Math.random() * 0.3); break;
+          case 'dca':        profitPct = isWinFinal ? (0.8 + Math.random() * 2)   : -(0.15 + Math.random() * 0.3); break;
+          case 'momentum':   profitPct = isWinFinal ? (2 + Math.random() * 4)     : -(0.2 + Math.random() * 0.5); break;
+          default:           profitPct = isWinFinal ? 0.8 : -0.15;
         }
         profitPct *= (1 + vipBoost);
         const slPct = sub.stop_loss || 5;
         const tpPct = sub.take_profit || 10;
         if (profitPct < 0 && Math.abs(profitPct) > slPct) profitPct = -slPct;
         if (profitPct > 0 && profitPct > tpPct) profitPct = tpPct;
+        // Hard cap: max loss per trade = $2
+        const maxLossDollars = 2;
+        if (profitPct < 0) {
+          const lossDollars = Math.abs(profitPct / 100) * positionSize;
+          if (lossDollars > maxLossDollars) profitPct = -(maxLossDollars / positionSize * 100);
+        }
 
         const quantity = Number((positionSize / currentPrice).toFixed(8));
         if (!quantity || isNaN(quantity) || quantity <= 0) continue;
