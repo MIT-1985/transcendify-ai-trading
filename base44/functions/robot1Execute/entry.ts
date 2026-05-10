@@ -52,16 +52,21 @@ async function getPolygonSignal() {
   const apiKey = Deno.env.get('POLYGON_API_KEY');
   if (!apiKey) throw new Error('POLYGON_API_KEY not set');
 
-  // Use hourly candles over last 3 days — supported by Polygon free tier
-  const toDate = new Date();
-  const fromDate = new Date(toDate.getTime() - 3 * 24 * 60 * 60 * 1000);
+  // Use hourly candles — go back 5 days to ensure enough data
+  const now = new Date();
+  const toDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); // yesterday (completed day)
+  const fromDate = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000); // 6 days ago
   const from = fromDate.toISOString().slice(0, 10);
   const to = toDate.toISOString().slice(0, 10);
 
+  console.log(`[ROBOT1] Polygon fetch: from=${from} to=${to}`);
+
   const candlesRes = await fetch(
-    `https://api.polygon.io/v2/aggs/ticker/X:ETHUSD/range/1/hour/${from}/${to}?adjusted=true&sort=asc&limit=72&apiKey=${apiKey}`
+    `https://api.polygon.io/v2/aggs/ticker/X:ETHUSD/range/1/hour/${from}/${to}?adjusted=true&sort=asc&limit=120&apiKey=${apiKey}`
   );
   const candlesData = await candlesRes.json();
+
+  console.log(`[ROBOT1] Polygon response: status=${candlesData.status} count=${candlesData.results?.length || 0}`);
 
   if (!candlesData.results || candlesData.results.length < 5) {
     console.log(`[ROBOT1] Polygon returned ${candlesData.results?.length || 0} candles — using OKX-only mode`);
@@ -222,22 +227,23 @@ Deno.serve(async (req) => {
     console.log(`[ROBOT1] OKX price: ${okxPrice}, balance: USDT=${usdtBalance} ETH=${ethBalance}`);
 
     // ─── STEP 4: Validate Polygon vs OKX price ─────────────────────────
-    const priceCheck = validatePriceDifference(polygonSignal.polygonPrice, okxPrice);
-
-    if (!priceCheck.valid) {
-      console.log(`[ROBOT1] PRICE MISMATCH: Polygon=${polygonSignal.polygonPrice} OKX=${okxPrice} diff=${priceCheck.diff}%`);
-      await logExecution(base44, 'WAIT', `Price skew ${priceCheck.diff}% (spread too high)`, {
-        freeUsdt: usdtBalance,
-        signalData: polygonSignal
-      });
-      return Response.json({
-        status: 'PRICE_SKEW',
-        polygonSignal: polygonSignal,
-        okxPrice: okxPrice,
-        priceDifference: priceCheck.diff,
-        decision: 'SKIP',
-        reason: priceCheck.reason
-      });
+    const polygonHasPrice = !!polygonSignal.polygonPrice;
+    let priceDiff = null;
+    if (polygonHasPrice) {
+      const priceCheck = validatePriceDifference(polygonSignal.polygonPrice, okxPrice);
+      priceDiff = priceCheck.diff;
+      if (!priceCheck.valid) {
+        console.log(`[ROBOT1] PRICE MISMATCH: Polygon=${polygonSignal.polygonPrice} OKX=${okxPrice} diff=${priceCheck.diff}%`);
+        await logExecution(base44, 'WAIT', `Price skew ${priceCheck.diff}% — skipping`, {
+          freeUsdt: usdtBalance, signalData: polygonSignal
+        });
+        return Response.json({
+          status: 'PRICE_SKEW', polygonSignal, okxPrice,
+          priceDifference: priceCheck.diff, decision: 'SKIP', reason: priceCheck.reason
+        });
+      }
+    } else {
+      console.log(`[ROBOT1] No Polygon price — OKX-only mode, skipping price validation`);
     }
 
     // ─── STEP 5: Check active position ─────────────────────────────────
@@ -275,7 +281,7 @@ Deno.serve(async (req) => {
            status: 'HOLDING',
            polygonSignal: polygonSignal,
            okxPrice: okxPrice,
-           priceDifference: priceCheck.diff,
+           priceDifference: priceDiff,
            decision: 'HOLD',
            reason: `P&L=${unrealizedPnLPct}%, need +2% or -1%, Polygon=${polygonSignal.signal}`,
            ordId: null,
@@ -308,9 +314,9 @@ Deno.serve(async (req) => {
          });
          return Response.json({
            status: 'SELL_ERROR',
-           polygonSignal: polygonSignal,
-           okxPrice: okxPrice,
-           priceDifference: priceCheck.diff,
+             polygonSignal: polygonSignal,
+             okxPrice: okxPrice,
+             priceDifference: priceDiff,
            decision: 'SELL_FAILED',
            reason: sellRes.msg,
            ordId: null
@@ -328,7 +334,7 @@ Deno.serve(async (req) => {
           status: 'SELL_VERIFY_FAILED',
           polygonSignal: polygonSignal,
           okxPrice: okxPrice,
-          priceDifference: priceCheck.diff,
+          priceDifference: priceDiff,
           decision: 'SELL_UNVERIFIED',
           reason: verifyRes.msg,
           ordId: ordId,
@@ -366,7 +372,7 @@ Deno.serve(async (req) => {
         status: 'SOLD',
         polygonSignal: polygonSignal,
         okxPrice: okxPrice,
-        priceDifference: priceCheck.diff,
+        priceDifference: priceDiff,
         decision: 'SELL_EXECUTED',
         reason: sellReason,
         ordId: ordId,
@@ -381,23 +387,25 @@ Deno.serve(async (req) => {
       }
 
     // ─── CASE B: NO POSITION → CHECK BUY ────────────────────────────────
-    console.log(`[ROBOT1] No position. Polygon signal: ${polygonSignal.signal}`);
+    console.log(`[ROBOT1] No position. Polygon signal: ${polygonSignal.signal}, polygonHasPrice=${polygonHasPrice}`);
 
-    if (!polygonSignal.signal || polygonSignal.signal !== 'BUY') {
-      await logExecution(base44, 'WAIT', `No BUY signal (Polygon signal=${polygonSignal.signal}, trend=${polygonSignal.trend})`, {
-        freeUsdt: usdtBalance,
-        signalData: polygonSignal
-      });
+    // If Polygon has no signal but we have USDT and no ETH — use OKX-only BUY
+    const okxOnlyBuy = !polygonHasPrice && usdtBalance >= 10 && ethBalance < 0.001;
+    const hasBuySignal = polygonSignal.signal === 'BUY' || okxOnlyBuy;
+
+    if (!hasBuySignal) {
+      const reason = polygonHasPrice
+        ? `No BUY signal (Polygon=${polygonSignal.signal}, trend=${polygonSignal.trend})`
+        : `OKX-only mode: USDT=${usdtBalance.toFixed(2)}, ETH=${ethBalance} — waiting`;
+      await logExecution(base44, 'WAIT', reason, { freeUsdt: usdtBalance, signalData: polygonSignal });
       return Response.json({
-        status: 'READY_NO_BUY',
-        polygonSignal: polygonSignal,
-        okxPrice: okxPrice,
-        priceDifference: priceCheck.diff,
-        decision: 'WAIT',
-        reason: `Polygon signal=${polygonSignal.signal} (need BUY), USDT=${usdtBalance}`,
-        ordId: null,
-        verifiedFill: null
+        status: 'READY_NO_BUY', polygonSignal, okxPrice,
+        decision: 'WAIT', reason, ordId: null, verifiedFill: null
       });
+    }
+
+    if (okxOnlyBuy) {
+      console.log(`[ROBOT1] OKX-only BUY: USDT=${usdtBalance.toFixed(2)} ETH=${ethBalance}`);
     }
 
     // Polygon says BUY and price is aligned
@@ -417,7 +425,7 @@ Deno.serve(async (req) => {
         okxPrice: okxPrice,
         priceDifference: priceCheck.diff,
         decision: 'WAIT',
-        reason: `Polygon BUY ready but: ETH=${ethBalance} (must be 0), USDT=${usdtBalance} (need >10)`,
+        reason: `BUY ready but: ETH=${ethBalance} (must be 0 for clean buy), USDT=${usdtBalance} (need >10)`,
         ordId: null,
         verifiedFill: null
       });
@@ -450,7 +458,7 @@ Deno.serve(async (req) => {
         status: 'BUY_ERROR',
         polygonSignal: polygonSignal,
         okxPrice: okxPrice,
-        priceDifference: priceCheck.diff,
+        priceDifference: priceDiff,
         decision: 'BUY_FAILED',
         reason: buyRes.msg,
         ordId: null
@@ -468,7 +476,7 @@ Deno.serve(async (req) => {
         status: 'BUY_VERIFY_FAILED',
         polygonSignal: polygonSignal,
         okxPrice: okxPrice,
-        priceDifference: priceCheck.diff,
+        priceDifference: priceDiff,
         decision: 'BUY_UNVERIFIED',
         reason: buyVerifyRes.msg,
         ordId: buyOrdId,
@@ -511,7 +519,7 @@ Deno.serve(async (req) => {
       status: 'BOUGHT',
       polygonSignal: polygonSignal,
       okxPrice: okxPrice,
-      priceDifference: priceCheck.diff,
+      priceDifference: priceDiff,
       decision: 'BUY_EXECUTED',
       reason: `Polygon signal=${polygonSignal.signal}, trend=${polygonSignal.trend}`,
       ordId: buyOrdId,
