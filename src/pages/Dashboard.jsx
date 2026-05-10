@@ -6,11 +6,13 @@ import { Wallet, TrendingUp, Activity } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Robot1Panel from '@/components/dashboard/Robot1Panel';
-import PairScoringTable from '@/components/dashboard/PairScoringTable';
+import PairScoringTable from '@/components/dashboard/PairScoringTable.jsx';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [syncStatus, setSyncStatus] = useState('idle');
+  const [pairScores, setPairScores] = useState([]);
+  const [scoresLoading, setScoresLoading] = useState(false);
 
   const handleSync = async () => {
     setSyncStatus('syncing');
@@ -62,7 +64,7 @@ export default function Dashboard() {
     staleTime: 30000
   });
 
-  const ALLOWED_PAIRS = ['ETH-USDT', 'SOL-USDT'];
+  const ALLOWED_PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT'];
   const robot1PnL = robot1Trades.reduce((s, t) => s + (t.realizedPnL || 0), 0);
 
   return (
@@ -111,10 +113,17 @@ export default function Dashboard() {
         </section>
 
         {/* 2. Robot 1 Live Status */}
-        <Robot1Panel />
+        <Robot1Panel onRunResult={(data) => { if (data?.pairScores) setPairScores(data.pairScores); }} />
 
-        {/* 2b. Pair Scoring Table */}
-        <PairScoringTable />
+        {/* 2b. Pair Scoring */}
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-purple-400" />
+            <h2 className="font-bold text-sm">Pair Scoring — Last Run</h2>
+            <span className="ml-auto text-xs text-slate-500">score ≥ 40 required to BUY</span>
+          </div>
+          <PairScoringTable pairScores={pairScores} isLoading={scoresLoading} />
+        </section>
 
         {/* 3. Robot 1 Verified Trades */}
         <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
