@@ -101,15 +101,39 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold">Robot 1 Dashboard</h1>
             <p className="text-slate-400 text-sm mt-1">Real OKX Data · Verified Trades Only</p>
           </div>
-          <Button
-            onClick={handleSync}
-            disabled={syncStatus === 'syncing'}
-            size="sm"
-            className={`gap-2 ${syncStatus === 'success' ? 'bg-emerald-700' : 'bg-slate-700 hover:bg-slate-600'}`}
-          >
-            <Activity className="w-4 h-4" />
-            {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'success' ? '✓ Synced' : 'Sync OKX'}
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              onClick={async () => {
+                if (window.confirm('Sell ALL crypto to USDT immediately?')) {
+                  try {
+                    setSyncStatus('syncing');
+                    await base44.functions.invoke('liquidateAllToUSDT', {});
+                    refetchBalance();
+                    setSyncStatus('success');
+                    setTimeout(() => setSyncStatus('idle'), 2000);
+                  } catch (e) {
+                    console.error(e);
+                    setSyncStatus('error');
+                    setTimeout(() => setSyncStatus('idle'), 2000);
+                  }
+                }
+              }}
+              disabled={syncStatus === 'syncing'}
+              size="sm"
+              className="gap-2 bg-red-700 hover:bg-red-600"
+            >
+              Liquidate All
+            </Button>
+            <Button
+              onClick={handleSync}
+              disabled={syncStatus === 'syncing'}
+              size="sm"
+              className={`gap-2 ${syncStatus === 'success' ? 'bg-emerald-700' : 'bg-slate-700 hover:bg-slate-600'}`}
+            >
+              <Activity className="w-4 h-4" />
+              {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'success' ? '✓ Synced' : 'Sync OKX'}
+            </Button>
+          </div>
         </div>
 
         {/* 1. Live Balance Card */}
