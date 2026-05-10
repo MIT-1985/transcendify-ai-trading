@@ -122,7 +122,7 @@ export default function Robot1LivePnL() {
 
   // Fetch active positions from OXXOrderLedger (FIFO Robot1 only)
   const fetchPositions = async () => {
-    const all = await base44.asServiceRole.entities.OXXOrderLedger.filter({ robotId: 'robot1', verified: true });
+    const all = await base44.entities.OXXOrderLedger.filter({ robotId: 'robot1', verified: true });
     const sorted = all.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     const buyStack = {};
     const PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT'];
