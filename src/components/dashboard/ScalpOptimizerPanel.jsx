@@ -39,11 +39,12 @@ export default function ScalpOptimizerPanel() {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const refresh = async () => {
+  const refreshMetrics = async () => {
     setLoading(true);
     try {
       const res = await base44.functions.invoke('robot1Scalp', {});
       const d = res.data || {};
+      setScalpData(d);
       if (d.optimizerMetrics) {
         setMetrics({
           ...d.optimizerMetrics,
@@ -58,12 +59,33 @@ export default function ScalpOptimizerPanel() {
     }
   };
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refreshMetrics(); }, []);
 
   const m = metrics;
+  const [scalpData, setScalpData] = React.useState(null);
 
   const pnlTodayColor = !m ? 'text-white' : m.realizedPnLToday > 0 ? 'text-emerald-400' : m.realizedPnLToday < 0 ? 'text-red-400' : 'text-slate-400';
   const pnl7dColor = !m ? 'text-white' : m.realizedPnL7D > 0 ? 'text-emerald-400' : m.realizedPnL7D < 0 ? 'text-red-400' : 'text-slate-400';
+
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const res = await base44.functions.invoke('robot1Scalp', {});
+      const d = res.data || {};
+      setScalpData(d);
+      if (d.optimizerMetrics) {
+        setMetrics({
+          ...d.optimizerMetrics,
+          capitalEfficiencyScore: d.capitalReserve?.capitalEfficiencyScore ?? 0,
+          freeCapitalPercent: d.freeCapitalPercent ?? d.capitalReserve?.freeCapitalPct ?? 0,
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="bg-slate-900/50 border border-purple-700/40 rounded-xl p-5 space-y-4">
@@ -71,11 +93,16 @@ export default function ScalpOptimizerPanel() {
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-purple-400" />
           <h2 className="font-bold text-sm">Final Optimizer Metrics</h2>
+          {scalpData?.balanceMode === 'SMALL' && (
+            <span className="text-xs px-2 py-1 rounded bg-yellow-900/40 border border-yellow-700/40 text-yellow-400">
+              SMALL BALANCE MODE ({scalpData.capitalReserve?.totalCapital?.toFixed(2)} USDT)
+            </span>
+          )}
           <span className="text-xs text-slate-500 ml-1">30–80 quality trades/day · compound profits</span>
         </div>
         <Button
           size="sm" variant="ghost"
-          onClick={refresh}
+          onClick={refreshMetrics}
           disabled={loading}
           className="text-slate-400 hover:text-white h-7 px-2"
         >
@@ -173,6 +200,21 @@ export default function ScalpOptimizerPanel() {
               <span>Reduce after losses ✓</span>
             </div>
           </div>
+
+          {/* Small Balance Mode Details */}
+          {scalpData?.smallBalanceModeConfig && (
+            <div className="text-xs bg-yellow-900/20 border border-yellow-700/40 rounded-lg px-3 py-2.5 text-yellow-300 space-y-2">
+              <div className="font-bold text-yellow-400 mb-1">🔹 Small Balance Mode Config</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>Min Net Profit: <span className="font-mono font-bold">${scalpData.smallBalanceModeConfig.minNetProfit.toFixed(4)}</span></div>
+                <div>TP: <span className="font-mono font-bold">{scalpData.smallBalanceModeConfig.takeProfitPercent}%</span></div>
+                <div>SL: <span className="font-mono font-bold">{scalpData.smallBalanceModeConfig.stopLossPercent}%</span></div>
+                <div>Max Trade: <span className="font-mono font-bold">${scalpData.smallBalanceModeConfig.maxTradeAmount.toFixed(2)}</span></div>
+                <div>Min Free Cap %: <span className="font-mono font-bold">{(scalpData.smallBalanceModeConfig.minFreeCapitalPct * 100).toFixed(0)}%</span></div>
+                <div>Max Positions: <span className="font-mono font-bold">{scalpData.smallBalanceModeConfig.maxSimultaneousPositions}</span></div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
