@@ -12,8 +12,14 @@ const ALLOWED_PAIRS          = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT',
 
 const DEFAULT_TRADE_USDT     = 20;     // default USDT per trade
 const MAX_TRADE_USDT         = 30;     // hard ceiling regardless of balance
-const MAX_POSITION_PCT       = 0.30;   // cap at 30% of freeUSDT
-const MIN_FREE_USDT          = 12;     // minimum balance to enter new position
+const MAX_POSITION_PCT       = 0.25;   // cap at 25% of totalCapital per position
+const MIN_FREE_USDT          = 12;     // absolute minimum balance to enter
+
+// ─── Capital Reserve Management ───────────────────────────────────────────────
+const MIN_FREE_CAPITAL_PCT   = 0.30;   // always keep ≥30% free
+const PREFERRED_FREE_PCT     = 0.50;   // target 50% free for best liquidity
+const MAX_SIMULTANEOUS_POS   = 2;      // hard max positions
+const CAPITAL_RECOVERY_PCT   = 0.30;   // activate recovery mode below this
 
 const TAKE_PROFIT_PCT        = 0.25;   // 0.25% TP (must exceed round-trip fees ~0.20%)
 const STOP_LOSS_PCT          = -0.18;  // -0.18% SL
@@ -24,7 +30,7 @@ const MICRO_TRAIL_DROP_PCT   = 0.05;   // sell if price drops 0.05% from best
 const MIN_NET_PROFIT_USDT    = 0.02;   // minimum net profit after fees to SELL (except SL)
 const MAX_SPREAD_PCT         = 0.08;   // tight spread gate
 const OKX_FEE_RATE           = 0.001;  // 0.1% taker per side
-const MAX_POSITIONS          = 2;
+const MAX_POSITIONS          = MAX_SIMULTANEOUS_POS;
 const COOLDOWN_SECONDS       = 30;     // cooldown after any sell
 
 // ─── OKX auth helpers ─────────────────────────────────────────────────────────
@@ -134,33 +140,81 @@ function analyzeTradeSizing(tradeUSDT, tpPct) {
   };
 }
 
-// Decide trade amount: default → scale up → reject if cap too tight
-function computeTradeAmount(freeUsdt) {
-  const balanceCap  = freeUsdt * MAX_POSITION_PCT;
-  const hardCap     = Math.min(MAX_TRADE_USDT, balanceCap);
+// ─── Capital Reserve Analysis ─────────────────────────────────────────────────
+function analyzeCapitalReserve(freeUsdt, activePositions, tickerMap) {
+  // Estimate locked capital = sum of position values at current price
+  let lockedCapital = 0;
+  const capitalLockedByPair = {};
+  for (const pos of activePositions) {
+    const cur = parseFloat(tickerMap[pos.instId]?.last || pos.entryPrice);
+    const val = parseFloat((cur * pos.qty).toFixed(2));
+    lockedCapital += val;
+    capitalLockedByPair[pos.instId] = val;
+  }
+  const totalCapital       = freeUsdt + lockedCapital;
+  const freeCapitalPct     = totalCapital > 0 ? freeUsdt / totalCapital : 1;
+  const lockedCapitalPct   = totalCapital > 0 ? lockedCapital / totalCapital : 0;
+  const capitalRecovery    = freeCapitalPct < CAPITAL_RECOVERY_PCT;
+  const availableTradeSlots = Math.max(0, MAX_SIMULTANEOUS_POS - activePositions.length);
+  // Efficiency: how many opportunities are viable (slots open + enough free capital)
+  const capitalEfficiencyScore = parseFloat(
+    (Math.min(freeCapitalPct / PREFERRED_FREE_PCT, 1) * 100).toFixed(1)
+  );
+
+  return {
+    totalCapital:         parseFloat(totalCapital.toFixed(2)),
+    freeCapital:          parseFloat(freeUsdt.toFixed(2)),
+    lockedCapital:        parseFloat(lockedCapital.toFixed(2)),
+    freeCapitalPct:       parseFloat((freeCapitalPct * 100).toFixed(1)),
+    lockedCapitalPct:     parseFloat((lockedCapitalPct * 100).toFixed(1)),
+    capitalRecoveryMode:  capitalRecovery,
+    availableTradeSlots,
+    capitalEfficiencyScore,
+    capitalLockedByPair
+  };
+}
+
+// Decide trade amount: respects capital reserve rules
+function computeTradeAmount(freeUsdt, totalCapital, capitalRecoveryMode) {
+  // In recovery mode reduce position size to accelerate capital release
+  const maxPct  = capitalRecoveryMode ? 0.15 : MAX_POSITION_PCT;
+  const balanceCap = totalCapital * maxPct;   // % of total, not just free
+  const hardCap    = Math.min(MAX_TRADE_USDT, balanceCap);
+
+  // Must keep MIN_FREE_CAPITAL_PCT of total free after the trade
+  const maxAllowedByReserve = freeUsdt - (totalCapital * MIN_FREE_CAPITAL_PCT);
+  const effectiveCap = Math.min(hardCap, maxAllowedByReserve);
+
+  if (effectiveCap <= 0) {
+    return {
+      amount: 0, analysis: analyzeTradeSizing(DEFAULT_TRADE_USDT, TAKE_PROFIT_PCT),
+      scaled: false, rejected: true,
+      reason: `Capital reserve breach: would drop freeCapital below ${(MIN_FREE_CAPITAL_PCT * 100)}%`
+    };
+  }
 
   // 1. Try default
   const defaultA = analyzeTradeSizing(DEFAULT_TRADE_USDT, TAKE_PROFIT_PCT);
-  if (defaultA.viable && DEFAULT_TRADE_USDT <= hardCap) {
+  if (defaultA.viable && DEFAULT_TRADE_USDT <= effectiveCap) {
     return { amount: DEFAULT_TRADE_USDT, analysis: defaultA, scaled: false, rejected: false };
   }
 
-  // 2. Scale up to minimum required (+ 5% buffer), capped at hardCap
+  // 2. Scale up to minimum required (+ 5% buffer), capped at effectiveCap
   const minReq = defaultA.minTradeAmountForProfit;
-  if (minReq !== Infinity && minReq <= hardCap) {
-    const scaledAmount = parseFloat(Math.min(minReq * 1.05, hardCap).toFixed(2));
+  if (minReq !== Infinity && minReq <= effectiveCap) {
+    const scaledAmount = parseFloat(Math.min(minReq * 1.05, effectiveCap).toFixed(2));
     const scaledA = analyzeTradeSizing(scaledAmount, TAKE_PROFIT_PCT);
     return { amount: scaledAmount, analysis: scaledA, scaled: true, rejected: false };
   }
 
-  // 3. Cannot make trade viable within balance cap → reject
-  const capAnalysis = analyzeTradeSizing(hardCap, TAKE_PROFIT_PCT);
+  // 3. Cannot make trade viable within effective cap → reject
+  const capAnalysis = analyzeTradeSizing(Math.max(effectiveCap, 0.01), TAKE_PROFIT_PCT);
   return {
     amount: 0,
     analysis: capAnalysis,
     scaled: false,
     rejected: true,
-    reason: `minRequired=${minReq === Infinity ? '∞' : minReq.toFixed(2)} USDT > hardCap=${hardCap.toFixed(2)} USDT`
+    reason: `minRequired=${minReq === Infinity ? '∞' : minReq?.toFixed(2)} USDT > effectiveCap=${effectiveCap.toFixed(2)} USDT`
   };
 }
 
@@ -334,7 +388,16 @@ Deno.serve(async (req) => {
     const details  = balRes.data?.[0]?.details || [];
     const freeUsdt = parseFloat(details.find(d => d.ccy === 'USDT')?.availBal || 0);
 
-    console.log(`[SCALP] freeUSDT=${freeUsdt.toFixed(2)} positions=${activePositions.length}/${MAX_POSITIONS}`);
+    // ── Capital Reserve Analysis ──
+    const capitalReserve = analyzeCapitalReserve(freeUsdt, activePositions, tickerMap);
+    const { totalCapital, capitalRecoveryMode } = capitalReserve;
+
+    console.log(`[SCALP] freeUSDT=${freeUsdt.toFixed(2)} total=${totalCapital.toFixed(2)} freeCapPct=${capitalReserve.freeCapitalPct}% recovery=${capitalRecoveryMode} positions=${activePositions.length}/${MAX_POSITIONS}`);
+
+    // In CAPITAL_RECOVERY mode, log it clearly
+    if (capitalRecoveryMode) {
+      console.log(`[SCALP] ⚠️ CAPITAL_RECOVERY MODE — freeCapital ${capitalReserve.freeCapitalPct}% < ${(CAPITAL_RECOVERY_PCT*100)}% threshold. Prioritizing exits.`);
+    }
 
     // ── Pre-compute sizing preview for all pairs (always shown in dashboard) ──
     const sizingPreview = {};
@@ -379,13 +442,16 @@ Deno.serve(async (req) => {
       const hitSL         = pnlPct <= STOP_LOSS_PCT;
       const hitTrail      = pnlPct >= (TAKE_PROFIT_PCT - TRAILING_STOP_PCT) && pnlPct < TAKE_PROFIT_PCT && netProfit >= MIN_NET_PROFIT_USDT;
       const hitMicroTrail = microTrailingActive && newBest >= MICRO_TRAIL_PEAK_PCT && trailingDistance >= MICRO_TRAIL_DROP_PCT && netProfit >= MIN_NET_PROFIT_USDT;
-      const shouldSell    = hitTP || hitSL || hitTrail || hitMicroTrail;
+      // In CAPITAL_RECOVERY mode: also exit at break-even or better to free capital
+      const hitBreakEven  = capitalRecoveryMode && netProfit >= 0 && pnlPct > 0;
+      const shouldSell    = hitTP || hitSL || hitTrail || hitMicroTrail || hitBreakEven;
 
       let exitMode = 'WAIT';
       if (hitTP)              exitMode = 'TP';
       else if (hitSL)         exitMode = 'SL';
       else if (hitTrail)      exitMode = 'TRAIL';
       else if (hitMicroTrail) exitMode = 'MICRO_TRAIL';
+      else if (hitBreakEven)  exitMode = 'BREAK_EVEN_EXIT';
       else if (netProfit < MIN_NET_PROFIT_USDT && pnlPct > 0) exitMode = 'WAIT_NET_TOO_LOW';
 
       console.log(`[SCALP] ${pos.instId}: exitMode=${exitMode}`);
@@ -404,9 +470,10 @@ Deno.serve(async (req) => {
       sellDetails.push(diag);
 
       if (shouldSell) {
-        const reason = hitTP    ? `TP: pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}`
-                     : hitSL    ? `SL: pnl=${pnlPct.toFixed(4)}%`
-                     : hitTrail ? `TRAIL: pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}`
+        const reason = hitTP         ? `TP: pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}`
+                     : hitSL         ? `SL: pnl=${pnlPct.toFixed(4)}%`
+                     : hitTrail      ? `TRAIL: pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}`
+                     : hitBreakEven  ? `BREAK_EVEN_EXIT: capital recovery mode, pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}`
                      : `MICRO_TRAIL: bestPnl=${newBest.toFixed(4)}% drop=${trailingDistance}% net=${netProfit.toFixed(4)}`;
         const sr = await executeSell(base44, apiKey, apiSecret, passphrase, pos, reason);
         sellResults.push({ ...diag, ...sr });
@@ -418,15 +485,22 @@ Deno.serve(async (req) => {
     const activePairNow = new Set(posNow.map(p => p.instId));
     let buyResult = null;
 
-    if (posNow.length > 0) {
+    // Re-run capital reserve with updated positions after sells
+    const capitalReserveNow = analyzeCapitalReserve(freeUsdt, posNow, tickerMap);
+
+    if (posNow.length >= MAX_POSITIONS) {
       const holdingStr = posNow.map(p => {
         const t = tickerMap[p.instId];
         const cur = t ? parseFloat(t.last || 0) : 0;
         const pct = cur ? ((cur - p.entryPrice) / p.entryPrice * 100).toFixed(4) : '?';
         return `${p.instId} @${p.entryPrice} cur=${cur} pnl=${pct}%`;
       }).join(' | ');
-      console.log(`[SCALP] WAIT — active positions: ${holdingStr}`);
-      buyResult = { decision: 'WAIT_ACTIVE_POSITION', reason: `Holding: ${holdingStr}` };
+      console.log(`[SCALP] WAIT — max positions reached: ${holdingStr}`);
+      buyResult = { decision: 'WAIT_ACTIVE_POSITION', reason: `Max positions (${MAX_POSITIONS}): ${holdingStr}` };
+
+    } else if (capitalReserveNow.capitalRecoveryMode) {
+      console.log(`[SCALP] WAIT — CAPITAL_RECOVERY: freeCapital=${capitalReserveNow.freeCapitalPct}% < ${(CAPITAL_RECOVERY_PCT*100)}%. No new positions.`);
+      buyResult = { decision: 'WAIT_CAPITAL_RECOVERY', freeUsdt, freeCapitalPct: capitalReserveNow.freeCapitalPct };
 
     } else if (freeUsdt < MIN_FREE_USDT) {
       console.log(`[SCALP] WAIT: freeUSDT=${freeUsdt.toFixed(2)} < min=${MIN_FREE_USDT}`);
@@ -444,8 +518,8 @@ Deno.serve(async (req) => {
         const cooled = await isInCooldown(base44, pair);
         if (cooled) { console.log(`[SCALP] SKIP ${pair}: cooldown`); continue; }
 
-        // Fee-aware sizing decision
-        const sizing = computeTradeAmount(freeUsdt);
+        // Capital-reserve-aware sizing
+        const sizing = computeTradeAmount(freeUsdt, capitalReserveNow.totalCapital, capitalReserveNow.capitalRecoveryMode);
 
         if (sizing.analysis?.tpBelowFees) {
           console.log(`[SCALP] SKIP ${pair}: TP below round-trip fees — trading disabled`);
@@ -520,13 +594,15 @@ Deno.serve(async (req) => {
     }
 
     const finalPositions = await getActivePositions(base44);
+    const finalCapital = analyzeCapitalReserve(freeUsdt, finalPositions, tickerMap);
     return Response.json({
       mode: 'scalp',
       freeUsdt,
       positionCount: finalPositions.length,
       maxPositions: MAX_POSITIONS,
+      capitalReserve: finalCapital,
       positionDiagnostics: sellDetails,
-      sizingPreview,          // fee analysis per pair for dashboard
+      sizingPreview,
       activePositions: finalPositions.map(p => ({
         instId: p.instId, qty: p.qty, entryPrice: p.entryPrice,
         currentPrice: parseFloat(tickerMap[p.instId]?.last || 0),
@@ -536,6 +612,7 @@ Deno.serve(async (req) => {
       buy: buyResult,
       config: {
         DEFAULT_TRADE_USDT, MAX_TRADE_USDT, MAX_POSITION_PCT,
+        MIN_FREE_CAPITAL_PCT, PREFERRED_FREE_PCT, CAPITAL_RECOVERY_PCT,
         TAKE_PROFIT_PCT, STOP_LOSS_PCT, TRAILING_STOP_PCT,
         MICRO_TRAIL_ENTER_PCT, MICRO_TRAIL_PEAK_PCT, MICRO_TRAIL_DROP_PCT,
         MIN_NET_PROFIT_USDT, MAX_SPREAD_PCT, OKX_FEE_RATE, COOLDOWN_SECONDS
