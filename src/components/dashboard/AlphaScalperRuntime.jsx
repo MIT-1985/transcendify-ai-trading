@@ -182,7 +182,14 @@ export default function AlphaScalperRuntime({ enabled = true }) {
 
   // ========== EXECUTION PULSE (10s) ==========
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      if (executionIntervalRef.current) {
+        clearInterval(executionIntervalRef.current);
+        executionIntervalRef.current = null;
+      }
+      setExecution(prev => ({ ...prev, lastCommand: 'PAUSED', runtimeActive: false }));
+      return;
+    }
 
     const executeScalp = async () => {
       try {
