@@ -27,7 +27,9 @@ const POLYGON_TICKER = {
   'XRP-USDT': 'X:XRPUSD',
 };
 
-const MIN_TRADE_USDT = 10;
+const TRADE_AMOUNT_USDT = 20;     // fixed USDT per trade
+const MAX_POSITION_PCT = 0.30;    // never use more than 30% of freeUSDT in one trade
+const MIN_FREE_USDT = 15;         // minimum required free USDT to consider buying
 const MAX_SPREAD_PCT = 0.15;      // per pair; high-liq pairs typically <0.05%
 const TAKE_PROFIT_PCT = 2.0;
 const STOP_LOSS_PCT = -1.0;
@@ -111,9 +113,9 @@ async function fetchPolygonCandles(ticker) {
 }
 
 // ─── Score a single pair (0-100) ──────────────────────────────────────────────
-// Returns { score, signal, trend, momentum, volRatio, volatilityPct, spreadPct, polygonPrice, detail }
+// Returns { score, signal, trend, momentum, volRatio, volatilityPct, spreadPct, polygonPrice, detail, decisionReason }
 function scorePair(pair, ticker, candles) {
-  if (!ticker) return { pair, score: 0, signal: null, trend: 'N/A', momentum: 0, volRatio: 0, volatilityPct: 0, spreadPct: 99, polygonPrice: null, detail: 'no_ticker' };
+  if (!ticker) return { pair, score: 0, signal: null, trend: 'N/A', momentum: 0, volRatio: 0, volatilityPct: 0, spreadPct: 99, polygonPrice: null, detail: 'no_ticker', decisionReason: 'No ticker data available' };
 
   const bid = parseFloat(ticker.bidPx || 0);
   const ask = parseFloat(ticker.askPx || 0);
@@ -122,7 +124,7 @@ function scorePair(pair, ticker, candles) {
 
   // Hard block: spread too wide
   if (spreadPct > MAX_SPREAD_PCT) {
-    return { pair, score: 0, signal: null, trend: 'N/A', momentum: 0, volRatio: 0, volatilityPct: 0, spreadPct, polygonPrice: null, detail: 'spread_too_wide' };
+    return { pair, score: 0, signal: null, trend: 'N/A', momentum: 0, volRatio: 0, volatilityPct: 0, spreadPct, polygonPrice: null, detail: 'spread_too_wide', decisionReason: `Spread ${spreadPct.toFixed(4)}% exceeds max ${MAX_SPREAD_PCT}%` };
   }
 
   // Spread score: 0% = 30pts, MAX_SPREAD_PCT = 0pts
@@ -130,9 +132,8 @@ function scorePair(pair, ticker, candles) {
 
   // No candles → use OKX-only partial score
   if (!candles || candles.length < 5) {
-    // Can still trade but with reduced confidence, no trend score
-    const score = Math.round(spreadScore * 0.5); // max ~15 without polygon
-    return { pair, score, signal: null, trend: 'UNKNOWN', momentum: 0, volRatio: 0, volatilityPct: 0, spreadPct, polygonPrice: null, detail: 'no_candles' };
+    const score = Math.round(spreadScore * 0.5);
+    return { pair, score, signal: null, trend: 'UNKNOWN', momentum: 0, volRatio: 0, volatilityPct: 0, spreadPct, polygonPrice: null, detail: 'no_candles', decisionReason: 'No Polygon candle data — partial score only' };
   }
 
   const slice = candles.slice(-20);
@@ -181,6 +182,15 @@ function scorePair(pair, ticker, candles) {
   const signal = isUp && momentum > 0.3 && volRatio > 1.1 && volatilityPct < 2.0 && bullish ? 'BUY' :
                  !isUp && momentum < -0.3 ? 'SELL' : null;
 
+  const reasons = [];
+  if (isUp) reasons.push(`trend UP`); else reasons.push(`trend DOWN`);
+  if (bullish) reasons.push(`bullish candle`);
+  reasons.push(`momentum=${momentum.toFixed(3)}%`);
+  reasons.push(`volRatio=${volRatio.toFixed(2)}x`);
+  reasons.push(`spread=${spreadPct.toFixed(4)}%`);
+  reasons.push(`volatility=${volatilityPct.toFixed(3)}%`);
+  reasons.push(`score=${Math.round(trendScore + momentumScore + volumeScore + volatilityScore + spreadScore)}`);
+
   return {
     pair, score, signal,
     trend: isUp ? 'UP' : 'DOWN',
@@ -189,7 +199,8 @@ function scorePair(pair, ticker, candles) {
     volatilityPct: parseFloat(volatilityPct.toFixed(3)),
     spreadPct,
     polygonPrice: parseFloat(lastCandle.c.toFixed(8)),
-    detail: 'scored'
+    detail: 'scored',
+    decisionReason: reasons.join(' | ')
   };
 }
 
@@ -206,7 +217,7 @@ async function saveLog(base44, decision, reason, data = {}) {
       okx_status: data.okxStatus || 'OK',
       polygon_status: data.polygonStatus || 'OK',
       free_usdt: data.freeUsdt || 0,
-      signal_data: data.signalData || null,
+      signal_data: data.pairScores ? { pairScores: data.pairScores, ...(data.signalData || {}) } : (data.signalData || null),
       error_message: data.errorMessage || null
     });
   } catch (err) {
@@ -388,7 +399,13 @@ Deno.serve(async (req) => {
     console.log(`[R1] Pair scores: ${pairScores.map(p => `${p.pair}=${p.score}`).join(', ')}`);
 
     const polygonStatus = candleResults.some(r => r.candles) ? 'OK' : 'UNAVAILABLE';
-    const commonData = { freeUsdt, signalData: pairScores, polygonStatus, okxStatus: 'OK' };
+    // Build full pairScores array for logging (with decisionReason)
+    const pairScoresForLog = pairScores.map(p => ({
+      pair: p.pair, score: p.score, signal: p.signal, spread: p.spreadPct,
+      trend: p.trend, momentum: p.momentum, volRatio: p.volRatio,
+      volatility: p.volatilityPct, decisionReason: p.decisionReason
+    }));
+    const commonData = { freeUsdt, pairScores: pairScoresForLog, polygonStatus, okxStatus: 'OK' };
 
     // ── 5. SELL check: iterate all open positions ─────────────────────────────
     const sellResults = [];
@@ -424,8 +441,9 @@ Deno.serve(async (req) => {
       const reason = `Max positions reached (${activeCountNow}/${MAX_POSITIONS}). Holding: ${[...activePairSetNow].join(', ')}`;
       console.log(`[R1] WAIT: ${reason}`);
       await saveLog(base44, 'WAIT', reason, { ...commonData, activePosition: true, positionSymbol: [...activePairSetNow].join(','), positionQty: activeCountNow });
-    } else if (freeUsdt < MIN_TRADE_USDT) {
-      const reason = `Insufficient USDT: ${freeUsdt.toFixed(2)} < ${MIN_TRADE_USDT}`;
+    } else if (freeUsdt < MIN_FREE_USDT) {
+      const reason = `Insufficient USDT: ${freeUsdt.toFixed(2)} < minRequired=${MIN_FREE_USDT}`;
+      console.log(`[R1] WAIT: ${reason}`);
       await saveLog(base44, 'WAIT', reason, commonData);
     } else {
       // Find best candidate: highest score, not already held, passes min score
@@ -437,13 +455,17 @@ Deno.serve(async (req) => {
 
       if (!candidate) {
         const topScore = pairScores[0];
-        const reason = `No qualified setup. Best: ${topScore.pair} score=${topScore.score}/${MIN_SCORE_TO_BUY} required. ${topScore.detail || ''}`;
+        const reason = `No qualified setup. Best: ${topScore.pair} score=${topScore.score}/${MIN_SCORE_TO_BUY} required. Reason: ${topScore.decisionReason || topScore.detail || ''}`;
         console.log(`[R1] WAIT: ${reason}`);
         await saveLog(base44, 'WAIT', reason, commonData);
       } else {
-        console.log(`[R1] BUY candidate: ${candidate.pair} score=${candidate.score} signal=${candidate.signal}`);
+        // Capital safety: fixed amount, capped at 30% of freeUSDT
+        const maxByPct = parseFloat((freeUsdt * MAX_POSITION_PCT).toFixed(2));
+        const buyUsdtAmount = Math.min(TRADE_AMOUNT_USDT, maxByPct);
+        const winReason = `Selected ${candidate.pair} — score=${candidate.score} (best eligible). ${candidate.decisionReason}`;
+        console.log(`[R1] BUY candidate: ${candidate.pair} score=${candidate.score} signal=${candidate.signal} — ${winReason}`);
+        console.log(`[R1] Capital allocation: fixed=${TRADE_AMOUNT_USDT} USDT | 30% cap=${maxByPct} USDT | using=${buyUsdtAmount} USDT`);
 
-        const buyUsdtAmount = parseFloat((freeUsdt * 0.9).toFixed(2));
         const buyBody = JSON.stringify({
           instId: candidate.pair, tdMode: 'cash', side: 'buy',
           ordType: 'market', sz: buyUsdtAmount.toString(), tgtCcy: 'quote_ccy'
@@ -472,14 +494,15 @@ Deno.serve(async (req) => {
               timestamp: new Date(parseInt(buyFill.fillTime || buyFill.uTime || Date.now())).toISOString()
             };
             await saveToLedger(base44, buyFillData);
-            const buyMode = `Score=${candidate.score} | trend=${candidate.trend} | momentum=${candidate.momentum} | volRatio=${candidate.volRatio}`;
+            const buyMode = `${winReason} | usedUSDT=${buyUsdtAmount} | avgPx=${buyFillData.avgPx}`;
             await saveLog(base44, 'BUY', buyMode, {
               ...commonData, orderId: buyOrdId, activePosition: true,
               positionSymbol: candidate.pair, positionQty: buyFillData.accFillSz
             });
-            console.log(`[R1] BUY EXECUTED ${candidate.pair} ordId=${buyOrdId} qty=${buyFillData.accFillSz} px=${buyFillData.avgPx}`);
+            console.log(`[R1] BUY EXECUTED ${candidate.pair} ordId=${buyOrdId} qty=${buyFillData.accFillSz} px=${buyFillData.avgPx} usdt=${buyUsdtAmount}`);
             buyResult = {
               decision: 'BUY_EXECUTED', pair: candidate.pair, reason: buyMode, ordId: buyOrdId,
+              usedUSDT: buyUsdtAmount,
               fill: { avgPx: buyFillData.avgPx, accFillSz: buyFillData.accFillSz, fee: Math.abs(buyFillData.fee) }
             };
           }
