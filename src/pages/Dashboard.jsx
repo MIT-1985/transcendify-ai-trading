@@ -27,13 +27,13 @@ export default function Dashboard() {
 
   const sessionStartRef = React.useRef(new Date());
 
-  // Verified Trades
+  // Verified Trades (both robot1 and alphaScalper)
   const { data: verifiedTrades = [], isLoading: loadVerified } = useQuery({
     queryKey: ['robot1-verified', user?.email],
     queryFn: async () => {
       const all = await base44.asServiceRole.entities.VerifiedTrade.list();
       return all
-        .filter(t => t.robotId === 'robot1' && ALLOWED_PAIRS.includes(t.instId) && t.status === 'closed')
+        .filter(t => (t.robotId === 'robot1' || t.robotId === 'alphaScalper') && ALLOWED_PAIRS.includes(t.instId) && t.status === 'closed')
         .sort((a, b) => new Date(b.sellTime).getTime() - new Date(a.sellTime).getTime());
     },
     enabled: !!user,
@@ -59,13 +59,13 @@ export default function Dashboard() {
     refetchInterval: 30000
   });
 
-  // OKX Ledger
+  // OKX Ledger (both robot1 and alphaScalper)
   const { data: ledger = [], isLoading: loadLedger } = useQuery({
     queryKey: ['oxx-ledger', user?.email],
     queryFn: async () => {
       const all = await base44.asServiceRole.entities.OXXOrderLedger.list();
       return all
-        .filter(o => o.robotId === 'robot1' && ALLOWED_PAIRS.includes(o.instId))
+        .filter(o => (o.robotId === 'robot1' || o.robotId === 'alphaScalper') && ALLOWED_PAIRS.includes(o.instId) && o.verified === true)
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     },
     enabled: !!user,
@@ -315,7 +315,9 @@ export default function Dashboard() {
           {loadLedger ? (
             <Skeleton className="h-32 bg-slate-800" />
           ) : ledger.length === 0 ? (
-            <div className="text-center text-slate-500 py-8">No orders yet</div>
+            <div className="text-center text-yellow-600 py-8 bg-yellow-900/20 rounded border border-yellow-700 m-4">
+              OXXOrderLedger missing — OKX fills not synced
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -356,7 +358,9 @@ export default function Dashboard() {
           {loadVerified ? (
             <Skeleton className="h-32 bg-slate-800" />
           ) : todaysTrades.length === 0 ? (
-            <div className="text-center text-slate-500 py-8">No closed trades yet</div>
+            <div className="text-center text-yellow-600 py-8 bg-yellow-900/20 rounded border border-yellow-700 m-4">
+              {ledger.length > 0 ? 'Reconciliation missing — OKX fills found but VerifiedTrade not created' : 'No closed trades yet'}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
