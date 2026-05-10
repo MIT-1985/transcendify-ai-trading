@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
@@ -11,7 +11,6 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [syncStatus, setSyncStatus] = useState('idle');
 
-  // Sync OKX ledger
   const handleSync = async () => {
     setSyncStatus('syncing');
     try {
@@ -27,226 +26,213 @@ export default function Dashboard() {
     }
   };
 
-  // === 1. OKX LIVE BALANCE ===
+  // 1. OKX Live Balance
   const { data: balance = {}, isLoading: loadBalance } = useQuery({
     queryKey: ['okx-live-balance', user?.email],
     queryFn: async () => {
-      try {
-        const res = await base44.functions.invoke('getSuzanaBalance', {});
-        return res.data || {};
-      } catch (e) {
-        return { error: e.message };
-      }
+      const res = await base44.functions.invoke('getSuzanaBalance', {});
+      return res.data || {};
     },
     enabled: !!user,
     staleTime: 30000
   });
 
-  // === 3. ROBOT 1 VERIFIED TRADES ===
+  // 3. Robot 1 Verified Trades
   const { data: robot1Trades = [], refetch: refetchVerified, isLoading: loadVerified } = useQuery({
     queryKey: ['robot1-verified', user?.email],
     queryFn: async () => {
-      try {
-        const all = await base44.asServiceRole.entities.VerifiedTrade.list();
-        return all.filter(t => t.robotId === 'robot1' && (t.instId === 'ETH-USDT' || t.instId === 'SOL-USDT'));
-      } catch (e) {
-        return [];
-      }
+      const all = await base44.asServiceRole.entities.VerifiedTrade.list();
+      return all
+        .filter(t => t.robotId === 'robot1' && ALLOWED_PAIRS.includes(t.instId))
+        .sort((a, b) => new Date(b.sellTime).getTime() - new Date(a.sellTime).getTime());
     },
     enabled: !!user,
     staleTime: 30000
   });
 
-  // === 4. OKX RAW ORDERS ===
+  // 4. OKX Raw Orders
   const { data: ledger = [], refetch: refetchLedger, isLoading: loadLedger } = useQuery({
     queryKey: ['oxx-ledger', user?.email],
     queryFn: async () => {
-      try {
-        const all = await base44.asServiceRole.entities.OXXOrderLedger.list();
-        return all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      } catch (e) {
-        return [];
-      }
+      const all = await base44.asServiceRole.entities.OXXOrderLedger.list();
+      return all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     },
     enabled: !!user,
     staleTime: 30000
   });
 
-  const robot1PnL = robot1Trades.reduce((sum, t) => sum + (t.realizedPnL || 0), 0);
+  const ALLOWED_PAIRS = ['ETH-USDT', 'SOL-USDT'];
+  const robot1PnL = robot1Trades.reduce((s, t) => s + (t.realizedPnL || 0), 0);
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
+
+        {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-slate-400 text-sm">OKX + Robot 1 Live Data</p>
+            <h1 className="text-2xl font-bold">Robot 1 Dashboard</h1>
+            <p className="text-slate-500 text-xs mt-0.5">OKX live data · verified fills only</p>
           </div>
-          <Button 
-            onClick={handleSync} 
+          <Button
+            onClick={handleSync}
             disabled={syncStatus === 'syncing'}
-            className={`gap-2 ${syncStatus === 'success' ? 'bg-emerald-600' : 'bg-blue-600'}`}
+            size="sm"
+            className={`gap-2 text-xs ${syncStatus === 'success' ? 'bg-emerald-700' : 'bg-slate-700 hover:bg-slate-600'}`}
           >
-            <Activity className="w-4 h-4" />
-            {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'success' ? '✓ Synced' : 'Sync OKX'}
+            <Activity className="w-3.5 h-3.5" />
+            {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'success' ? '✓ Synced' : 'Sync OKX Ledger'}
           </Button>
         </div>
 
-        {/* 1. OKX LIVE BALANCE */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Wallet className="w-5 h-5 text-yellow-400" />
-            <h2 className="text-lg font-bold">1. OKX Live Balance</h2>
+        {/* 1. OKX Live Balance */}
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Wallet className="w-4 h-4 text-yellow-400" />
+            <h2 className="font-bold text-sm">OKX Live Balance</h2>
           </div>
-          {loadBalance ? (
-            <Skeleton className="h-24" />
-          ) : balance.error ? (
-            <div className="text-red-400 text-sm">{balance.error}</div>
-          ) : (
-            <div className="grid grid-cols-4 gap-4">
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
-                <div className="text-xs text-slate-400">Total Equity</div>
-                <div className="text-2xl font-bold text-emerald-400">
-                  ${parseFloat(balance.totalEquity || 0).toFixed(2)}
-                </div>
+          {loadBalance ? <Skeleton className="h-16 bg-slate-800" /> :
+            balance.error ? <div className="text-red-400 text-xs">{balance.error}</div> : (
+              <div className="grid grid-cols-4 gap-3">
+                {[
+                  { label: 'Total Equity', value: `$${parseFloat(balance.totalEquity || 0).toFixed(2)}`, color: 'text-emerald-400' },
+                  { label: 'Free USDT', value: `$${parseFloat(balance.freeUSDT || 0).toFixed(2)}`, color: 'text-white' },
+                  { label: 'ETH', value: parseFloat(balance.ETH || 0).toFixed(6), color: 'text-white' },
+                  { label: 'SOL', value: parseFloat(balance.SOL || 0).toFixed(4), color: 'text-white' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                    <div className="text-xs text-slate-500 mb-1">{label}</div>
+                    <div className={`text-lg font-bold font-mono ${color}`}>{value}</div>
+                  </div>
+                ))}
               </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
-                <div className="text-xs text-slate-400">Free USDT</div>
-                <div className="text-2xl font-bold text-white">
-                  ${parseFloat(balance.freeUSDT || 0).toFixed(2)}
-                </div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
-                <div className="text-xs text-slate-400">ETH</div>
-                <div className="text-xl font-bold text-white">
-                  {parseFloat(balance.ETH || 0).toFixed(6)}
-                </div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-700/30">
-                <div className="text-xs text-slate-400">SOL</div>
-                <div className="text-xl font-bold text-white">
-                  {parseFloat(balance.SOL || 0).toFixed(4)}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+        </section>
 
-        {/* 2. ROBOT 1 LIVE STATUS */}
+        {/* 2. Robot 1 Live Status */}
         <Robot1Panel />
 
-        {/* 3. ROBOT 1 VERIFIED TRADES */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <TrendingUp className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-lg font-bold">3. Robot 1 Verified Trades (ETH-USDT / SOL-USDT)</h2>
+        {/* 3. Robot 1 Verified Trades */}
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <h2 className="font-bold text-sm">Robot 1 Verified Trades</h2>
+            <span className="ml-auto text-xs text-slate-500">ETH-USDT / SOL-USDT only</span>
           </div>
-          {loadVerified ? (
-            <Skeleton className="h-20" />
-          ) : robot1Trades.length === 0 ? (
-            <div className="text-slate-400 text-sm">No verified trades yet</div>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                <div className="bg-slate-800/50 rounded-lg p-3 border border-emerald-700/30">
-                  <div className="text-xs text-slate-400">Total Trades</div>
-                  <div className="text-2xl font-bold text-white">{robot1Trades.length}</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-3 border border-emerald-700/30">
-                  <div className="text-xs text-slate-400">Closed</div>
-                  <div className="text-2xl font-bold text-white">{robot1Trades.filter(t => t.status === 'closed').length}</div>
-                </div>
-                <div className={`bg-slate-800/50 rounded-lg p-3 border ${robot1PnL >= 0 ? 'border-emerald-700/30' : 'border-red-700/30'}`}>
-                  <div className="text-xs text-slate-400">Total P&L</div>
-                  <div className={`text-2xl font-bold ${robot1PnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {robot1PnL >= 0 ? '+' : ''}{robot1PnL.toFixed(2)}
+          {loadVerified ? <Skeleton className="h-24 bg-slate-800" /> :
+            robot1Trades.length === 0 ? (
+              <div className="text-slate-500 text-xs py-4 text-center">No verified trades yet. BUY→SELL pairs appear here after close.</div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                    <div className="text-xs text-slate-500">Closed Trades</div>
+                    <div className="text-xl font-bold">{robot1Trades.length}</div>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                    <div className="text-xs text-slate-500">Win Rate</div>
+                    <div className="text-xl font-bold text-white">
+                      {robot1Trades.length > 0
+                        ? `${Math.round(robot1Trades.filter(t => t.realizedPnL > 0).length / robot1Trades.length * 100)}%`
+                        : '—'}
+                    </div>
+                  </div>
+                  <div className={`bg-slate-800/50 rounded-lg p-3 border ${robot1PnL >= 0 ? 'border-emerald-700/40' : 'border-red-700/40'}`}>
+                    <div className="text-xs text-slate-500">Total P&L</div>
+                    <div className={`text-xl font-bold font-mono ${robot1PnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {robot1PnL >= 0 ? '+' : ''}{robot1PnL.toFixed(2)} USDT
+                    </div>
                   </div>
                 </div>
-              </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="text-slate-500 border-b border-slate-700">
+                      <tr>
+                        <th className="text-left px-2 py-2">Pair</th>
+                        <th className="text-right px-2 py-2">Buy Px</th>
+                        <th className="text-right px-2 py-2">Sell Px</th>
+                        <th className="text-right px-2 py-2">Qty</th>
+                        <th className="text-right px-2 py-2">P&L</th>
+                        <th className="text-right px-2 py-2">%</th>
+                        <th className="text-right px-2 py-2">Closed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {robot1Trades.slice(0, 10).map((t, i) => (
+                        <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/20">
+                          <td className="px-2 py-2 font-bold">{t.instId}</td>
+                          <td className="px-2 py-2 text-right font-mono">${t.buyPrice?.toFixed(2)}</td>
+                          <td className="px-2 py-2 text-right font-mono">${t.sellPrice?.toFixed(2)}</td>
+                          <td className="px-2 py-2 text-right font-mono">{t.buyQty?.toFixed(4)}</td>
+                          <td className={`px-2 py-2 text-right font-mono ${t.realizedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {t.realizedPnL >= 0 ? '+' : ''}{t.realizedPnL?.toFixed(4)}
+                          </td>
+                          <td className={`px-2 py-2 text-right font-mono ${t.realizedPnLPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {t.realizedPnLPct?.toFixed(2)}%
+                          </td>
+                          <td className="px-2 py-2 text-right text-slate-500">
+                            {t.sellTime ? new Date(t.sellTime).toLocaleString() : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+        </section>
+
+        {/* 4. OKX Raw Orders */}
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="w-4 h-4 text-cyan-400" />
+            <h2 className="font-bold text-sm">OKX Raw Orders</h2>
+            <span className="ml-auto text-xs text-slate-500">Verified fills · robot1 only</span>
+          </div>
+          {loadLedger ? <Skeleton className="h-32 bg-slate-800" /> :
+            ledger.length === 0 ? (
+              <div className="text-slate-500 text-xs py-4 text-center">No orders. Click "Sync OKX Ledger" above.</div>
+            ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="text-slate-400 border-b border-slate-700">
+                  <thead className="text-slate-500 border-b border-slate-700">
                     <tr>
-                      <th className="text-left px-3 py-2">Pair</th>
-                      <th className="text-right px-3 py-2">Buy Qty</th>
-                      <th className="text-right px-3 py-2">Buy Price</th>
-                      <th className="text-right px-3 py-2">Sell Price</th>
-                      <th className="text-right px-3 py-2">P&L</th>
-                      <th className="text-right px-3 py-2">%</th>
+                      <th className="text-left px-2 py-2">Ord ID</th>
+                      <th className="text-left px-2 py-2">Pair</th>
+                      <th className="text-left px-2 py-2">Side</th>
+                      <th className="text-right px-2 py-2">Qty</th>
+                      <th className="text-right px-2 py-2">Avg Px</th>
+                      <th className="text-right px-2 py-2">Quote USDT</th>
+                      <th className="text-right px-2 py-2">Fee</th>
+                      <th className="text-left px-2 py-2">Time</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {robot1Trades.slice(0, 8).map((t, i) => (
-                      <tr key={i} className="border-b border-slate-800 hover:bg-slate-800/30">
-                        <td className="px-3 py-2 font-bold">{t.instId}</td>
-                        <td className="px-3 py-2 text-right font-mono">{t.buyQty?.toFixed(4)}</td>
-                        <td className="px-3 py-2 text-right font-mono">${t.buyPrice?.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right font-mono">${t.sellPrice?.toFixed(2)}</td>
-                        <td className={`px-3 py-2 text-right font-mono ${t.realizedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {t.realizedPnL >= 0 ? '+' : ''}{t.realizedPnL?.toFixed(2)}
+                    {ledger.slice(0, 20).map(o => (
+                      <tr key={o.ordId} className="border-b border-slate-800/50 hover:bg-slate-800/20">
+                        <td className="px-2 py-2 font-mono text-cyan-400">…{o.ordId?.slice(-8)}</td>
+                        <td className="px-2 py-2 font-bold">{o.instId}</td>
+                        <td className="px-2 py-2">
+                          <span className={o.side === 'buy' ? 'text-emerald-400' : 'text-red-400'}>
+                            {o.side?.toUpperCase()}
+                          </span>
                         </td>
-                        <td className={`px-3 py-2 text-right font-mono ${t.realizedPnLPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {t.realizedPnLPct?.toFixed(1)}%
-                        </td>
+                        <td className="px-2 py-2 text-right font-mono">{o.accFillSz?.toFixed(4)}</td>
+                        <td className="px-2 py-2 text-right font-mono">${o.avgPx?.toFixed(2)}</td>
+                        <td className="px-2 py-2 text-right font-mono">${o.quoteUSDT?.toFixed(2)}</td>
+                        <td className="px-2 py-2 text-right font-mono text-red-400">{o.fee?.toFixed(4)}</td>
+                        <td className="px-2 py-2 text-slate-500 text-xs">{new Date(o.timestamp).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                {ledger.length > 20 && (
+                  <div className="text-xs text-slate-600 text-center mt-2">…{ledger.length - 20} more</div>
+                )}
               </div>
-            </div>
-          )}
-        </div>
+            )}
+        </section>
 
-        {/* 4. OKX RAW ORDERS */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Activity className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-lg font-bold">4. OKX Raw Orders (Verified Fills Only)</h2>
-          </div>
-          {loadLedger ? (
-            <Skeleton className="h-40" />
-          ) : ledger.length === 0 ? (
-            <div className="text-slate-400 text-sm">No orders. Click "Sync OKX" above.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="text-slate-400 border-b border-slate-700">
-                  <tr>
-                    <th className="text-left px-3 py-2">Ord ID</th>
-                    <th className="text-left px-3 py-2">Pair</th>
-                    <th className="text-left px-3 py-2">Side</th>
-                    <th className="text-right px-3 py-2">Base Qty</th>
-                    <th className="text-right px-3 py-2">Quote USDT</th>
-                    <th className="text-right px-3 py-2">Fee</th>
-                    <th className="text-left px-3 py-2">Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ledger.slice(0, 20).map(ord => (
-                    <tr key={ord.ordId} className="border-b border-slate-800 hover:bg-slate-800/30">
-                      <td className="px-3 py-2 font-mono text-cyan-400">{ord.ordId.slice(-10)}</td>
-                      <td className="px-3 py-2 font-bold">{ord.instId}</td>
-                      <td className="px-3 py-2">
-                        <span className={ord.side === 'buy' ? 'text-emerald-400' : 'text-red-400'}>
-                          {ord.side.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono">{ord.accFillSz?.toFixed(4)}</td>
-                      <td className="px-3 py-2 text-right font-mono">${ord.quoteUSDT?.toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right font-mono text-red-400">{ord.fee?.toFixed(4)}</td>
-                      <td className="px-3 py-2 text-slate-500">
-                        {new Date(ord.timestamp).toLocaleTimeString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {ledger.length > 20 && (
-                <div className="text-xs text-slate-500 mt-2 text-center">... {ledger.length - 20} more</div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
