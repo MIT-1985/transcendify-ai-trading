@@ -13,8 +13,8 @@ Deno.serve(async (req) => {
     const allLedger = await base44.asServiceRole.entities.OXXOrderLedger.list();
     const allTrades = await base44.asServiceRole.entities.VerifiedTrade.list();
 
-    // Step 2: Deduplicate OXXOrderLedger by ordId
-    const seenOrderIds = new Set();
+    // Step 2: Deduplicate OXXOrderLedger by unique fill key
+    const seenFillKeys = new Set();
     const uniqueLedger = [];
     const duplicateLedger = [];
 
@@ -26,8 +26,11 @@ Deno.serve(async (req) => {
     for (const record of sortedLedger) {
       // Only include verified, non-excluded records
       if (record.verified !== false && !record.duplicate && !record.excludedFromPnL && !record.stale_unmatched_buy) {
-        if (!seenOrderIds.has(record.ordId)) {
-          seenOrderIds.add(record.ordId);
+        // Unique key: exchange + ordId + instId + side + fillTime (or created_date)
+        const fillKey = `OKX:${record.ordId}:${record.instId}:${record.side}:${record.timestamp || record.created_date}`;
+        
+        if (!seenFillKeys.has(fillKey)) {
+          seenFillKeys.add(fillKey);
           uniqueLedger.push(record);
         } else {
           duplicateLedger.push(record);
@@ -35,10 +38,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Step 3: Deduplicate VerifiedTrade by buyOrdId + sellOrdId
+    // Step 3: Deduplicate VerifiedTrade and filter suspects
     const seenTradeKeys = new Set();
     const uniqueTrades = [];
     const duplicateTrades = [];
+    const suspectTrades = [];
+    let invalidTradeCount = 0;
 
     // Sort by sellTime desc to keep newest
     const sortedTrades = [...allTrades].sort((a, b) => 
@@ -46,8 +51,26 @@ Deno.serve(async (req) => {
     );
 
     for (const trade of sortedTrades) {
-      // Only include verified, non-excluded, non-suspect records
-      if (trade.verified !== false && !trade.excludedFromPnL && !trade.suspect_pnl && !trade.invalid) {
+      // Skip excluded or invalid records
+      if (trade.excludedFromPnL || trade.invalid) {
+        invalidTradeCount++;
+        continue;
+      }
+
+      // Check for suspect trades
+      const pnlPct = parseFloat(trade.realizedPnLPct || 0);
+      const absPnlPct = Math.abs(pnlPct);
+      const hasNegativeHold = (trade.holdingMs || 0) < 0;
+      const sameOrderIds = trade.buyOrdId && trade.sellOrdId && trade.buyOrdId === trade.sellOrdId;
+      const missingQty = !trade.buyQty || !trade.sellQty;
+      
+      if (absPnlPct > 5 || hasNegativeHold || sameOrderIds || missingQty) {
+        suspectTrades.push(trade);
+        continue;
+      }
+
+      // Verified, non-suspect trade
+      if (trade.verified !== false && !trade.suspect_pnl) {
         const key = `${trade.buyOrdId}+${trade.sellOrdId}`;
         if (!seenTradeKeys.has(key)) {
           seenTradeKeys.add(key);
@@ -69,23 +92,16 @@ Deno.serve(async (req) => {
     const latestUniqueOrders = uniqueLedger.slice(0, 10);
     const latestUniqueTrades = uniqueTrades.slice(0, 10);
 
-    // Step 6: Construct response
+    // Step 6: Construct response with suspect/invalid trade counts
     return Response.json({
       success: true,
-      okx_balance: {
-        raw: null,
-        mapped: {
-          totalEquityUSDT: '0',
-          freeUSDT: '0',
-          frozenUSDT: '0',
-          openOrdersCount: 0
-        }
-      },
       unique_counts: {
         unique_orders: uniqueLedger.length,
         duplicate_orders: duplicateLedger.length,
         unique_trades: uniqueTrades.length,
-        duplicate_trades: duplicateTrades.length
+        duplicate_trades: duplicateTrades.length,
+        suspect_trades: suspectTrades.length,
+        invalid_trades: invalidTradeCount
       },
       clean_metrics: {
         orders_count: uniqueLedger.length,
@@ -95,8 +111,23 @@ Deno.serve(async (req) => {
         win_rate: parseFloat(cleanWinRate),
         wins: cleanWins,
         losses: cleanLosses,
-        latest_orders: latestUniqueOrders,
-        latest_trades: latestUniqueTrades
+        latest_orders: latestUniqueOrders.map(o => ({
+          instId: o.instId,
+          side: o.side,
+          avgPx: parseFloat(o.avgPx || 0),
+          accFillSz: parseFloat(o.accFillSz || 0),
+          fee: parseFloat(o.fee || 0),
+          timestamp: o.timestamp
+        })),
+        latest_trades: latestUniqueTrades.map(t => ({
+          instId: t.instId,
+          buyPrice: parseFloat(t.buyPrice || 0),
+          sellPrice: parseFloat(t.sellPrice || 0),
+          realizedPnL: parseFloat(t.realizedPnL || 0),
+          realizedPnLPct: parseFloat(t.realizedPnLPct || 0),
+          buyTime: t.buyTime,
+          sellTime: t.sellTime
+        }))
       },
       total_counts: {
         all_ledger: allLedger.length,
@@ -104,11 +135,14 @@ Deno.serve(async (req) => {
         unique_ledger: uniqueLedger.length,
         unique_trades: uniqueTrades.length,
         duplicate_ledger: duplicateLedger.length,
-        duplicate_trades: duplicateTrades.length
+        duplicate_trades: duplicateTrades.length,
+        suspect_trades: suspectTrades.length,
+        invalid_trades: invalidTradeCount
       },
       trading_status: {
-        kill_switch_active: true,
-        trading_paused: true,
+        okxDataLive: true,
+        tradingPaused: true,
+        killSwitchActive: true,
         status: 'PAUSED_KILL_SWITCH'
       }
     });

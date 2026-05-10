@@ -196,26 +196,35 @@ Deno.serve(async (req) => {
     // Get raw USDT balance object
     const usdtDetails = tradingRes.data?.[0]?.details?.find(d => d.ccy === 'USDT') || {};
     
-    // Calculate frozen (ordFrozen + frozenBal)
+    // Correct mapping per OKX API:
+    // availBal = available balance (can be used freely)
+    // frozenBal = frozen in account
+    // ordFrozen = frozen in orders
+    // cashBal = cash balance (total liquid)
+    // eq = total equity including positions
+    const availableUSDT = parseFloat(usdtDetails.availBal || 0);
     const frozenUSDT = (parseFloat(usdtDetails.ordFrozen || 0) + parseFloat(usdtDetails.frozenBal || 0));
 
-    console.log('[okxLiveBalance] Success: totalEquity=' + totalEquityUSDT.toFixed(2) + ' availEq=' + (parseFloat(usdtDetails.availEq || 0)).toFixed(2) + ' freeUSDT=' + freeUSDT.toFixed(2) + ' frozen=' + frozenUSDT.toFixed(2) + ' assets=' + assets.length);
+    console.log('[okxLiveBalance] Success: totalEquity=' + totalEquityUSDT.toFixed(2) + ' availBal=' + availableUSDT.toFixed(2) + ' frozen=' + frozenUSDT.toFixed(2) + ' cashBal=' + (parseFloat(usdtDetails.cashBal || 0)).toFixed(2) + ' assets=' + assets.length);
 
     return Response.json({
       success: true,
       totalEquityUSDT: parseFloat(totalEquityUSDT.toFixed(2)),
-      freeUSDT: parseFloat(freeUSDT.toFixed(2)),
+      availableUSDT: parseFloat(availableUSDT.toFixed(2)),
+      freeUSDT: parseFloat(availableUSDT.toFixed(2)),
       frozenUSDT: parseFloat(frozenUSDT.toFixed(2)),
       openOrdersCount: 0,
+      nonFreeBal: parseFloat((parseFloat(usdtDetails.eq || 0) - availableUSDT).toFixed(2)),
+      nonFreeExplanation: 'cashBal - availBal = capital in positions',
       raw_usdt_balance: {
         ccy: usdtDetails.ccy,
-        eq: usdtDetails.eq,
-        cashBal: usdtDetails.cashBal,
-        availBal: usdtDetails.availBal,
-        availEq: usdtDetails.availEq,
-        frozenBal: usdtDetails.frozenBal,
-        ordFrozen: usdtDetails.ordFrozen,
-        disEq: usdtDetails.disEq,
+        eq: parseFloat(usdtDetails.eq || 0),
+        cashBal: parseFloat(usdtDetails.cashBal || 0),
+        availBal: parseFloat(usdtDetails.availBal || 0),
+        availEq: parseFloat(usdtDetails.availEq || 0),
+        frozenBal: parseFloat(usdtDetails.frozenBal || 0),
+        ordFrozen: parseFloat(usdtDetails.ordFrozen || 0),
+        disEq: parseFloat(usdtDetails.disEq || 0),
         uTime: usdtDetails.uTime
       },
       assets,

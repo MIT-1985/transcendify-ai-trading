@@ -11,7 +11,7 @@ export default function Dashboard() {
   const [killSwitchStatus, setKillSwitchStatus] = useState('CHECKING');
   const sessionStartRef = useRef(new Date());
 
-  // Fetch OKX Live Balance (live from exchange)
+  // Fetch OKX Live Balance (live from exchange) - every 5 seconds
   const { data: okxBalance = {}, isLoading: loadBalance } = useQuery({
     queryKey: ['okx-live-balance-final', user?.email],
     queryFn: async () => {
@@ -23,21 +23,21 @@ export default function Dashboard() {
             success: false, 
             error: 'OKX API unreachable',
             totalEquityUSDT: 'ERROR',
-            freeUSDT: 'ERROR',
-            frozenUSDT: 'ERROR',
-            availEq: 'ERROR'
+            availableUSDT: 'ERROR',
+            frozenUSDT: 'ERROR'
           };
         }
+        const raw = d.raw_usdt_balance || {};
         return {
           success: true,
           totalEquityUSDT: d.totalEquityUSDT || '0',
-          freeUSDT: d.freeUSDT || '0',
+          availableUSDT: d.availableUSDT || '0',
           frozenUSDT: d.frozenUSDT || '0',
-          availEq: d.raw_usdt_balance?.availEq || d.freeUSDT || '0',
+          nonFreeBal: d.nonFreeBal || '0',
           openOrdersCount: d.openOrdersCount || 0,
           assetCount: d.assetCount || 0,
-          rawUsdt: d.raw_usdt_balance || {},
-          timestamp: new Date().toLocaleTimeString()
+          rawUsdt: raw,
+          timestamp: d.fetchedAt
         };
       } catch (e) {
         console.error('[Dashboard] OKX Balance error:', e);
@@ -45,15 +45,14 @@ export default function Dashboard() {
           success: false, 
           error: e.message,
           totalEquityUSDT: 'ERROR',
-          freeUSDT: 'ERROR',
-          frozenUSDT: 'ERROR',
-          availEq: 'ERROR'
+          availableUSDT: 'ERROR',
+          frozenUSDT: 'ERROR'
         };
       }
     },
     enabled: !!user,
     staleTime: 0,
-    refetchInterval: 15000,
+    refetchInterval: 5000,
     gcTime: 0
   });
 
@@ -107,13 +106,6 @@ export default function Dashboard() {
   const excluded = {}; // Legacy/suspect excluded from dedup function
 
   const getBalanceColor = (success) => success ? 'border-emerald-600 bg-emerald-950/30' : 'border-red-600 bg-red-950/30';
-  const getFreeUSDTDisplay = () => {
-    // Prefer OKX live availEq field, fallback to freeUSDT
-    const free = okxBalance?.availEq || okxBalance?.freeUSDT;
-    if (free === 'ERROR' || free === '0' || !free) return '—';
-    const val = parseFloat(free);
-    return `$${val.toFixed(2)}`;
-  };
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
@@ -132,28 +124,30 @@ export default function Dashboard() {
         {/* SECTION 1: OKX LIVE BALANCE */}
         <div className={`rounded-2xl p-8 border-2 ${getBalanceColor(okxBalance?.success)} shadow-2xl`}>
           <div className="text-center space-y-4">
-            <div className="text-sm font-semibold text-emerald-400 uppercase">OKX Live Balance (from Exchange)</div>
+            <div className="text-sm font-semibold text-emerald-400 uppercase">OKX DATA: LIVE | Read Mode: ACTIVE</div>
             
             <div className="text-5xl font-black text-emerald-400">
-              {loadBalance ? '...' : okxBalance?.totalEquityUSDT || 'ERROR'}
+              {loadBalance ? '...' : `$${parseFloat(okxBalance?.totalEquityUSDT || 0).toFixed(2)}`}
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
               <div className="bg-slate-800/50 rounded-lg p-4 border border-emerald-600">
                 <div className="text-xs text-slate-500 mb-1">Available USDT</div>
                 <div className="font-mono font-bold text-emerald-400 text-lg">
-                  ${loadBalance ? '...' : (parseFloat(okxBalance?.availEq || okxBalance?.freeUSDT || 0).toFixed(2))}
+                  ${loadBalance ? '...' : (parseFloat(okxBalance?.availableUSDT || 0).toFixed(2))}
                 </div>
               </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-600">
                 <div className="text-xs text-slate-500 mb-1">Frozen USDT</div>
-                <div className="font-mono font-bold text-slate-400">
+                <div className="font-mono font-bold text-yellow-400">
                   ${loadBalance ? '...' : (parseFloat(okxBalance?.frozenUSDT || 0).toFixed(2))}
                 </div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">Open Orders</div>
-                <div className="font-mono font-bold text-slate-400">{okxBalance?.openOrdersCount || 0}</div>
+                <div className="text-xs text-slate-500 mb-1">In Positions</div>
+                <div className="font-mono font-bold text-slate-400">
+                  ${loadBalance ? '...' : (parseFloat(okxBalance?.nonFreeBal || 0).toFixed(2))}
+                </div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                 <div className="text-xs text-slate-500 mb-1">Assets</div>
@@ -164,52 +158,65 @@ export default function Dashboard() {
             {/* Raw USDT Balance Details */}
             {okxBalance?.rawUsdt?.eq && (
               <div className="mt-6 p-4 bg-slate-800/30 rounded-lg border border-slate-700 text-left text-xs">
-                <div className="font-bold text-slate-400 mb-2">Raw USDT Object from OKX:</div>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 text-slate-500 font-mono text-xs">
-                  <div>eq (total): <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.eq || 0).toFixed(2)}</span></div>
-                  <div>availEq: <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.availEq || 0).toFixed(2)}</span></div>
-                  <div>availBal: <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.availBal || 0).toFixed(2)}</span></div>
-                  <div>frozenBal: <span className="text-yellow-400">${parseFloat(okxBalance.rawUsdt?.frozenBal || 0).toFixed(2)}</span></div>
-                  <div>ordFrozen: <span className="text-yellow-400">${parseFloat(okxBalance.rawUsdt?.ordFrozen || 0).toFixed(2)}</span></div>
-                  <div>cashBal: <span className="text-slate-400">${parseFloat(okxBalance.rawUsdt?.cashBal || 0).toFixed(2)}</span></div>
+                <div className="font-bold text-slate-400 mb-3">Raw USDT Object from OKX API:</div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-slate-500 font-mono text-xs">
+                  <div><span className="text-slate-400">ccy:</span> <span className="text-emerald-400">{okxBalance.rawUsdt?.ccy || 'USDT'}</span></div>
+                  <div><span className="text-slate-400">eq:</span> <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.eq || 0).toFixed(2)}</span></div>
+                  <div><span className="text-slate-400">cashBal:</span> <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.cashBal || 0).toFixed(2)}</span></div>
+                  <div><span className="text-slate-400">availBal:</span> <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.availBal || 0).toFixed(2)}</span></div>
+                  <div><span className="text-slate-400">availEq:</span> <span className="text-slate-300">${parseFloat(okxBalance.rawUsdt?.availEq || 0).toFixed(2)}</span></div>
+                  <div><span className="text-slate-400">frozenBal:</span> <span className="text-yellow-400">${parseFloat(okxBalance.rawUsdt?.frozenBal || 0).toFixed(2)}</span></div>
+                  <div><span className="text-slate-400">ordFrozen:</span> <span className="text-yellow-400">${parseFloat(okxBalance.rawUsdt?.ordFrozen || 0).toFixed(2)}</span></div>
+                  <div><span className="text-slate-400">disEq:</span> <span className="text-slate-300">${parseFloat(okxBalance.rawUsdt?.disEq || 0).toFixed(2)}</span></div>
+                </div>
+                <div className="mt-3 p-2 bg-slate-700/30 rounded border-l-2 border-emerald-500 text-xs text-slate-300">
+                  <strong>Mapping:</strong> totalEquity = eq | Available = availBal | Frozen = frozenBal + ordFrozen | InPositions = cashBal - availBal
                 </div>
               </div>
             )}
 
             {okxBalance?.timestamp && (
-              <div className="text-xs text-slate-500 mt-4">Last checked: {okxBalance.timestamp}</div>
+              <div className="text-xs text-slate-500 mt-4">Last fetched: {okxBalance.timestamp}</div>
             )}
           </div>
         </div>
 
         {/* SECTION 2: CLEAN OKX ACCOUNTING */}
         <div className="rounded-2xl p-8 border-2 border-emerald-600 bg-emerald-950/20">
-          <h2 className="text-2xl font-bold mb-6 text-emerald-400">✅ OKX CLEAN REAL TRADES (DEDUPED)</h2>
+          <h2 className="text-2xl font-bold mb-6 text-emerald-400">✅ OKX CLEAN REAL TRADES (DEDUPED + SUSPECT FILTERED)</h2>
           
           {loadMetrics ? (
             <Skeleton className="h-40 bg-slate-800" />
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
               <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
                 <div className="text-xs text-slate-500 uppercase mb-2">Unique Orders</div>
-                <div className="text-4xl font-bold text-emerald-400">{uniqueCounts.unique_orders || 0}</div>
+                <div className="text-3xl font-bold text-emerald-400">{uniqueCounts.unique_orders || 0}</div>
                 <div className="text-xs text-slate-500 mt-1">Dup: {uniqueCounts.duplicate_orders || 0}</div>
               </div>
               <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
-                <div className="text-xs text-slate-500 uppercase mb-2">Unique Closed Trades</div>
-                <div className="text-4xl font-bold text-emerald-400">{uniqueCounts.unique_trades || 0}</div>
+                <div className="text-xs text-slate-500 uppercase mb-2">Clean Trades</div>
+                <div className="text-3xl font-bold text-emerald-400">{uniqueCounts.unique_trades || 0}</div>
                 <div className="text-xs text-slate-500 mt-1">Dup: {uniqueCounts.duplicate_trades || 0}</div>
+              </div>
+              <div className="bg-red-950/50 rounded-xl p-6 border border-red-600">
+                <div className="text-xs text-red-400 uppercase mb-2">Suspect</div>
+                <div className="text-3xl font-bold text-red-400">{uniqueCounts.suspect_trades || 0}</div>
               </div>
               <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
                 <div className="text-xs text-slate-500 uppercase mb-2">Net P&L</div>
-                <div className={`text-4xl font-bold ${(metrics.net_pnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <div className={`text-3xl font-bold ${(metrics.net_pnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {(metrics.net_pnl || 0) >= 0 ? '+' : ''}{(metrics.net_pnl || 0).toFixed(4)}
                 </div>
               </div>
               <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
+                <div className="text-xs text-slate-500 uppercase mb-2">Fees</div>
+                <div className="text-3xl font-bold text-red-400">{(metrics.fees || 0).toFixed(4)}</div>
+              </div>
+              <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
                 <div className="text-xs text-slate-500 uppercase mb-2">Win Rate</div>
-                <div className="text-4xl font-bold text-cyan-400">{(metrics.win_rate || 0).toFixed(1)}%</div>
-                <div className="text-xs text-slate-400 mt-2">({metrics.wins || 0}W / {metrics.losses || 0}L)</div>
+                <div className="text-3xl font-bold text-cyan-400">{(metrics.win_rate || 0).toFixed(1)}%</div>
+                <div className="text-xs text-slate-400 mt-1">({metrics.wins || 0}W/{metrics.losses || 0}L)</div>
               </div>
             </div>
           )}
