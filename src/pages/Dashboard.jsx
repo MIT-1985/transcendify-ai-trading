@@ -124,6 +124,8 @@ export default function Dashboard() {
       }
     };
     checkKillSwitch();
+    const interval = setInterval(checkKillSwitch, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -139,11 +141,11 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* SECTION 1: BIG LIVE CLOCK */}
-        <div className={`rounded-2xl p-8 border-2 ${clock.realizedPnL >= 0 ? 'border-emerald-500 bg-emerald-950/30' : 'border-red-500 bg-red-950/30'} shadow-2xl`}>
+        <div className={`rounded-2xl p-8 border-2 ${killSwitchStatus === 'ACTIVE' ? 'border-red-600 bg-red-950/30' : clock.realizedPnL >= 0 ? 'border-emerald-500 bg-emerald-950/30' : 'border-red-500 bg-red-950/30'} shadow-2xl`}>
           <div className="text-center space-y-4">
             <div className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Real-Time Earnings</div>
             
-            <div className={`text-6xl font-black font-mono ${clock.realizedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <div className={`text-6xl font-black font-mono ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : clock.realizedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
               {clock.realizedPnL >= 0 ? '+' : ''}{clock.realizedPnL.toFixed(4)} USDT
             </div>
 
@@ -172,14 +174,14 @@ export default function Dashboard() {
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                 <div className="text-xs text-slate-500 mb-1">Status</div>
-                <div className={`font-mono font-bold text-sm ${alphaScalperEnabled ? 'text-emerald-400' : 'text-slate-400'}`}>
-                  {alphaScalperEnabled ? 'ACTIVE' : 'OFF'}
+                <div className={`font-mono font-bold text-sm ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : alphaScalperEnabled ? 'text-emerald-400' : 'text-slate-400'}`}>
+                  {killSwitchStatus === 'ACTIVE' ? 'PAUSED_KILL_SWITCH' : alphaScalperEnabled ? 'ACTIVE' : 'OFF'}
                 </div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                 <div className="text-xs text-slate-500 mb-1">Runtime</div>
-                <div className={`font-mono font-bold text-sm ${clock.runtimeActive ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`}>
-                  {clock.runtimeActive ? '● LIVE' : '○ OFF'}
+                <div className={`font-mono font-bold text-sm ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : clock.runtimeActive ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`}>
+                  {killSwitchStatus === 'ACTIVE' ? '● PAUSED_KILL_SWITCH' : clock.runtimeActive ? '● LIVE' : '○ OFF'}
                 </div>
               </div>
             </div>
@@ -245,7 +247,7 @@ export default function Dashboard() {
         <div className="flex gap-3">
           <Button
             onClick={() => setAlphaScalperEnabled(true)}
-            disabled={alphaScalperEnabled}
+            disabled={alphaScalperEnabled || killSwitchStatus === 'ACTIVE'}
             className="gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50"
           >
             <Play className="w-4 h-4" />
@@ -267,7 +269,8 @@ export default function Dashboard() {
                 console.error(e);
               }
             }}
-            className="gap-2 bg-blue-700 hover:bg-blue-600 ml-auto"
+            disabled={killSwitchStatus === 'ACTIVE'}
+            className="gap-2 bg-blue-700 hover:bg-blue-600 ml-auto disabled:opacity-50"
           >
             <Zap className="w-4 h-4" />
             Run One Cycle
@@ -278,23 +281,28 @@ export default function Dashboard() {
         <div>
           <h2 className="text-xl font-bold mb-4">Active Bots</h2>
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            {['Swing Master', 'Momentum Rider', 'Grid Profit Pro', 'Alpha Scalper', 'DCA Warrior'].map(botName => (
-              <div key={botName} className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="font-bold text-sm">{botName}</div>
-                  <div className={`text-xs font-bold px-2 py-1 rounded ${
-                    botName === 'Alpha Scalper' ? 'bg-emerald-900/50 text-emerald-400' : 'bg-slate-800 text-slate-400'
-                  }`}>
-                    {botName === 'Alpha Scalper' ? 'ACTIVE' : 'PAUSED'}
+            {['Swing Master', 'Momentum Rider', 'Grid Profit Pro', 'Alpha Scalper', 'DCA Warrior'].map(botName => {
+              const isAlpha = botName === 'Alpha Scalper';
+              const shouldShowActive = isAlpha && killSwitchStatus !== 'ACTIVE' && alphaScalperEnabled;
+              return (
+                <div key={botName} className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="font-bold text-sm">{botName}</div>
+                    <div className={`text-xs font-bold px-2 py-1 rounded ${
+                      isAlpha && killSwitchStatus === 'ACTIVE' ? 'bg-red-900/50 text-red-400' :
+                      shouldShowActive ? 'bg-emerald-900/50 text-emerald-400' : 'bg-slate-800 text-slate-400'
+                    }`}>
+                      {isAlpha && killSwitchStatus === 'ACTIVE' ? 'PAUSED_KILL_SWITCH' : shouldShowActive ? 'ACTIVE' : 'PAUSED'}
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-xs text-slate-400">
+                    <div>Strategy: {isAlpha ? 'Scalping' : '—'}</div>
+                    <div>P&L: {isAlpha ? `+${clock.realizedPnL.toFixed(4)}` : '—'}</div>
+                    <div>Trades: {isAlpha ? todaysTrades.length : '0'}</div>
                   </div>
                 </div>
-                <div className="space-y-2 text-xs text-slate-400">
-                  <div>Strategy: {botName === 'Alpha Scalper' ? 'Scalping' : '—'}</div>
-                  <div>P&L: {botName === 'Alpha Scalper' ? `+${clock.realizedPnL.toFixed(4)}` : '—'}</div>
-                  <div>Trades: {botName === 'Alpha Scalper' ? todaysTrades.length : '0'}</div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
