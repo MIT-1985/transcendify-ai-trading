@@ -11,7 +11,7 @@ export default function Dashboard() {
   const [killSwitchStatus, setKillSwitchStatus] = useState('CHECKING');
   const sessionStartRef = useRef(new Date());
 
-  // Fetch OKX Live Balance
+  // Fetch OKX Live Balance (live from exchange)
   const { data: okxBalance = {}, isLoading: loadBalance } = useQuery({
     queryKey: ['okx-live-balance-final', user?.email],
     queryFn: async () => {
@@ -25,7 +25,7 @@ export default function Dashboard() {
             totalEquityUSDT: 'ERROR',
             freeUSDT: 'ERROR',
             frozenUSDT: 'ERROR',
-            openOrdersCount: 'ERROR'
+            availEq: 'ERROR'
           };
         }
         return {
@@ -33,8 +33,10 @@ export default function Dashboard() {
           totalEquityUSDT: d.totalEquityUSDT || '0',
           freeUSDT: d.freeUSDT || '0',
           frozenUSDT: d.frozenUSDT || '0',
+          availEq: d.raw_usdt_balance?.availEq || d.freeUSDT || '0',
           openOrdersCount: d.openOrdersCount || 0,
           assetCount: d.assetCount || 0,
+          rawUsdt: d.raw_usdt_balance || {},
           timestamp: new Date().toLocaleTimeString()
         };
       } catch (e) {
@@ -45,7 +47,7 @@ export default function Dashboard() {
           totalEquityUSDT: 'ERROR',
           freeUSDT: 'ERROR',
           frozenUSDT: 'ERROR',
-          openOrdersCount: 'ERROR'
+          availEq: 'ERROR'
         };
       }
     },
@@ -55,34 +57,26 @@ export default function Dashboard() {
     gcTime: 0
   });
 
-  // Fetch Clean Accounting Metrics
+  // Fetch Clean Accounting Metrics with Dedup
   const { data: cleanMetrics = {}, isLoading: loadMetrics } = useQuery({
-    queryKey: ['clean-metrics', user?.email],
+    queryKey: ['final-clean-metrics-dedup', user?.email],
     queryFn: async () => {
       try {
-        const res = await base44.functions.invoke('getCleanAccountingMetrics', {});
+        const res = await base44.functions.invoke('finalCleanMetricsWithDedup', {});
         if (!res.data.success) {
           throw new Error('Failed to get clean metrics');
         }
         return res.data;
       } catch (e) {
-        console.error('[Dashboard] Clean metrics error:', e);
+        console.error('[Dashboard] Final clean metrics error:', e);
         return {
           success: false,
           error: e.message,
-          clean_metrics: {
-            orders_count: 0,
-            closed_trades_count: 0,
-            net_pnl: 0,
-            fees: 0,
-            win_rate: 0,
-            wins: 0,
-            losses: 0,
-            latest_trades: [],
-            latest_orders: []
-          },
-          excluded_data: {},
-          total_counts: {}
+          okx_balance: { mapped: { totalEquityUSDT: '0', freeUSDT: '0', frozenUSDT: '0' } },
+          unique_counts: { unique_orders: 0, duplicate_orders: 0, unique_trades: 0, duplicate_trades: 0 },
+          clean_metrics: { orders_count: 0, closed_trades_count: 0, net_pnl: 0, fees: 0, win_rate: 0, wins: 0, losses: 0, latest_orders: [], latest_trades: [] },
+          total_counts: {},
+          trading_status: { kill_switch_active: true, trading_paused: true }
         };
       }
     },
@@ -108,13 +102,16 @@ export default function Dashboard() {
   }, []);
 
   const metrics = cleanMetrics?.clean_metrics || {};
-  const excluded = cleanMetrics?.excluded_data || {};
+  const uniqueCounts = cleanMetrics?.unique_counts || {};
   const totals = cleanMetrics?.total_counts || {};
+  const excluded = {}; // Legacy/suspect excluded from dedup function
 
   const getBalanceColor = (success) => success ? 'border-emerald-600 bg-emerald-950/30' : 'border-red-600 bg-red-950/30';
   const getFreeUSDTDisplay = () => {
-    if (okxBalance?.freeUSDT === 'ERROR') return '—';
-    const val = parseFloat(okxBalance?.freeUSDT || '0');
+    // Prefer OKX live availEq field, fallback to freeUSDT
+    const free = okxBalance?.availEq || okxBalance?.freeUSDT;
+    if (free === 'ERROR' || free === '0' || !free) return '—';
+    const val = parseFloat(free);
     return `$${val.toFixed(2)}`;
   };
 
@@ -135,7 +132,7 @@ export default function Dashboard() {
         {/* SECTION 1: OKX LIVE BALANCE */}
         <div className={`rounded-2xl p-8 border-2 ${getBalanceColor(okxBalance?.success)} shadow-2xl`}>
           <div className="text-center space-y-4">
-            <div className="text-sm font-semibold text-emerald-400 uppercase">OKX Live Balance (Verified)</div>
+            <div className="text-sm font-semibold text-emerald-400 uppercase">OKX Live Balance (from Exchange)</div>
             
             <div className="text-5xl font-black text-emerald-400">
               {loadBalance ? '...' : okxBalance?.totalEquityUSDT || 'ERROR'}
@@ -143,12 +140,16 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
               <div className="bg-slate-800/50 rounded-lg p-4 border border-emerald-600">
-                <div className="text-xs text-slate-500 mb-1">Free USDT</div>
-                <div className="font-mono font-bold text-emerald-400 text-lg">{getFreeUSDTDisplay()}</div>
+                <div className="text-xs text-slate-500 mb-1">Available USDT</div>
+                <div className="font-mono font-bold text-emerald-400 text-lg">
+                  ${loadBalance ? '...' : (parseFloat(okxBalance?.availEq || okxBalance?.freeUSDT || 0).toFixed(2))}
+                </div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                 <div className="text-xs text-slate-500 mb-1">Frozen USDT</div>
-                <div className="font-mono font-bold text-slate-400">${okxBalance?.frozenUSDT || '0.00'}</div>
+                <div className="font-mono font-bold text-slate-400">
+                  ${loadBalance ? '...' : (parseFloat(okxBalance?.frozenUSDT || 0).toFixed(2))}
+                </div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                 <div className="text-xs text-slate-500 mb-1">Open Orders</div>
@@ -160,27 +161,44 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Raw USDT Balance Details */}
+            {okxBalance?.rawUsdt?.eq && (
+              <div className="mt-6 p-4 bg-slate-800/30 rounded-lg border border-slate-700 text-left text-xs">
+                <div className="font-bold text-slate-400 mb-2">Raw USDT Object from OKX:</div>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 text-slate-500 font-mono text-xs">
+                  <div>eq (total): <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.eq || 0).toFixed(2)}</span></div>
+                  <div>availEq: <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.availEq || 0).toFixed(2)}</span></div>
+                  <div>availBal: <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.availBal || 0).toFixed(2)}</span></div>
+                  <div>frozenBal: <span className="text-yellow-400">${parseFloat(okxBalance.rawUsdt?.frozenBal || 0).toFixed(2)}</span></div>
+                  <div>ordFrozen: <span className="text-yellow-400">${parseFloat(okxBalance.rawUsdt?.ordFrozen || 0).toFixed(2)}</span></div>
+                  <div>cashBal: <span className="text-slate-400">${parseFloat(okxBalance.rawUsdt?.cashBal || 0).toFixed(2)}</span></div>
+                </div>
+              </div>
+            )}
+
             {okxBalance?.timestamp && (
-              <div className="text-xs text-slate-500 mt-4">Updated: {okxBalance.timestamp}</div>
+              <div className="text-xs text-slate-500 mt-4">Last checked: {okxBalance.timestamp}</div>
             )}
           </div>
         </div>
 
         {/* SECTION 2: CLEAN OKX ACCOUNTING */}
         <div className="rounded-2xl p-8 border-2 border-emerald-600 bg-emerald-950/20">
-          <h2 className="text-2xl font-bold mb-6 text-emerald-400">✅ OKX CLEAN REAL TRADES</h2>
+          <h2 className="text-2xl font-bold mb-6 text-emerald-400">✅ OKX CLEAN REAL TRADES (DEDUPED)</h2>
           
           {loadMetrics ? (
             <Skeleton className="h-40 bg-slate-800" />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
-                <div className="text-xs text-slate-500 uppercase mb-2">Clean Orders</div>
-                <div className="text-4xl font-bold text-emerald-400">{metrics.orders_count || 0}</div>
+                <div className="text-xs text-slate-500 uppercase mb-2">Unique Orders</div>
+                <div className="text-4xl font-bold text-emerald-400">{uniqueCounts.unique_orders || 0}</div>
+                <div className="text-xs text-slate-500 mt-1">Dup: {uniqueCounts.duplicate_orders || 0}</div>
               </div>
               <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
-                <div className="text-xs text-slate-500 uppercase mb-2">Clean Closed Trades</div>
-                <div className="text-4xl font-bold text-emerald-400">{metrics.closed_trades_count || 0}</div>
+                <div className="text-xs text-slate-500 uppercase mb-2">Unique Closed Trades</div>
+                <div className="text-4xl font-bold text-emerald-400">{uniqueCounts.unique_trades || 0}</div>
+                <div className="text-xs text-slate-500 mt-1">Dup: {uniqueCounts.duplicate_trades || 0}</div>
               </div>
               <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
                 <div className="text-xs text-slate-500 uppercase mb-2">Net P&L</div>
@@ -345,25 +363,25 @@ export default function Dashboard() {
 
         {/* SECTION 4: SUMMARY STATS */}
         <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
-          <h3 className="text-lg font-bold mb-4">📊 Full Dataset Summary</h3>
+          <h3 className="text-lg font-bold mb-4">📊 Full Dataset Summary (with Dedup)</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
             <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-              <div className="text-xs text-slate-500 mb-1">Total Ledger Records</div>
-              <div className="text-2xl font-bold text-slate-300">{totals.all_ledger_records || 0}</div>
+              <div className="text-xs text-slate-500 mb-1">Total Ledger</div>
+              <div className="text-2xl font-bold text-slate-300">{totals.all_ledger || 0}</div>
+              <div className="text-xs text-slate-600 mt-1">Unique: {totals.unique_ledger || 0}</div>
             </div>
             <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
               <div className="text-xs text-slate-500 mb-1">Total Verified Trades</div>
-              <div className="text-2xl font-bold text-slate-300">{totals.all_verified_trades || 0}</div>
+              <div className="text-2xl font-bold text-slate-300">{totals.all_trades || 0}</div>
+              <div className="text-xs text-slate-600 mt-1">Unique: {totals.unique_trades || 0}</div>
             </div>
             <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-              <div className="text-xs text-slate-500 mb-1">Clean OKX Trades</div>
-              <div className="text-2xl font-bold text-emerald-400">{metrics.closed_trades_count || 0}</div>
+              <div className="text-xs text-slate-500 mb-1">Duplicate Ledger</div>
+              <div className="text-2xl font-bold text-yellow-400">{totals.duplicate_ledger || 0}</div>
             </div>
             <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-              <div className="text-xs text-slate-500 mb-1">Excluded Trades</div>
-              <div className="text-2xl font-bold text-yellow-400">
-                {((excluded.legacy_trades_count || 0) + (excluded.suspect_trades_count || 0) + (excluded.invalid_trades_count || 0))}
-              </div>
+              <div className="text-xs text-slate-500 mb-1">Duplicate Trades</div>
+              <div className="text-2xl font-bold text-yellow-400">{totals.duplicate_trades || 0}</div>
             </div>
           </div>
         </div>
