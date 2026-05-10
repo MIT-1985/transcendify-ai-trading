@@ -13,10 +13,13 @@ const ALLOWED_PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USD
 const TRADE_AMOUNT_USDT    = 15;      // USDT per scalp trade
 const MAX_POSITION_PCT     = 0.25;    // max 25% of freeUSDT in one trade
 const MIN_FREE_USDT        = 12;      // minimum to enter new position
-const TAKE_PROFIT_PCT      = 0.18;    // 0.18% TP
-const STOP_LOSS_PCT        = -0.18;   // -0.18% SL
-const TRAILING_STOP_PCT    = 0.06;    // trail: sell if price falls 0.06% from peak
-const MIN_NET_PROFIT_USDT  = 0.02;    // minimum net profit after fees to trigger SELL
+const TAKE_PROFIT_PCT        = 0.18;   // 0.18% standard TP
+const STOP_LOSS_PCT          = -0.18;  // -0.18% SL
+const TRAILING_STOP_PCT      = 0.06;   // standard trail from peak (when >= TP)
+const MICRO_TRAIL_ENTER_PCT  = 0.07;   // activate micro-trail when pnl >= this
+const MICRO_TRAIL_PEAK_PCT   = 0.08;   // require bestPnl >= this before trailing
+const MICRO_TRAIL_DROP_PCT   = 0.04;   // sell if price drops 0.04% from best
+const MIN_NET_PROFIT_USDT    = 0.02;   // minimum net profit after fees to trigger SELL
 const MAX_SPREAD_PCT       = 0.08;    // tight spread gate
 const OKX_FEE_RATE         = 0.001;   // 0.1% taker per side
 const MAX_POSITIONS        = 2;
@@ -85,13 +88,16 @@ async function getActivePositions(base44) {
   const all = await base44.asServiceRole.entities.OXXOrderLedger.filter({ robotId: 'robot1', verified: true });
   const sorted = all.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   const buyStack = {};
+  const buyRecords = {}; // keep full record for bestPnlPct + id
   for (const ord of sorted) {
     if (!ALLOWED_PAIRS.includes(ord.instId)) continue;
-    if (!buyStack[ord.instId]) buyStack[ord.instId] = [];
+    if (!buyStack[ord.instId]) { buyStack[ord.instId] = []; buyRecords[ord.instId] = []; }
     if (ord.side === 'buy') {
       buyStack[ord.instId].push({ ordId: ord.ordId, avgPx: ord.avgPx, accFillSz: ord.accFillSz, fee: ord.fee, timestamp: ord.timestamp });
+      buyRecords[ord.instId].push(ord); // full record with id + bestPnlPct
     } else if (ord.side === 'sell' && buyStack[ord.instId].length > 0) {
       buyStack[ord.instId].shift();
+      buyRecords[ord.instId].shift();
     }
   }
   const active = [];
@@ -99,7 +105,13 @@ async function getActivePositions(base44) {
     const stack = buyStack[inst] || [];
     if (stack.length > 0) {
       const b = stack[0];
-      active.push({ instId: inst, qty: b.accFillSz, entryPrice: b.avgPx, buyOrdId: b.ordId, buyTimestamp: b.timestamp, buyFee: Math.abs(b.fee) });
+      const rec = buyRecords[inst][0];
+      active.push({
+        instId: inst, qty: b.accFillSz, entryPrice: b.avgPx,
+        buyOrdId: b.ordId, buyTimestamp: b.timestamp, buyFee: Math.abs(b.fee),
+        ledgerId: rec.id,            // entity record id for update
+        bestPnlPct: rec.bestPnlPct ?? 0  // persisted peak pnl
+      });
     }
   }
   return active;
@@ -254,14 +266,19 @@ Deno.serve(async (req) => {
     const sellResults = [];
 
     // 3. SELL pass — ALWAYS check active positions FIRST before any BUY logic
-    // Rules (in order):
-    //   a) if pnlPct >= TAKE_PROFIT_PCT AND netProfit >= MIN_NET_PROFIT_USDT → SELL (TP)
-    //   b) if pnlPct <= STOP_LOSS_PCT → SELL (SL, no net profit requirement)
-    //   c) if pnlPct >= (TAKE_PROFIT_PCT - TRAILING_STOP_PCT) AND netProfit >= MIN_NET_PROFIT_USDT → SELL (trail)
-    //   d) else → WAIT (active position, do not buy more)
+    // Exit modes (in priority order):
+    //   TP          — pnlPct >= 0.18% AND netProfit >= 0.02
+    //   SL          — pnlPct <= -0.18% (no net check)
+    //   TRAIL       — pnlPct >= (TP - 0.06%) and < TP AND netProfit >= 0.02
+    //   MICRO_TRAIL — pnlPct in [0.07%, 0.18%), bestPnlPct >= 0.08%, and
+    //                 pnlPct has dropped >= 0.04% from bestPnlPct AND netProfit >= 0.02
+    //   WAIT        — none of the above
+    const sellDetails = []; // per-position diagnostic for response
+
     for (const pos of activePositions) {
       const ticker = tickerMap[pos.instId];
-      if (!ticker) { console.log(`[SCALP] ${pos.instId}: no ticker, skipping sell check`); continue; }
+      if (!ticker) { console.log(`[SCALP] ${pos.instId}: no ticker, skipping`); continue; }
+
       const currentPrice = parseFloat(ticker.last || 0);
       const pnlPct = (currentPrice - pos.entryPrice) / pos.entryPrice * 100;
       const grossProfit = (currentPrice - pos.entryPrice) * pos.qty;
@@ -270,21 +287,63 @@ Deno.serve(async (req) => {
       const estimatedFees = buyFee + sellFee;
       const netProfit = grossProfit - estimatedFees;
 
-      console.log(`[SCALP] ${pos.instId}: entry=${pos.entryPrice} cur=${currentPrice} pnlPct=${pnlPct.toFixed(4)}% gross=${grossProfit.toFixed(4)} fees=${estimatedFees.toFixed(4)} net=${netProfit.toFixed(4)} USDT`);
+      // Update bestPnlPct if current pnl is a new high
+      const prevBest = pos.bestPnlPct ?? 0;
+      const newBest = Math.max(prevBest, pnlPct);
+      if (newBest > prevBest && pos.ledgerId) {
+        try {
+          await base44.asServiceRole.entities.OXXOrderLedger.update(pos.ledgerId, { bestPnlPct: parseFloat(newBest.toFixed(6)) });
+        } catch (e) { console.error(`[SCALP] bestPnlPct update failed: ${e.message}`); }
+      }
+
+      const trailingDistance = parseFloat((newBest - pnlPct).toFixed(4));
+      const microTrailingActive = pnlPct >= MICRO_TRAIL_ENTER_PCT && pnlPct < TAKE_PROFIT_PCT;
+
+      console.log(`[SCALP] ${pos.instId}: entry=${pos.entryPrice} cur=${currentPrice} pnlPct=${pnlPct.toFixed(4)}% bestPnl=${newBest.toFixed(4)}% trailDist=${trailingDistance}% gross=${grossProfit.toFixed(4)} fees=${estimatedFees.toFixed(4)} net=${netProfit.toFixed(4)} USDT`);
 
       const hitTP    = pnlPct >= TAKE_PROFIT_PCT && netProfit >= MIN_NET_PROFIT_USDT;
       const hitSL    = pnlPct <= STOP_LOSS_PCT;
       const hitTrail = pnlPct >= (TAKE_PROFIT_PCT - TRAILING_STOP_PCT) && pnlPct < TAKE_PROFIT_PCT && netProfit >= MIN_NET_PROFIT_USDT;
-      const shouldSell = hitTP || hitSL || hitTrail;
+      const hitMicroTrail = microTrailingActive
+        && newBest >= MICRO_TRAIL_PEAK_PCT
+        && trailingDistance >= MICRO_TRAIL_DROP_PCT
+        && netProfit >= MIN_NET_PROFIT_USDT;
 
-      console.log(`[SCALP] ${pos.instId}: hitTP=${hitTP} hitSL=${hitSL} hitTrail=${hitTrail} → sell=${shouldSell}`);
+      const shouldSell = hitTP || hitSL || hitTrail || hitMicroTrail;
+
+      // Determine exit mode for diagnostics
+      let exitMode = 'WAIT';
+      if (hitTP)         exitMode = 'TP';
+      else if (hitSL)    exitMode = 'SL';
+      else if (hitTrail) exitMode = 'TRAIL';
+      else if (hitMicroTrail) exitMode = 'MICRO_TRAIL';
+      else if (netProfit < MIN_NET_PROFIT_USDT && pnlPct > 0) exitMode = 'WAIT_NET_TOO_LOW';
+
+      console.log(`[SCALP] ${pos.instId}: exitMode=${exitMode} hitTP=${hitTP} hitSL=${hitSL} hitTrail=${hitTrail} hitMicroTrail=${hitMicroTrail} microTrailingActive=${microTrailingActive}`);
+
+      const diag = {
+        pair: pos.instId,
+        entryPx: pos.entryPrice,
+        currentPx: currentPrice,
+        pnlPercent: parseFloat(pnlPct.toFixed(4)),
+        grossPnL: parseFloat(grossProfit.toFixed(4)),
+        estimatedFees: parseFloat(estimatedFees.toFixed(4)),
+        netPnL: parseFloat(netProfit.toFixed(4)),
+        bestPnlPercent: parseFloat(newBest.toFixed(4)),
+        trailingDistance: trailingDistance,
+        microTrailingActive,
+        exitMode,
+        buyOrdId: pos.buyOrdId
+      };
+      sellDetails.push(diag);
 
       if (shouldSell) {
         const reason = hitTP    ? `TP: pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}USDT`
                      : hitSL    ? `SL: pnl=${pnlPct.toFixed(4)}%`
-                     : `Trail: pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}USDT`;
+                     : hitTrail ? `TRAIL: pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}USDT`
+                     : `MICRO_TRAIL: bestPnl=${newBest.toFixed(4)}% drop=${trailingDistance}% net=${netProfit.toFixed(4)}USDT`;
         const sr = await executeSell(base44, apiKey, apiSecret, passphrase, pos, reason);
-        sellResults.push({ pair: pos.instId, ...sr, pnlPct: parseFloat(pnlPct.toFixed(4)), netProfit: parseFloat(netProfit.toFixed(4)) });
+        sellResults.push({ ...diag, ...sr });
       }
     }
 
@@ -379,6 +438,7 @@ Deno.serve(async (req) => {
       freeUsdt,
       positionCount: finalPositions.length,
       maxPositions: MAX_POSITIONS,
+      positionDiagnostics: sellDetails,   // full per-position detail incl. exitMode
       activePositions: finalPositions.map(p => ({
         instId: p.instId, qty: p.qty, entryPrice: p.entryPrice,
         currentPrice: parseFloat(tickerMap[p.instId]?.last || 0),
@@ -386,8 +446,8 @@ Deno.serve(async (req) => {
       })),
       sells: sellResults,
       buy: buyResult,
-      config: { TAKE_PROFIT_PCT, STOP_LOSS_PCT, TRAILING_STOP_PCT, MIN_NET_PROFIT_USDT, MAX_SPREAD_PCT, COOLDOWN_SECONDS, TRADE_AMOUNT_USDT },
-      note: 'SELL always checked before BUY. BUY blocked while any position active.'
+      config: { TAKE_PROFIT_PCT, STOP_LOSS_PCT, TRAILING_STOP_PCT, MICRO_TRAIL_ENTER_PCT, MICRO_TRAIL_PEAK_PCT, MICRO_TRAIL_DROP_PCT, MIN_NET_PROFIT_USDT, MAX_SPREAD_PCT, COOLDOWN_SECONDS, TRADE_AMOUNT_USDT },
+      note: 'SELL always first. MICRO_TRAIL fires if pnl in [0.07,0.18), bestPnl>=0.08%, drop>=0.04%, net>=0.02.'
     });
 
   } catch (err) {

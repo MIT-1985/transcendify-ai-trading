@@ -162,16 +162,35 @@ export default function Dashboard() {
             </Button>
           </div>
           {scalpResult && (
-            <div className={`rounded-lg px-3 py-2 border text-xs mt-2 ${
-              scalpResult.error ? 'bg-red-900/30 border-red-700 text-red-300' :
-              scalpResult.buy?.decision === 'BUY_EXECUTED' ? 'bg-emerald-900/30 border-emerald-700 text-emerald-300' :
-              scalpResult.sells?.length > 0 ? 'bg-blue-900/30 border-blue-700 text-blue-300' :
-              'bg-slate-800/50 border-slate-600 text-slate-300'
-            }`}>
-              {scalpResult.error ? `Error: ${scalpResult.error}` :
-               scalpResult.buy?.decision === 'BUY_EXECUTED' ? `✓ BUY ${scalpResult.buy.pair} @ $${scalpResult.buy.avgPx} · ${scalpResult.buy.usedUSDT} USDT · expected net: +${scalpResult.buy.expectedNetProfit?.toFixed(4)} USDT` :
-               scalpResult.sells?.length > 0 ? `✓ SOLD ${scalpResult.sells.map(s => s.pair).join(', ')} → back to USDT` :
-               `WAIT · ${scalpResult.positionCount}/${scalpResult.maxPositions} positions · $${scalpResult.freeUsdt?.toFixed(2)} free`}
+            <div className="mt-2 space-y-2">
+              {/* Main status line */}
+              <div className={`rounded-lg px-3 py-2 border text-xs ${
+                scalpResult.error ? 'bg-red-900/30 border-red-700 text-red-300' :
+                scalpResult.buy?.decision === 'BUY_EXECUTED' ? 'bg-emerald-900/30 border-emerald-700 text-emerald-300' :
+                scalpResult.sells?.length > 0 ? 'bg-blue-900/30 border-blue-700 text-blue-300' :
+                'bg-slate-800/50 border-slate-600 text-slate-300'
+              }`}>
+                {scalpResult.error ? `Error: ${scalpResult.error}` :
+                 scalpResult.sells?.length > 0 ? `✓ SOLD ${scalpResult.sells.map(s => s.pair).join(', ')} [${scalpResult.sells.map(s => s.exitMode).join(', ')}] → back to USDT` :
+                 scalpResult.buy?.decision === 'BUY_EXECUTED' ? `✓ BUY ${scalpResult.buy.pair} @ $${scalpResult.buy.avgPx} · ${scalpResult.buy.usedUSDT} USDT` :
+                 `WAIT · ${scalpResult.positionCount}/${scalpResult.maxPositions} positions · $${scalpResult.freeUsdt?.toFixed(2)} free`}
+              </div>
+              {/* Per-position diagnostics */}
+              {scalpResult.positionDiagnostics?.map((d, i) => (
+                <div key={i} className="grid grid-cols-4 gap-1.5 text-xs bg-slate-900/40 rounded-lg p-2.5 border border-slate-700/50">
+                  <div><span className="text-slate-500">Pair</span><div className="font-bold text-white">{d.pair}</div></div>
+                  <div><span className="text-slate-500">Entry → Cur</span><div className="font-mono">${d.entryPx?.toFixed(2)} → ${d.currentPx?.toFixed(2)}</div></div>
+                  <div><span className="text-slate-500">P&L%</span><div className={`font-mono font-bold ${d.pnlPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{d.pnlPercent >= 0 ? '+' : ''}{d.pnlPercent?.toFixed(4)}%</div></div>
+                  <div><span className="text-slate-500">Exit Mode</span><div className={`font-bold ${d.exitMode === 'TP' || d.exitMode === 'MICRO_TRAIL' || d.exitMode === 'TRAIL' ? 'text-emerald-400' : d.exitMode === 'SL' ? 'text-red-400' : 'text-slate-400'}`}>{d.exitMode}</div></div>
+                  <div><span className="text-slate-500">Gross P&L</span><div className={`font-mono ${d.grossPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{d.grossPnL >= 0 ? '+' : ''}{d.grossPnL?.toFixed(4)}</div></div>
+                  <div><span className="text-slate-500">Est. Fees</span><div className="font-mono text-yellow-400">{d.estimatedFees?.toFixed(4)}</div></div>
+                  <div><span className="text-slate-500">Net P&L</span><div className={`font-mono font-bold ${d.netPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{d.netPnL >= 0 ? '+' : ''}{d.netPnL?.toFixed(4)}</div></div>
+                  <div><span className="text-slate-500">Best P&L%</span><div className="font-mono text-purple-400">{d.bestPnlPercent?.toFixed(4)}%</div></div>
+                  <div><span className="text-slate-500">Trail Dist</span><div className="font-mono text-cyan-400">{d.trailingDistance?.toFixed(4)}%</div></div>
+                  <div><span className="text-slate-500">µTrail Active</span><div className={`font-bold ${d.microTrailingActive ? 'text-yellow-400' : 'text-slate-600'}`}>{d.microTrailingActive ? 'YES' : 'no'}</div></div>
+                  <div className="col-span-2"><span className="text-slate-500">lastOrdId</span><div className="font-mono text-slate-400 truncate">{d.buyOrdId}</div></div>
+                </div>
+              ))}
             </div>
           )}
         </section>

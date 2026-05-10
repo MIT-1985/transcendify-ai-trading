@@ -60,6 +60,10 @@
         "pending"
       ],
       "default": "filled"
+    },
+    "bestPnlPct": {
+      "type": "number",
+      "description": "Highest pnlPct seen since entry (for micro-trailing)"
     }
   },
   "required": [
