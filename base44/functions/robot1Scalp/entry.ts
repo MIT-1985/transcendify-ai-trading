@@ -15,12 +15,12 @@ const MAX_TRADE_USDT         = 30;     // hard ceiling regardless of balance
 const MAX_POSITION_PCT       = 0.30;   // cap at 30% of freeUSDT
 const MIN_FREE_USDT          = 12;     // minimum balance to enter new position
 
-const TAKE_PROFIT_PCT        = 0.18;   // 0.18% TP
+const TAKE_PROFIT_PCT        = 0.25;   // 0.25% TP (must exceed round-trip fees ~0.20%)
 const STOP_LOSS_PCT          = -0.18;  // -0.18% SL
-const TRAILING_STOP_PCT      = 0.06;   // trail from peak once near TP
-const MICRO_TRAIL_ENTER_PCT  = 0.07;   // activate micro-trail when pnl >= this
-const MICRO_TRAIL_PEAK_PCT   = 0.08;   // require bestPnl >= this before trailing
-const MICRO_TRAIL_DROP_PCT   = 0.04;   // sell if price drops 0.04% from best
+const TRAILING_STOP_PCT      = 0.08;   // trail from peak once near TP
+const MICRO_TRAIL_ENTER_PCT  = 0.12;   // activate micro-trail when pnl >= this
+const MICRO_TRAIL_PEAK_PCT   = 0.13;   // require bestPnl >= this before trailing
+const MICRO_TRAIL_DROP_PCT   = 0.05;   // sell if price drops 0.05% from best
 const MIN_NET_PROFIT_USDT    = 0.02;   // minimum net profit after fees to SELL (except SL)
 const MAX_SPREAD_PCT         = 0.08;   // tight spread gate
 const OKX_FEE_RATE           = 0.001;  // 0.1% taker per side
@@ -110,10 +110,13 @@ function analyzeTradeSizing(tradeUSDT, tpPct) {
   const requiredPriceMovePercent = ((estimatedFees + MIN_NET_PROFIT_USDT) / tradeUSDT) * 100;
 
   // Minimum trade size that makes TP viable
+  // netRateAtTP = gross% - fee% = (tpPct/100) - OKX_FEE_RATE*(2 + tpPct/100)
+  // If <= 0, TP is below round-trip fees — structurally impossible regardless of size
   const netRateAtTP = (tpPct / 100) - OKX_FEE_RATE * (2 + tpPct / 100);
-  const minTradeAmountForProfit = netRateAtTP > 0
-    ? parseFloat((MIN_NET_PROFIT_USDT / netRateAtTP).toFixed(2))
-    : Infinity;
+  const tpBelowFees = netRateAtTP <= 0;
+  const minTradeAmountForProfit = tpBelowFees
+    ? null
+    : parseFloat((MIN_NET_PROFIT_USDT / netRateAtTP).toFixed(2));
 
   return {
     tradeUSDT,
@@ -125,7 +128,9 @@ function analyzeTradeSizing(tradeUSDT, tpPct) {
     breakEvenMovePct: parseFloat(breakEvenMovePct.toFixed(4)),
     requiredPriceMovePercent: parseFloat(requiredPriceMovePercent.toFixed(4)),
     minTradeAmountForProfit,
-    viable: netProfitAtTP >= MIN_NET_PROFIT_USDT
+    tpBelowFees,
+    viable: !tpBelowFees && netProfitAtTP >= MIN_NET_PROFIT_USDT,
+    reason: tpBelowFees ? 'TP below estimated round-trip fees' : null
   };
 }
 
@@ -435,6 +440,11 @@ Deno.serve(async (req) => {
 
         // Fee-aware sizing decision
         const sizing = computeTradeAmount(freeUsdt);
+
+        if (sizing.analysis?.tpBelowFees) {
+          console.log(`[SCALP] SKIP ${pair}: TP below round-trip fees — trading disabled`);
+          continue;
+        }
 
         if (sizing.rejected) {
           console.log(`[SCALP] SKIP ${pair}: trade size rejected — ${sizing.reason} (minRequired=${sizing.analysis.minTradeAmountForProfit} USDT)`);

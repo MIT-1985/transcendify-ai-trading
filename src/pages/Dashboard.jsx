@@ -199,6 +199,12 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+              {/* TP below fees global warning */}
+              {scalpResult.sizingPreview && Object.values(scalpResult.sizingPreview).some(s => s.tpBelowFees) && (
+                <div className="text-xs bg-red-900/30 border border-red-600 rounded-lg px-3 py-2 text-red-300 font-semibold">
+                  ⚠️ Current TP ({scalpResult.config?.TAKE_PROFIT_PCT}%) is below round-trip fees (~{(scalpResult.config?.OKX_FEE_RATE * 200).toFixed(2)}%). Trading disabled until TP &gt; fees.
+                </div>
+              )}
               {/* Sizing preview table for all pairs */}
               {scalpResult.sizingPreview && Object.keys(scalpResult.sizingPreview).length > 0 && (
                 <div className="text-xs bg-slate-900/40 rounded-lg p-3 border border-slate-700/50">
@@ -222,7 +228,7 @@ export default function Dashboard() {
                           <td className="py-1 text-right font-mono text-cyan-400">{s.minTradeAmountForProfit?.toFixed(2)}</td>
                           <td className="py-1 text-right font-mono text-red-400">{s.estimatedFees?.toFixed(4)}</td>
                           <td className={`py-1 text-right font-mono ${s.netProfitAtTP >= 0.02 ? 'text-emerald-400' : 'text-yellow-400'}`}>{s.netProfitAtTP?.toFixed(4)}</td>
-                          <td className={`py-1 text-right font-bold ${s.viable ? 'text-emerald-400' : 'text-red-400'}`}>{s.viable ? '✓' : '✗'}</td>
+                          <td className={`py-1 text-right font-bold ${s.viable ? 'text-emerald-400' : 'text-red-400'}`}>{s.viable ? '✓' : s.tpBelowFees ? '✗ TP<fees' : '✗'}</td>
                         </tr>
                       ))}
                     </tbody>
