@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
-import { Wallet, Zap, TrendingUp, Activity } from 'lucide-react';
+import { Wallet, TrendingUp, Activity } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import Robot1Panel from '@/components/dashboard/Robot1Panel';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -17,7 +18,6 @@ export default function Dashboard() {
       await base44.functions.invoke('syncOKXOrderLedger', {});
       refetchLedger();
       refetchVerified();
-      refetchExecution();
       setSyncStatus('success');
       setTimeout(() => setSyncStatus('idle'), 2000);
     } catch (e) {
@@ -40,21 +40,6 @@ export default function Dashboard() {
     },
     enabled: !!user,
     staleTime: 30000
-  });
-
-  // === 2. ROBOT 1 LIVE STATUS ===
-  const { data: execution = {}, refetch: refetchExecution, isLoading: loadExecution } = useQuery({
-    queryKey: ['robot1-execution', user?.email],
-    queryFn: async () => {
-      try {
-        const logs = await base44.asServiceRole.entities.Robot1ExecutionLog.list();
-        return logs.length > 0 ? logs[0] : {};
-      } catch (e) {
-        return { error: e.message };
-      }
-    },
-    enabled: !!user,
-    staleTime: 20000
   });
 
   // === 3. ROBOT 1 VERIFIED TRADES ===
@@ -148,55 +133,7 @@ export default function Dashboard() {
         </div>
 
         {/* 2. ROBOT 1 LIVE STATUS */}
-        <div className="bg-blue-900/20 border border-blue-700 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Zap className="w-5 h-5 text-blue-400" />
-            <h2 className="text-lg font-bold">2. Robot 1 Live Status</h2>
-          </div>
-          {loadExecution ? (
-            <Skeleton className="h-32" />
-          ) : !execution.execution_time ? (
-            <div className="text-slate-400 text-sm">No execution log yet</div>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-800/50 rounded-lg p-3 border border-blue-700/30">
-                  <div className="text-xs text-slate-400">Last Run</div>
-                  <div className="text-sm font-mono text-blue-300">
-                    {new Date(execution.execution_time).toLocaleTimeString()}
-                  </div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-3 border border-blue-700/30">
-                  <div className="text-xs text-slate-400">Decision</div>
-                  <div className={`text-sm font-bold ${
-                    execution.decision === 'BUY' ? 'text-emerald-400' : 
-                    execution.decision === 'SELL' ? 'text-red-400' : 
-                    'text-slate-400'
-                  }`}>
-                    {execution.decision || '—'}
-                  </div>
-                </div>
-              </div>
-              <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700">
-                <div className="text-xs text-slate-400 mb-1">Reason</div>
-                <div className="text-sm text-white">{execution.reason || '—'}</div>
-              </div>
-              {execution.active_position && (
-                <div className="grid grid-cols-2 gap-4 mt-3">
-                  <div className="bg-blue-800/30 rounded-lg p-3 border border-blue-700/30">
-                    <div className="text-xs text-slate-400">Active Position</div>
-                    <div className="text-sm font-bold text-blue-300">{execution.position_symbol}</div>
-                    <div className="text-xs text-slate-500 mt-1">{execution.position_qty?.toFixed(4) || '—'} qty</div>
-                  </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                    <div className="text-xs text-slate-400">Last Order ID</div>
-                    <div className="text-xs font-mono text-cyan-400">{execution.last_order_id?.slice?.(-10) || '—'}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <Robot1Panel />
 
         {/* 3. ROBOT 1 VERIFIED TRADES */}
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">

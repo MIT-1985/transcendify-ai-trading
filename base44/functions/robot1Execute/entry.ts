@@ -50,91 +50,67 @@ async function okxRequest(apiKey, secret, passphrase, method, path, bodyStr = ''
 // ─── Polygon Market Analysis ────────────────────────────────────────
 async function getPolygonSignal() {
   const apiKey = Deno.env.get('POLYGON_API_KEY');
-  if (!apiKey) throw new Error('POLYGON_API_KEY not set');
+  if (!apiKey) return { signal: null, polygonPrice: null, status: 'UNAVAILABLE', reason: 'No API key' };
 
-  // Use hourly candles — go back 5 days to ensure enough data
   const now = new Date();
-  const toDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); // yesterday (completed day)
-  const fromDate = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000); // 6 days ago
+  const toDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const fromDate = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
   const from = fromDate.toISOString().slice(0, 10);
   const to = toDate.toISOString().slice(0, 10);
 
   console.log(`[ROBOT1] Polygon fetch: from=${from} to=${to}`);
 
-  const candlesRes = await fetch(
-    `https://api.polygon.io/v2/aggs/ticker/X:ETHUSD/range/1/hour/${from}/${to}?adjusted=true&sort=asc&limit=120&apiKey=${apiKey}`
-  );
-  const candlesData = await candlesRes.json();
+  try {
+    const candlesRes = await fetch(
+      `https://api.polygon.io/v2/aggs/ticker/X:ETHUSD/range/1/hour/${from}/${to}?adjusted=true&sort=asc&limit=120&apiKey=${apiKey}`
+    );
+    const candlesData = await candlesRes.json();
+    console.log(`[ROBOT1] Polygon response: status=${candlesData.status} count=${candlesData.results?.length || 0}`);
 
-  console.log(`[ROBOT1] Polygon response: status=${candlesData.status} count=${candlesData.results?.length || 0}`);
+    if (!candlesData.results || candlesData.results.length < 5) {
+      console.log(`[ROBOT1] Polygon returned ${candlesData.results?.length || 0} candles — OKX-only mode`);
+      return { signal: null, polygonPrice: null, status: 'UNAVAILABLE', reason: `Only ${candlesData.results?.length || 0} candles` };
+    }
 
-  if (!candlesData.results || candlesData.results.length < 5) {
-    console.log(`[ROBOT1] Polygon returned ${candlesData.results?.length || 0} candles — using OKX-only mode`);
-    return { trend: 'NEUTRAL', momentum: 0, volume: 0, volatility: 0, signal: null, polygonPrice: null };
+    const candles = candlesData.results.slice(-20);
+    const closes = candles.map(c => c.c);
+    const volumes = candles.map(c => c.v || 0);
+
+    const isUptrend = closes.slice(-3).every((c, i, arr) => !i || c > arr[i - 1]);
+    const momentum = ((closes[closes.length - 1] - closes[closes.length - 10]) / closes[closes.length - 10]) * 100;
+    const recentVol = volumes.slice(-5).reduce((a, b) => a + b, 0) / 5;
+    const olderVol = volumes.slice(-10, -5).reduce((a, b) => a + b, 0) / 5;
+    const volumeRatio = recentVol / (olderVol || 1);
+    const recentCloses = closes.slice(-10);
+    const mean = recentCloses.reduce((a, b) => a + b) / recentCloses.length;
+    const variance = recentCloses.reduce((sum, c) => sum + Math.pow(c - mean, 2), 0) / recentCloses.length;
+    const volatilityPct = (Math.sqrt(variance) / mean) * 100;
+    const lastCandle = candles[candles.length - 1];
+    const isBullishCandle = lastCandle.c > lastCandle.o;
+
+    const signal = isUptrend && momentum > 0.3 && volumeRatio > 1.1 && volatilityPct < 2.0 && isBullishCandle ? 'BUY' :
+                   !isUptrend && momentum < -0.3 && volatilityPct > 1.5 ? 'SELL' : null;
+
+    console.log(`[ROBOT1] Polygon: trend=${isUptrend?'UP':'DOWN'} momentum=${momentum.toFixed(3)}% volRatio=${volumeRatio.toFixed(2)} signal=${signal}`);
+
+    return {
+      trend: isUptrend ? 'UP' : 'DOWN',
+      momentum: parseFloat(momentum.toFixed(3)),
+      volume: parseFloat(volumeRatio.toFixed(2)),
+      volatility: parseFloat(volatilityPct.toFixed(4)),
+      candle: isBullishCandle ? 'BULLISH' : 'BEARISH',
+      signal,
+      polygonPrice: parseFloat(lastCandle.c.toFixed(2)),
+      status: 'OK'
+    };
+  } catch (err) {
+    console.error(`[ROBOT1] Polygon fetch error: ${err.message}`);
+    return { signal: null, polygonPrice: null, status: 'UNAVAILABLE', reason: err.message };
   }
-
-  const candles = candlesData.results.slice(-20); // Last 20 hourly candles
-  const closes = candles.map(c => c.c);
-  const volumes = candles.map(c => c.v || 0);
-
-  // Trend: last 3 closes rising
-  const isUptrend = closes.slice(-3).every((c, i, arr) => !i || c > arr[i - 1]);
-
-  // Momentum: % change over last 10 candles
-  const momentum = ((closes[closes.length - 1] - closes[closes.length - 10]) / closes[closes.length - 10]) * 100;
-
-  // Volume ratio: recent 5 vs prior 5
-  const recentVol = volumes.slice(-5).reduce((a, b) => a + b, 0) / 5;
-  const olderVol = volumes.slice(-10, -5).reduce((a, b) => a + b, 0) / 5;
-  const volumeRatio = recentVol / (olderVol || 1);
-
-  // Volatility: std dev of last 10 closes
-  const recentCloses = closes.slice(-10);
-  const mean = recentCloses.reduce((a, b) => a + b) / recentCloses.length;
-  const variance = recentCloses.reduce((sum, c) => sum + Math.pow(c - mean, 2), 0) / recentCloses.length;
-  const volatility = Math.sqrt(variance);
-  const volatilityPct = (volatility / mean) * 100; // as % of price
-
-  const lastCandle = candles[candles.length - 1];
-  const isBullishCandle = lastCandle.c > lastCandle.o;
-
-  // BUY: uptrend + positive momentum + volume rising + low volatility + bullish candle
-  const signal = isUptrend && momentum > 0.3 && volumeRatio > 1.1 && volatilityPct < 2.0 && isBullishCandle ? 'BUY' :
-                 !isUptrend && momentum < -0.3 && volatilityPct > 1.5 ? 'SELL' : null;
-
-  console.log(`[ROBOT1] Polygon candles=${candles.length} trend=${isUptrend?'UP':'DOWN'} momentum=${momentum.toFixed(3)}% volRatio=${volumeRatio.toFixed(2)} volatilityPct=${volatilityPct.toFixed(3)}% bullish=${isBullishCandle} → signal=${signal}`);
-
-  return {
-    trend: isUptrend ? 'UP' : 'DOWN',
-    momentum: parseFloat(momentum.toFixed(3)),
-    volume: parseFloat(volumeRatio.toFixed(2)),
-    volatility: parseFloat(volatilityPct.toFixed(4)),
-    candle: isBullishCandle ? 'BULLISH' : 'BEARISH',
-    signal: signal,
-    polygonPrice: parseFloat(lastCandle.c.toFixed(2))
-  };
-}
-
-// ─── Price Comparison (must be within 0.15%) ────────────────────────
-function validatePriceDifference(polygonPrice, okxPrice, maxDiffPct = 0.15) {
-  if (!polygonPrice || !okxPrice) return { valid: false, diff: null, reason: 'Missing prices' };
-
-  const diff = Math.abs((okxPrice - polygonPrice) / polygonPrice) * 100;
-  const valid = diff <= maxDiffPct;
-
-  return {
-    valid: valid,
-    diff: parseFloat(diff.toFixed(4)),
-    reason: valid ? 'PRICE_ALIGNED' : `PRICE_SKEW_${diff.toFixed(2)}%`
-  };
 }
 
 async function logExecution(base44, decision, reason, data = {}) {
   try {
-    const balanceRes = await fetch('https://www.okx.com/api/v5/account/balance', {
-      headers: { 'OK-ACCESS-KEY': '' }
-    }).catch(() => ({}));
-    
     await base44.asServiceRole.entities.Robot1ExecutionLog.create({
       execution_time: new Date().toISOString(),
       decision,
@@ -168,24 +144,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    console.log(`[ROBOT1] Hybrid Mode: Polygon Signal + OKX Execution`);
+    console.log(`[ROBOT1] === START EXECUTION ===`);
 
-    // ─── STEP 1: Get Polygon signal ─────────────────────────────────────
-    let polygonSignal = null;
-    try {
-      polygonSignal = await getPolygonSignal();
-      console.log(`[ROBOT1] Polygon signal: ${JSON.stringify(polygonSignal)}`);
-    } catch (err) {
-      console.error(`[ROBOT1] Polygon fetch failed: ${err.message}`);
-      await logExecution(base44, 'ERROR', `Polygon unavailable: ${err.message}`, {
-        polygonStatus: 'UNAVAILABLE',
-        errorMessage: err.message
-      });
-      return Response.json({
-        error: 'Polygon signal unavailable',
-        reason: err.message
-      }, { status: 500 });
-    }
+    // ─── STEP 1: Try Polygon signal (non-blocking) ─────────────────────
+    const polygonSignal = await getPolygonSignal();
+    const polygonAvailable = polygonSignal.status === 'OK';
+    console.log(`[ROBOT1] Polygon status=${polygonSignal.status} signal=${polygonSignal.signal}`);
 
     // ─── STEP 2: Get OKX connection ────────────────────────────────────
     const [byCreator, byEmail] = await Promise.all([
@@ -194,14 +158,17 @@ Deno.serve(async (req) => {
     ]);
 
     const seen = new Set();
-    let conns = [...byCreator, ...byEmail].filter(c => {
+    const conns = [...byCreator, ...byEmail].filter(c => {
       if (seen.has(c.id)) return false;
       seen.add(c.id);
       return true;
     });
 
     if (conns.length === 0) {
-      await logExecution(base44, 'ERROR', 'No OKX connection found', { okxStatus: 'FAILED' });
+      await logExecution(base44, 'ERROR', 'No OKX connection found', {
+        okxStatus: 'FAILED',
+        polygonStatus: polygonAvailable ? 'OK' : 'UNAVAILABLE'
+      });
       return Response.json({ error: 'No OKX connection' }, { status: 400 });
     }
 
@@ -217,321 +184,203 @@ Deno.serve(async (req) => {
     ]);
 
     const okxPrice = parseFloat(tickerRes.data?.[0]?.last || 0);
-    const bid = parseFloat(tickerRes.data?.[0]?.bidPx || 0);
-    const ask = parseFloat(tickerRes.data?.[0]?.askPx || 0);
-    const spread = ((ask - bid) / bid * 100).toFixed(4);
+    if (!okxPrice) {
+      await logExecution(base44, 'ERROR', 'OKX price fetch failed', { okxStatus: 'FAILED' });
+      return Response.json({ error: 'OKX price unavailable' }, { status: 500 });
+    }
 
     const ethBalance = parseFloat(balanceRes.data?.[0]?.details?.find(d => d.ccy === 'ETH')?.availBal || 0);
     const usdtBalance = parseFloat(balanceRes.data?.[0]?.details?.find(d => d.ccy === 'USDT')?.availBal || 0);
 
-    console.log(`[ROBOT1] OKX price: ${okxPrice}, balance: USDT=${usdtBalance} ETH=${ethBalance}`);
+    console.log(`[ROBOT1] OKX price=${okxPrice} USDT=${usdtBalance} ETH=${ethBalance}`);
 
-    // ─── STEP 4: Validate Polygon vs OKX price ─────────────────────────
-    const polygonHasPrice = !!polygonSignal.polygonPrice;
+    // ─── STEP 4: Validate price ONLY if Polygon is available ──────────
+    // NEVER block on price mismatch if Polygon is unavailable
     let priceDiff = null;
-    if (polygonHasPrice) {
-      const priceCheck = validatePriceDifference(polygonSignal.polygonPrice, okxPrice);
-      priceDiff = priceCheck.diff;
-      if (!priceCheck.valid) {
-        console.log(`[ROBOT1] PRICE MISMATCH: Polygon=${polygonSignal.polygonPrice} OKX=${okxPrice} diff=${priceCheck.diff}%`);
-        await logExecution(base44, 'WAIT', `Price skew ${priceCheck.diff}% — skipping`, {
-          freeUsdt: usdtBalance, signalData: polygonSignal
+    if (polygonAvailable && polygonSignal.polygonPrice) {
+      const diff = Math.abs((okxPrice - polygonSignal.polygonPrice) / polygonSignal.polygonPrice) * 100;
+      priceDiff = parseFloat(diff.toFixed(4));
+      if (diff > 0.15) {
+        console.log(`[ROBOT1] Price skew ${diff.toFixed(3)}% — skipping trade this cycle`);
+        await logExecution(base44, 'WAIT', `Price skew ${diff.toFixed(2)}% (Polygon=${polygonSignal.polygonPrice} OKX=${okxPrice})`, {
+          freeUsdt: usdtBalance,
+          signalData: polygonSignal,
+          polygonStatus: 'OK'
         });
         return Response.json({
-          status: 'PRICE_SKEW', polygonSignal, okxPrice,
-          priceDifference: priceCheck.diff, decision: 'SKIP', reason: priceCheck.reason
+          status: 'PRICE_SKEW', polygonSignal, okxPrice, priceDifference: priceDiff,
+          decision: 'WAIT', reason: `Price skew ${diff.toFixed(2)}% — skipping`
         });
       }
-    } else {
-      console.log(`[ROBOT1] No Polygon price — OKX-only mode, skipping price validation`);
     }
 
-    // ─── STEP 5: Check active position ─────────────────────────────────
-    const activeBuys = await base44.asServiceRole.entities.Trade.filter({
-      symbol: 'ETH-USDT',
-      side: 'BUY',
-      execution_mode: 'MAINNET',
-      strategy_used: 'robot1'
-    });
+    // ─── STEP 5: Check active Robot1 ETH or SOL position ──────────────
+    const [ethTrades, solTrades] = await Promise.all([
+      base44.asServiceRole.entities.Trade.filter({ symbol: 'ETH-USDT', side: 'BUY', execution_mode: 'MAINNET', strategy_used: 'robot1' }),
+      base44.asServiceRole.entities.Trade.filter({ symbol: 'SOL-USDT', side: 'BUY', execution_mode: 'MAINNET', strategy_used: 'robot1' })
+    ]);
 
-    const pendingBuy = activeBuys.find(t => !t.exit_price);
+    const pendingBuy = [...ethTrades, ...solTrades].find(t => !t.exit_price);
+    const polygonStatus = polygonAvailable ? 'OK' : 'UNAVAILABLE';
 
     // ─── CASE A: POSITION OPEN → CHECK SELL ────────────────────────────
     if (pendingBuy) {
       const entryPrice = pendingBuy.entry_price;
       const qty = pendingBuy.quantity;
-      const unrealizedPnL = (okxPrice - entryPrice) * qty;
+      const symbol = pendingBuy.symbol;
       const unrealizedPnLPct = parseFloat(((okxPrice - entryPrice) / entryPrice * 100).toFixed(2));
 
       const sellGain = unrealizedPnLPct >= 2.0;
       const sellLoss = unrealizedPnLPct <= -1.0;
-      const polygonSellSignal = polygonSignal.signal === 'SELL' || polygonSignal.momentum < -0.5;
+      const polygonSellSignal = polygonAvailable && (polygonSignal.signal === 'SELL' || polygonSignal.momentum < -0.5);
       const shouldSell = sellGain || sellLoss || polygonSellSignal;
 
       if (!shouldSell) {
-         console.log(`[ROBOT1] Holding: P&L=${unrealizedPnLPct}%, Polygon=${polygonSignal.signal}`);
-         await logExecution(base44, 'WAIT', `Active position waiting (P&L=${unrealizedPnLPct}%, trend=${polygonSignal.trend})`, {
-           activePosition: true,
-           positionSymbol: 'ETH-USDT',
-           positionQty: qty,
-           freeUsdt: usdtBalance,
-           signalData: polygonSignal
-         });
-         return Response.json({
-           status: 'HOLDING',
-           polygonSignal: polygonSignal,
-           okxPrice: okxPrice,
-           priceDifference: priceDiff,
-           decision: 'HOLD',
-           reason: `P&L=${unrealizedPnLPct}%, need +2% or -1%, Polygon=${polygonSignal.signal}`,
-           ordId: null,
-           verifiedFill: null
-         });
-       }
+        const holdReason = `Holding ${symbol}: P&L=${unrealizedPnLPct}%, need +2% or -1%, Polygon=${polygonAvailable ? polygonSignal.signal : 'UNAVAILABLE'}`;
+        console.log(`[ROBOT1] ${holdReason}`);
+        await logExecution(base44, 'WAIT', holdReason, {
+          activePosition: true, positionSymbol: symbol, positionQty: qty,
+          freeUsdt: usdtBalance, signalData: polygonSignal,
+          polygonStatus, okxStatus: 'OK'
+        });
+        return Response.json({
+          status: 'HOLDING', polygonSignal, okxPrice, priceDifference: priceDiff,
+          decision: 'HOLD', reason: holdReason, ordId: null, verifiedFill: null,
+          activePosition: { symbol, qty, entryPrice, unrealizedPnLPct }
+        });
+      }
 
       // Execute SELL
-      console.log(`[ROBOT1] SELL SIGNAL: gain=${sellGain}, loss=${sellLoss}, polygon=${polygonSellSignal}`);
+      const sellReason = sellGain ? 'Profit target +2%' : sellLoss ? 'Stop loss -1%' : 'Polygon reversal signal';
+      console.log(`[ROBOT1] SELL: ${sellReason}`);
 
-      const sellOrderBody = JSON.stringify({
-        instId: 'ETH-USDT',
-        tdMode: 'cash',
-        side: 'sell',
-        ordType: 'market',
-        sz: qty.toString()
-      });
-
+      const sellOrderBody = JSON.stringify({ instId: symbol, tdMode: 'cash', side: 'sell', ordType: 'market', sz: qty.toString() });
       const sellRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST', '/api/v5/trade/order', sellOrderBody);
 
       if (sellRes.code !== '0') {
-         console.error(`[ROBOT1] SELL FAILED: ${sellRes.msg}`);
-         await logExecution(base44, 'ERROR', `OKX verification failed: ${sellRes.msg}`, {
-           okxStatus: 'FAILED',
-           activePosition: true,
-           positionSymbol: 'ETH-USDT',
-           positionQty: qty,
-           freeUsdt: usdtBalance,
-           errorMessage: sellRes.msg
-         });
-         return Response.json({
-           status: 'SELL_ERROR',
-             polygonSignal: polygonSignal,
-             okxPrice: okxPrice,
-             priceDifference: priceDiff,
-           decision: 'SELL_FAILED',
-           reason: sellRes.msg,
-           ordId: null
-         }, { status: 400 });
-       }
-
-      const ordId = sellRes.data?.[0]?.ordId;
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const verifyRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', `/api/v5/trade/order?instId=ETH-USDT&ordId=${ordId}`);
-
-      if (verifyRes.code !== '0' || !verifyRes.data?.[0]) {
-        console.error(`[ROBOT1] SELL verify failed: ${verifyRes.msg}`);
-        return Response.json({
-          status: 'SELL_VERIFY_FAILED',
-          polygonSignal: polygonSignal,
-          okxPrice: okxPrice,
-          priceDifference: priceDiff,
-          decision: 'SELL_UNVERIFIED',
-          reason: verifyRes.msg,
-          ordId: ordId,
-          verifiedFill: null
-        }, { status: 400 });
+        const errMsg = sellRes.msg || 'OKX SELL rejected';
+        await logExecution(base44, 'ERROR', `SELL failed: ${errMsg}`, {
+          okxStatus: 'FAILED', activePosition: true, positionSymbol: symbol,
+          positionQty: qty, freeUsdt: usdtBalance, errorMessage: errMsg, polygonStatus
+        });
+        return Response.json({ status: 'SELL_ERROR', decision: 'SELL_FAILED', reason: errMsg, okxPrice }, { status: 400 });
       }
 
-      const verified = verifyRes.data[0];
-      const fillSz = parseFloat(verified.accFillSz || 0);
-      const fillPx = parseFloat(verified.avgPx || 0);
-      const fee = parseFloat(verified.fee || 0);
+      const ordId = sellRes.data?.[0]?.ordId;
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      const verifyRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', `/api/v5/trade/order?instId=${symbol}&ordId=${ordId}`);
+      const verified = verifyRes.data?.[0];
+      const fillSz = parseFloat(verified?.accFillSz || 0);
+      const fillPx = parseFloat(verified?.avgPx || 0);
+      const fee = parseFloat(verified?.fee || 0);
 
       const buyValue = entryPrice * qty;
       const buyFee = pendingBuy.fee || 0;
       const sellValue = fillPx * fillSz;
-      const realizedPnL = (sellValue - fee) - (buyValue + buyFee);
-      const realizedPnLPct = parseFloat(((realizedPnL / (buyValue + buyFee)) * 100).toFixed(2));
+      const realizedPnL = (sellValue - Math.abs(fee)) - (buyValue + Math.abs(buyFee));
+      const realizedPnLPct = parseFloat(((realizedPnL / (buyValue + Math.abs(buyFee))) * 100).toFixed(2));
 
       await base44.asServiceRole.entities.Trade.update(pendingBuy.id, {
-        exit_price: fillPx,
-        profit_loss: realizedPnL,
-        timestamp: new Date().toISOString()
+        exit_price: fillPx, profit_loss: realizedPnL, timestamp: new Date().toISOString()
       });
 
-      console.log(`[ROBOT1] SOLD: ordId=${ordId}, realized=${realizedPnL.toFixed(2)} USDT`);
-
-      const sellReason = sellGain ? 'Profit +2%' : sellLoss ? 'Loss -1%' : 'Polygon reversal';
+      console.log(`[ROBOT1] SOLD ordId=${ordId} realizedPnL=${realizedPnL.toFixed(2)}`);
       await logExecution(base44, 'SELL', sellReason, {
-        orderId: ordId,
-        freeUsdt: usdtBalance,
-        signalData: polygonSignal
+        orderId: ordId, freeUsdt: usdtBalance, signalData: polygonSignal,
+        polygonStatus, okxStatus: 'OK'
       });
 
       return Response.json({
-        status: 'SOLD',
-        polygonSignal: polygonSignal,
-        okxPrice: okxPrice,
-        priceDifference: priceDiff,
-        decision: 'SELL_EXECUTED',
-        reason: sellReason,
-        ordId: ordId,
-        verifiedFill: {
-          fillSz: fillSz,
-          fillPx: fillPx,
-          fee: fee,
-          realizedPnL: parseFloat(realizedPnL.toFixed(2)),
-          realizedPnLPct: realizedPnLPct
-        }
+        status: 'SOLD', polygonSignal, okxPrice, priceDifference: priceDiff,
+        decision: 'SELL_EXECUTED', reason: sellReason, ordId,
+        verifiedFill: { fillSz, fillPx, fee: Math.abs(fee), realizedPnL: parseFloat(realizedPnL.toFixed(2)), realizedPnLPct }
       });
-      }
+    }
 
     // ─── CASE B: NO POSITION → CHECK BUY ────────────────────────────────
-    console.log(`[ROBOT1] No position. Polygon signal: ${polygonSignal.signal}, polygonHasPrice=${polygonHasPrice}`);
+    console.log(`[ROBOT1] No open position. freeUSDT=${usdtBalance} ETH=${ethBalance}`);
 
-    // If Polygon has no signal but we have USDT and no ETH — use OKX-only BUY
-    const okxOnlyBuy = !polygonHasPrice && usdtBalance >= 10 && ethBalance < 0.001;
-    const hasBuySignal = polygonSignal.signal === 'BUY' || okxOnlyBuy;
-
-    if (!hasBuySignal) {
-      const reason = polygonHasPrice
-        ? `No BUY signal (Polygon=${polygonSignal.signal}, trend=${polygonSignal.trend})`
-        : `OKX-only mode: USDT=${usdtBalance.toFixed(2)}, ETH=${ethBalance} — waiting`;
-      await logExecution(base44, 'WAIT', reason, { freeUsdt: usdtBalance, signalData: polygonSignal });
-      return Response.json({
-        status: 'READY_NO_BUY', polygonSignal, okxPrice,
-        decision: 'WAIT', reason, ordId: null, verifiedFill: null
+    // BUY conditions:
+    // - Must have enough USDT (>= 10)
+    // - Must NOT have ETH already (clean entry)
+    // - Either Polygon says BUY, OR Polygon is unavailable (OKX-only mode)
+    if (usdtBalance < 10) {
+      const reason = `No BUY: insufficient USDT=${usdtBalance.toFixed(2)} (need >= 10)`;
+      await logExecution(base44, 'WAIT', reason, {
+        freeUsdt: usdtBalance, signalData: polygonSignal, polygonStatus, okxStatus: 'OK'
       });
+      return Response.json({ status: 'WAIT', decision: 'WAIT', reason, okxPrice, polygonSignal });
     }
 
-    if (okxOnlyBuy) {
-      console.log(`[ROBOT1] OKX-only BUY: USDT=${usdtBalance.toFixed(2)} ETH=${ethBalance}`);
+    if (ethBalance >= 0.001) {
+      const reason = `No BUY: ETH balance=${ethBalance} already held (no open trade record — manual hold?)`;
+      await logExecution(base44, 'WAIT', reason, {
+        freeUsdt: usdtBalance, signalData: polygonSignal, polygonStatus, okxStatus: 'OK'
+      });
+      return Response.json({ status: 'WAIT', decision: 'WAIT', reason, okxPrice, polygonSignal });
     }
 
-    // Polygon says BUY and price is aligned
-    console.log(`[ROBOT1] BUY SIGNAL from Polygon: trend=${polygonSignal.trend}, momentum=${polygonSignal.momentum}`);
-
-    // Check resources
-    if (ethBalance > 0 || usdtBalance < 10) {
-      const insuffReason = ethBalance > 0 ? `ETH=${ethBalance} (must be 0)` : `USDT=${usdtBalance} (need >10)`;
-      await logExecution(base44, 'WAIT', `Insufficient USDT: ${insuffReason}`, {
-        freeUsdt: usdtBalance,
-        signalData: polygonSignal,
-        errorMessage: insuffReason
+    // Check Polygon signal — only block BUY if Polygon IS available AND says no BUY
+    if (polygonAvailable && polygonSignal.signal !== 'BUY') {
+      const reason = `No BUY signal from Polygon: signal=${polygonSignal.signal}, trend=${polygonSignal.trend}, momentum=${polygonSignal.momentum}`;
+      await logExecution(base44, 'WAIT', reason, {
+        freeUsdt: usdtBalance, signalData: polygonSignal, polygonStatus: 'OK', okxStatus: 'OK'
       });
-      return Response.json({
-        status: 'READY_NO_BUY',
-        polygonSignal: polygonSignal,
-        okxPrice: okxPrice,
-        priceDifference: priceCheck.diff,
-        decision: 'WAIT',
-        reason: `BUY ready but: ETH=${ethBalance} (must be 0 for clean buy), USDT=${usdtBalance} (need >10)`,
-        ordId: null,
-        verifiedFill: null
-      });
+      return Response.json({ status: 'WAIT', decision: 'WAIT', reason, okxPrice, polygonSignal });
     }
 
-    // Execute BUY
-    const buyQty = (usdtBalance * 0.9 / okxPrice).toFixed(6); // 90% of balance
+    const buyMode = polygonAvailable ? `Polygon BUY signal (trend=${polygonSignal.trend})` : `OKX-only mode (Polygon unavailable)`;
+    console.log(`[ROBOT1] Executing BUY — ${buyMode}`);
 
-    console.log(`[ROBOT1] Placing BUY order: qty=${buyQty} at ${okxPrice}`);
-
-    const buyOrderBody = JSON.stringify({
-      instId: 'ETH-USDT',
-      tdMode: 'cash',
-      side: 'buy',
-      ordType: 'market',
-      sz: buyQty.toString()
-    });
-
+    const buyQty = (usdtBalance * 0.9 / okxPrice).toFixed(6);
+    const buyOrderBody = JSON.stringify({ instId: 'ETH-USDT', tdMode: 'cash', side: 'buy', ordType: 'market', sz: buyQty.toString() });
     const buyRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST', '/api/v5/trade/order', buyOrderBody);
 
     if (buyRes.code !== '0') {
-      console.error(`[ROBOT1] BUY FAILED: ${buyRes.msg}`);
-      await logExecution(base44, 'ERROR', `OKX verification failed: ${buyRes.msg}`, {
-        okxStatus: 'FAILED',
-        freeUsdt: usdtBalance,
-        signalData: polygonSignal,
-        errorMessage: buyRes.msg
+      const errMsg = buyRes.msg || 'OKX BUY rejected';
+      await logExecution(base44, 'ERROR', `BUY failed: ${errMsg}`, {
+        okxStatus: 'FAILED', freeUsdt: usdtBalance, errorMessage: errMsg, polygonStatus
       });
-      return Response.json({
-        status: 'BUY_ERROR',
-        polygonSignal: polygonSignal,
-        okxPrice: okxPrice,
-        priceDifference: priceDiff,
-        decision: 'BUY_FAILED',
-        reason: buyRes.msg,
-        ordId: null
-      }, { status: 400 });
+      return Response.json({ status: 'BUY_ERROR', decision: 'BUY_FAILED', reason: errMsg, okxPrice }, { status: 400 });
     }
 
     const buyOrdId = buyRes.data?.[0]?.ordId;
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 600));
 
     const buyVerifyRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', `/api/v5/trade/order?instId=ETH-USDT&ordId=${buyOrdId}`);
+    const buyVerified = buyVerifyRes.data?.[0];
+    const buyFillSz = parseFloat(buyVerified?.accFillSz || 0);
+    const buyFillPx = parseFloat(buyVerified?.avgPx || 0);
+    const buyFee = parseFloat(buyVerified?.fee || 0);
 
-    if (buyVerifyRes.code !== '0' || !buyVerifyRes.data?.[0]) {
-      console.error(`[ROBOT1] BUY verify failed: ${buyVerifyRes.msg}`);
-      return Response.json({
-        status: 'BUY_VERIFY_FAILED',
-        polygonSignal: polygonSignal,
-        okxPrice: okxPrice,
-        priceDifference: priceDiff,
-        decision: 'BUY_UNVERIFIED',
-        reason: buyVerifyRes.msg,
-        ordId: buyOrdId,
-        verifiedFill: null
-      }, { status: 400 });
-    }
-
-    const buyVerified = buyVerifyRes.data[0];
-    const buyFillSz = parseFloat(buyVerified.accFillSz || 0);
-    const buyFillPx = parseFloat(buyVerified.avgPx || 0);
-    const buyFee = parseFloat(buyVerified.fee || 0);
-
-    // Record trade
     await base44.asServiceRole.entities.Trade.create({
-      subscription_id: 'robot1',
-      symbol: 'ETH-USDT',
-      side: 'BUY',
-      quantity: buyFillSz,
-      price: buyFillPx,
-      entry_price: buyFillPx,
-      total_value: buyFillSz * buyFillPx,
-      fee: buyFee,
-      execution_mode: 'MAINNET',
-      strategy_used: 'robot1',
+      subscription_id: 'robot1', symbol: 'ETH-USDT', side: 'BUY',
+      quantity: buyFillSz, price: buyFillPx, entry_price: buyFillPx,
+      total_value: buyFillSz * buyFillPx, fee: buyFee,
+      execution_mode: 'MAINNET', strategy_used: 'robot1',
       timestamp: new Date().toISOString()
     });
 
-    console.log(`[ROBOT1] BUY EXECUTED: ordId=${buyOrdId}, qty=${buyFillSz}, px=${buyFillPx}`);
-
-    await logExecution(base44, 'BUY', `Polygon BUY signal (trend=${polygonSignal.trend})`, {
-      orderId: buyOrdId,
-      activePosition: true,
-      positionSymbol: 'ETH-USDT',
-      positionQty: buyFillSz,
-      freeUsdt: usdtBalance,
-      signalData: polygonSignal
+    console.log(`[ROBOT1] BUY EXECUTED ordId=${buyOrdId} qty=${buyFillSz} px=${buyFillPx}`);
+    await logExecution(base44, 'BUY', buyMode, {
+      orderId: buyOrdId, activePosition: true, positionSymbol: 'ETH-USDT',
+      positionQty: buyFillSz, freeUsdt: usdtBalance, signalData: polygonSignal,
+      polygonStatus, okxStatus: 'OK'
     });
 
     return Response.json({
-      status: 'BOUGHT',
-      polygonSignal: polygonSignal,
-      okxPrice: okxPrice,
-      priceDifference: priceDiff,
-      decision: 'BUY_EXECUTED',
-      reason: `Polygon signal=${polygonSignal.signal}, trend=${polygonSignal.trend}`,
-      ordId: buyOrdId,
-      verifiedFill: {
-        fillSz: buyFillSz,
-        fillPx: buyFillPx,
-        fee: buyFee
-      }
+      status: 'BOUGHT', polygonSignal, okxPrice, priceDifference: priceDiff,
+      decision: 'BUY_EXECUTED', reason: buyMode, ordId: buyOrdId,
+      verifiedFill: { fillSz: buyFillSz, fillPx: buyFillPx, fee: Math.abs(buyFee) }
     });
-    } catch (err) {
+
+  } catch (err) {
     console.error(`[ROBOT1] Exception: ${err.message}`);
-    await logExecution(base44, 'ERROR', `Exception: ${err.message}`, { errorMessage: err.message });
+    try {
+      const base44 = createClientFromRequest(req);
+      await logExecution(base44, 'ERROR', `Exception: ${err.message}`, { errorMessage: err.message });
+    } catch (_) {}
     return Response.json({ error: err.message }, { status: 500 });
-    }
-    });
+  }
+});
