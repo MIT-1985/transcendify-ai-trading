@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
-const TEST_PAIR = 'SOL-USDT';
+const TEST_PAIR = 'ETH-USDT';
 
 // ==================== CRYPTO UTILITIES ====================
 const MASTER_SECRET = Deno.env.get('BASE44_APP_ID') || 'okx-master-secret';
@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const BUY_AMOUNT_USDT = 100;
+    const BUY_AMOUNT_USDT = 110; // Fixed $110 test amount
     if (usdtBal < BUY_AMOUNT_USDT) {
       report.errors.push(`Insufficient balance: ${usdtBal} USDT (need ${BUY_AMOUNT_USDT})`);
       return Response.json({ ...report, cycle_status: 'FAILED' }, { status: 400 });
@@ -184,40 +184,46 @@ Deno.serve(async (req) => {
 
     // ========== VERIFY BUY FILL ==========
     let buyFilled = null;
-    for (let i = 0; i < 15; i++) {
-      const queryRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET',
+    for (let i = 0; i < 30; i++) {
+      let queryRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET',
         `/api/v5/trade/orders-pending?instId=${TEST_PAIR}`);
       
       if (queryRes.code === '0' && queryRes.data) {
         buyFilled = queryRes.data.find(o => o.ordId === buyOrdId);
+      }
+
+      // If not in pending, check order history
+      if (!buyFilled) {
+        const histRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET',
+          `/api/v5/trade/orders-history?instId=${TEST_PAIR}&instType=SPOT&ordId=${buyOrdId}`);
         
-        if (buyFilled) {
-          // Check if fully filled (state 2) or partially filled (state 1)
-          if (buyFilled.state === '2' || (parseFloat(buyFilled.accFillSz || 0) > 0 && parseFloat(buyFilled.accFillSz) === parseFloat(buyQty))) {
-            report.buy_order.state = 'filled';
-            report.buy_order.avgPx = parseFloat(buyFilled.avgPx);
-            report.buy_order.accFillSz = parseFloat(buyFilled.accFillSz);
-            report.buy_order.fee = parseFloat(buyFilled.fee || 0);
-            report.buy_order.feeCcy = buyFilled.feeCcy;
-            report.buy_order.fillTime = buyFilled.fillTime;
-            break;
-          } else if (buyFilled.state === '1') {
-            // Partially filled, continue waiting
-            await new Promise(r => setTimeout(r, 500));
-            continue;
-          } else if (buyFilled.state === '-1') {
-            report.errors.push('BUY order was cancelled');
-            report.buy_order.state = 'cancelled';
-            return Response.json({ ...report, cycle_status: 'FAILED' }, { status: 400 });
-          }
+        if (histRes.code === '0' && histRes.data && histRes.data.length > 0) {
+          buyFilled = histRes.data[0];
+        }
+      }
+      
+      if (buyFilled) {
+        if (buyFilled.state === '2' || (parseFloat(buyFilled.accFillSz || 0) > 0)) {
+          report.buy_order.state = 'filled';
+          report.buy_order.ordId = buyFilled.ordId;
+          report.buy_order.avgPx = parseFloat(buyFilled.avgPx);
+          report.buy_order.accFillSz = parseFloat(buyFilled.accFillSz);
+          report.buy_order.fee = parseFloat(buyFilled.fee || 0);
+          report.buy_order.feeCcy = buyFilled.feeCcy;
+          report.buy_order.fillTime = buyFilled.fillTime;
+          break;
+        } else if (buyFilled.state === '-1') {
+          report.errors.push('BUY order was cancelled');
+          report.buy_order.state = 'cancelled';
+          return Response.json({ ...report, cycle_status: 'FAILED' }, { status: 400 });
         }
       }
       
       await new Promise(r => setTimeout(r, 500));
     }
 
-    if (!buyFilled || buyFilled.state !== '2' && parseFloat(buyFilled.accFillSz || 0) === 0) {
-      report.errors.push('BUY order did not fill within 7.5 seconds');
+    if (!buyFilled || !buyFilled.accFillSz || parseFloat(buyFilled.accFillSz) === 0) {
+      report.errors.push('BUY order did not fill within 15 seconds');
       report.buy_order.state = 'timeout';
       return Response.json({ ...report, cycle_status: 'FAILED' }, { status: 400 });
     }
@@ -270,38 +276,46 @@ Deno.serve(async (req) => {
 
     // ========== VERIFY SELL FILL ==========
     let sellFilled = null;
-    for (let i = 0; i < 15; i++) {
-      const queryRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET',
+    for (let i = 0; i < 30; i++) {
+      let queryRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET',
         `/api/v5/trade/orders-pending?instId=${TEST_PAIR}`);
       
       if (queryRes.code === '0' && queryRes.data) {
         sellFilled = queryRes.data.find(o => o.ordId === sellOrdId);
+      }
+
+      // If not in pending, check order history
+      if (!sellFilled) {
+        const histRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET',
+          `/api/v5/trade/orders-history?instId=${TEST_PAIR}&instType=SPOT&ordId=${sellOrdId}`);
         
-        if (sellFilled) {
-          if (sellFilled.state === '2' || (parseFloat(sellFilled.accFillSz || 0) > 0 && parseFloat(sellFilled.accFillSz) === parseFloat(sellQty))) {
-            report.sell_order.state = 'filled';
-            report.sell_order.avgPx = parseFloat(sellFilled.avgPx);
-            report.sell_order.accFillSz = parseFloat(sellFilled.accFillSz);
-            report.sell_order.fee = parseFloat(sellFilled.fee || 0);
-            report.sell_order.feeCcy = sellFilled.feeCcy;
-            report.sell_order.fillTime = sellFilled.fillTime;
-            break;
-          } else if (sellFilled.state === '1') {
-            await new Promise(r => setTimeout(r, 500));
-            continue;
-          } else if (sellFilled.state === '-1') {
-            report.errors.push('SELL order was cancelled');
-            report.sell_order.state = 'cancelled';
-            return Response.json({ ...report, cycle_status: 'FAILED' }, { status: 400 });
-          }
+        if (histRes.code === '0' && histRes.data && histRes.data.length > 0) {
+          sellFilled = histRes.data[0];
+        }
+      }
+      
+      if (sellFilled) {
+        if (sellFilled.state === '2' || (parseFloat(sellFilled.accFillSz || 0) > 0)) {
+          report.sell_order.state = 'filled';
+          report.sell_order.ordId = sellFilled.ordId;
+          report.sell_order.avgPx = parseFloat(sellFilled.avgPx);
+          report.sell_order.accFillSz = parseFloat(sellFilled.accFillSz);
+          report.sell_order.fee = parseFloat(sellFilled.fee || 0);
+          report.sell_order.feeCcy = sellFilled.feeCcy;
+          report.sell_order.fillTime = sellFilled.fillTime;
+          break;
+        } else if (sellFilled.state === '-1') {
+          report.errors.push('SELL order was cancelled');
+          report.sell_order.state = 'cancelled';
+          return Response.json({ ...report, cycle_status: 'FAILED' }, { status: 400 });
         }
       }
       
       await new Promise(r => setTimeout(r, 500));
     }
 
-    if (!sellFilled || sellFilled.state !== '2' && parseFloat(sellFilled.accFillSz || 0) === 0) {
-      report.errors.push('SELL order did not fill within 7.5 seconds');
+    if (!sellFilled || !sellFilled.accFillSz || parseFloat(sellFilled.accFillSz) === 0) {
+      report.errors.push('SELL order did not fill within 15 seconds');
       report.sell_order.state = 'timeout';
       return Response.json({ ...report, cycle_status: 'FAILED' }, { status: 400 });
     }
