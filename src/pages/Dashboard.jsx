@@ -135,10 +135,10 @@ export default function Dashboard() {
         {/* 2b. Robot 1 Scalping Mode */}
         <section className="bg-slate-900/50 border border-purple-700/40 rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Zap className="w-4 h-4 text-purple-400" />
               <h2 className="font-bold text-sm">Robot 1 — Scalping Mode</h2>
-              <span className="text-xs text-slate-500 ml-1">TP=0.18% · SL=-0.18% · Trail=0.06% · minNet=0.02 USDT · Cooldown=30s</span>
+              <span className="text-xs text-slate-500 ml-1">TP=0.18% · SL=-0.18% · µTrail@0.07%/0.08%/0.04% · minNet=0.02 USDT · Cooldown=30s</span>
             </div>
             <Button
               size="sm"
@@ -177,18 +177,63 @@ export default function Dashboard() {
               </div>
               {/* Per-position diagnostics */}
               {scalpResult.positionDiagnostics?.map((d, i) => (
-                <div key={i} className="grid grid-cols-4 gap-1.5 text-xs bg-slate-900/40 rounded-lg p-2.5 border border-slate-700/50">
-                  <div><span className="text-slate-500">Pair</span><div className="font-bold text-white">{d.pair}</div></div>
-                  <div><span className="text-slate-500">Entry → Cur</span><div className="font-mono">${d.entryPx?.toFixed(2)} → ${d.currentPx?.toFixed(2)}</div></div>
-                  <div><span className="text-slate-500">P&L%</span><div className={`font-mono font-bold ${d.pnlPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{d.pnlPercent >= 0 ? '+' : ''}{d.pnlPercent?.toFixed(4)}%</div></div>
-                  <div><span className="text-slate-500">Exit Mode</span><div className={`font-bold ${d.exitMode === 'TP' || d.exitMode === 'MICRO_TRAIL' || d.exitMode === 'TRAIL' ? 'text-emerald-400' : d.exitMode === 'SL' ? 'text-red-400' : 'text-slate-400'}`}>{d.exitMode}</div></div>
-                  <div><span className="text-slate-500">Gross P&L</span><div className={`font-mono ${d.grossPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{d.grossPnL >= 0 ? '+' : ''}{d.grossPnL?.toFixed(4)}</div></div>
-                  <div><span className="text-slate-500">Est. Fees</span><div className="font-mono text-yellow-400">{d.estimatedFees?.toFixed(4)}</div></div>
-                  <div><span className="text-slate-500">Net P&L</span><div className={`font-mono font-bold ${d.netPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{d.netPnL >= 0 ? '+' : ''}{d.netPnL?.toFixed(4)}</div></div>
-                  <div><span className="text-slate-500">Best P&L%</span><div className="font-mono text-purple-400">{d.bestPnlPercent?.toFixed(4)}%</div></div>
-                  <div><span className="text-slate-500">Trail Dist</span><div className="font-mono text-cyan-400">{d.trailingDistance?.toFixed(4)}%</div></div>
-                  <div><span className="text-slate-500">µTrail Active</span><div className={`font-bold ${d.microTrailingActive ? 'text-yellow-400' : 'text-slate-600'}`}>{d.microTrailingActive ? 'YES' : 'no'}</div></div>
-                  <div className="col-span-2"><span className="text-slate-500">lastOrdId</span><div className="font-mono text-slate-400 truncate">{d.buyOrdId}</div></div>
+                <div key={i} className="text-xs bg-slate-900/40 rounded-lg p-3 border border-slate-700/50 space-y-2">
+                  {/* Row 1: identity + exit mode */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-white text-sm">{d.pair}</span>
+                      <span className="font-mono text-slate-400">${d.entryPx?.toFixed(2)} → ${d.currentPx?.toFixed(2)}</span>
+                    </div>
+                    <div className={`font-bold text-sm px-2 py-0.5 rounded ${
+                      d.exitMode === 'TP' ? 'bg-emerald-900/50 text-emerald-300' :
+                      d.exitMode === 'MICRO_TRAIL' ? 'bg-yellow-900/50 text-yellow-300' :
+                      d.exitMode === 'TRAIL' ? 'bg-blue-900/50 text-blue-300' :
+                      d.exitMode === 'SL' ? 'bg-red-900/50 text-red-300' :
+                      d.exitMode === 'WAIT_NET_TOO_LOW' ? 'bg-orange-900/40 text-orange-400' :
+                      'bg-slate-800 text-slate-400'
+                    }`}>
+                      Exit Mode: {d.exitMode}
+                    </div>
+                  </div>
+                  {/* Row 2: the 5 required metrics */}
+                  <div className="grid grid-cols-5 gap-2">
+                    <div className="bg-slate-800/60 rounded p-2">
+                      <div className="text-slate-500 mb-0.5">P&L %</div>
+                      <div className={`font-mono font-bold ${d.pnlPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {d.pnlPercent >= 0 ? '+' : ''}{d.pnlPercent?.toFixed(4)}%
+                      </div>
+                    </div>
+                    <div className="bg-slate-800/60 rounded p-2">
+                      <div className="text-slate-500 mb-0.5">Best PnL %</div>
+                      <div className="font-mono font-bold text-purple-400">
+                        {d.bestPnlPercent?.toFixed(4)}%
+                      </div>
+                    </div>
+                    <div className="bg-slate-800/60 rounded p-2">
+                      <div className="text-slate-500 mb-0.5">Trailing Dist</div>
+                      <div className="font-mono font-bold text-cyan-400">
+                        {d.trailingDistance?.toFixed(4)}%
+                      </div>
+                    </div>
+                    <div className="bg-slate-800/60 rounded p-2">
+                      <div className="text-slate-500 mb-0.5">Micro Trail</div>
+                      <div className={`font-bold ${d.microTrailingActive ? 'text-yellow-400' : 'text-slate-500'}`}>
+                        {d.microTrailingActive ? '✓ ACTIVE' : '✗ off'}
+                      </div>
+                    </div>
+                    <div className="bg-slate-800/60 rounded p-2">
+                      <div className="text-slate-500 mb-0.5">Net PnL After Fees</div>
+                      <div className={`font-mono font-bold ${d.netPnL >= 0.02 ? 'text-emerald-400' : d.netPnL >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+                        {d.netPnL >= 0 ? '+' : ''}{d.netPnL?.toFixed(4)} U
+                      </div>
+                    </div>
+                  </div>
+                  {/* Row 3: fees + ordId */}
+                  <div className="flex gap-4 text-slate-500">
+                    <span>Est. Fees: <span className="text-yellow-400 font-mono">{d.estimatedFees?.toFixed(4)} USDT</span></span>
+                    <span>Gross: <span className={`font-mono ${d.grossPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{d.grossPnL >= 0 ? '+' : ''}{d.grossPnL?.toFixed(4)}</span></span>
+                    <span className="ml-auto font-mono text-slate-600 truncate max-w-xs">ordId: …{d.buyOrdId?.slice(-12)}</span>
+                  </div>
                 </div>
               ))}
             </div>
