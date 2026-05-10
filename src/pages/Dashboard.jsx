@@ -17,7 +17,7 @@ import RobotLiveClockProfit from '@/components/dashboard/RobotLiveClockProfit';
 import LastRobotActionPanel from '@/components/dashboard/LastRobotActionPanel';
 import WhyNoTradePanel from '@/components/dashboard/WhyNoTradePanel';
 import ManualScalpTrigger from '@/components/dashboard/ManualScalpTrigger';
-import BlockerDiagnostics from '@/components/dashboard/BlockerDiagnostics';
+import BlockerDiagnosticsDetailed from '@/components/dashboard/BlockerDiagnosticsDetailed';
 import SchedulerStatus from '@/components/dashboard/SchedulerStatus';
 
 export default function Dashboard() {
@@ -146,8 +146,8 @@ export default function Dashboard() {
         {/* LIVE PROOF: Why No Trade */}
         <WhyNoTradePanel />
 
-        {/* Blocker Diagnostics */}
-        <BlockerDiagnostics />
+        {/* Exact OKX Ticker Analysis */}
+        <BlockerDiagnosticsDetailed />
 
         {/* Consistent Scheduler Status */}
         <SchedulerStatus />
