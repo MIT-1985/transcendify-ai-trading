@@ -13,7 +13,7 @@ const ALLOWED_PAIRS          = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT',
 const DEFAULT_TRADE_USDT     = 20;     // default USDT per trade
 const MAX_TRADE_USDT         = 30;     // hard ceiling regardless of balance
 const MAX_POSITION_PCT       = 0.25;   // cap at 25% of totalCapital per position
-const MIN_FREE_USDT          = 12;     // absolute minimum balance to enter
+const MIN_FREE_USDT          = 8;      // absolute minimum balance to enter (reduced for SMALL mode)
 
 // ─── Capital Reserve Management ───────────────────────────────────────────────
 // NORMAL MODE (balance >= 100 USDT)
@@ -26,8 +26,8 @@ const MIN_NET_PROFIT_USDT    = 0.02;   // minimum net profit after fees to SELL 
 // SMALL BALANCE MODE (balance < 100 USDT)
 const SMALL_BALANCE_THRESHOLD = 100;   // enable small balance mode below this
 const SMALL_MODE_MAX_POSITIONS = 1;    // only 1 position at a time
-const SMALL_MODE_MIN_FREE_PCT = 0.20;  // keep 20% free minimum
-const SMALL_MODE_MIN_NET_PROFIT = 0.005; // 0.5¢ minimum net profit
+const SMALL_MODE_MIN_FREE_PCT = 0.10;  // keep 10% free minimum (relaxed)
+const SMALL_MODE_MIN_NET_PROFIT = 0.003; // 0.3¢ minimum net profit (reduced)
 
 const TAKE_PROFIT_PCT        = 0.25;   // 0.25% TP (must exceed round-trip fees ~0.20%)
 const STOP_LOSS_PCT          = -0.18;  // -0.18% SL
@@ -426,45 +426,155 @@ function aggressionMultiplier(recentLosses) {
   return 0.55;
 }
 
-// ─── OKX-only pair scoring (no Polygon required) ────────────────────────────
-// Uses only OKX data: last price, 24h trend, spread, volume
-function scalpScore(pair, ticker, balanceMode = 'NORMAL') {
-  if (!ticker) return { ok: false, reason: 'no ticker', score: 0 };
-  const bid      = parseFloat(ticker.bidPx || 0);
-  const ask      = parseFloat(ticker.askPx || 0);
-  const last     = parseFloat(ticker.last || 0);
-  const open24h  = parseFloat(ticker.open24h || last);
-  const vol24h   = parseFloat(ticker.vol24h || 0);
-  // Correct spread: ((ask - bid) / midpoint) * 100
+// ─── Fetch Polygon candles with timeout (primary signal source) ────────────
+async function fetchPolygonCandles(pair) {
+  try {
+    const symbol = pair.replace('-USDT', '');
+    const apiKey = Deno.env.get('POLYGON_API_KEY');
+    if (!apiKey) return { ok: false, candles: [], reason: 'POLYGON_NO_KEY', resultsCount: 0 };
+    
+    // Timeout: 2 seconds
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    
+    const res = await fetch(
+      `https://api.polygon.io/v1/open-close/${symbol}/USDT/2026-05-10?adjusted=true&apiKey=${apiKey}`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeout);
+    const data = await res.json();
+    
+    if (!data.status || data.status === 'NOT_FOUND' || !data.o || !data.c) {
+      return { ok: false, candles: [], reason: 'EMPTY_RESULTS', resultsCount: 0 };
+    }
+    
+    return {
+      ok: true,
+      candles: [{ open: data.o, close: data.c, high: data.h, low: data.l, vol: data.v }],
+      resultsCount: 1,
+      reason: 'OK'
+    };
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      return { ok: false, candles: [], reason: 'POLYGON_TIMEOUT', resultsCount: 0 };
+    }
+    return { ok: false, candles: [], reason: 'POLYGON_ERROR', resultsCount: 0 };
+  }
+}
+
+// ─── Hybrid scoring: Polygon primary + OKX fallback ────────────────────────
+// Returns: { ok, score, signalSource, polygonStatus, okxStatus, confidence, decisionReason, ... }
+async function scalpScore(pair, ticker, balanceMode = 'NORMAL') {
+  if (!ticker) {
+    return { ok: false, reason: 'Missing OKX ticker', score: 0, signalSource: 'NONE', polygonStatus: 'UNKNOWN', okxStatus: 'MISSING' };
+  }
+  
+  const bid = parseFloat(ticker.bidPx || 0);
+  const ask = parseFloat(ticker.askPx || 0);
+  const last = parseFloat(ticker.last || 0);
+  const open24h = parseFloat(ticker.open24h || last);
+  const vol24h = parseFloat(ticker.vol24h || 0);
+  
+  if (!bid || !ask) {
+    return { ok: false, reason: 'Missing OKX bid/ask', score: 0, signalSource: 'NONE', okxStatus: 'MISSING_QUOTES' };
+  }
+  
+  // Spread calculation
   const mid = (bid + ask) / 2;
   const spreadPct = mid > 0 ? ((ask - bid) / mid) * 100 : 99;
 
   // Hard filters
-  if (spreadPct > MAX_SPREAD_PCT) return { ok: false, reason: `spread ${spreadPct.toFixed(4)}% > ${MAX_SPREAD_PCT}%`, score: 0 };
-  if (vol24h < 100) return { ok: false, reason: `volume too low (vol24h=${vol24h})`, score: 0 };
-
-  // OKX-only scoring (0-100)
-  // Trend component: +40pts if 24h trend positive
-  const trendScore = last > open24h ? 40 : 20;
-  
-  // Spread component: tighter spread = higher score (max 30pts)
-  const spreadScore = Math.max(0, 30 - (spreadPct * 500)); // tight spread rewards
-  
-  // Volume component: higher volume = higher score (max 20pts, normalized)
-  const volumeScore = Math.min(20, (vol24h / 1000) * 20);
-  
-  // Liquidity component: bid/ask presence (10pts if both present)
-  const liquidityScore = bid > 0 && ask > 0 ? 10 : 0;
-
-  const qualityScore = parseFloat((trendScore + spreadScore + volumeScore + liquidityScore).toFixed(1));
-  
-  // Minimum quality threshold depends on balance mode
-  const minQuality = balanceMode === 'SMALL' ? 25 : 50;
-  if (qualityScore < minQuality) {
-    return { ok: false, reason: `quality ${qualityScore.toFixed(1)} < ${minQuality}`, score: qualityScore };
+  if (spreadPct > MAX_SPREAD_PCT) {
+    return { ok: false, reason: `spread ${spreadPct.toFixed(4)}% > ${MAX_SPREAD_PCT}%`, score: 0, okxStatus: 'SPREAD_TOO_WIDE' };
+  }
+  if (vol24h < 100) {
+    return { ok: false, reason: 'OKX 24h volume too low', score: 0, okxStatus: 'LOW_VOLUME' };
   }
 
-  return { ok: true, spreadPct, last, bid, ask, score: qualityScore };
+  // ── Fetch Polygon candles (primary signal) ──
+  const polygonData = await fetchPolygonCandles(pair);
+  let polygonStatus = polygonData.reason;
+  let polygonScore = 0;
+  let polygonTrendConfirmed = false;
+
+  if (polygonData.ok && polygonData.candles.length > 0) {
+    polygonStatus = 'OK';
+    const candle = polygonData.candles[0];
+    polygonTrendConfirmed = candle.close > candle.open;
+    // Polygon trend: 40pts if uptrend, 20pts if downtrend
+    polygonScore = polygonTrendConfirmed ? 40 : 20;
+  }
+
+  // ── OKX execution quality score ──
+  // 24h trend: 20-40pts
+  const trendScore = last > open24h ? 40 : 20;
+  
+  // Spread: tighter = higher (0-25pts)
+  const spreadScore = Math.max(0, 25 - (spreadPct / MAX_SPREAD_PCT) * 25);
+  
+  // Volume: higher = higher (0-20pts)
+  const volumeScore = Math.min(20, Math.max(0, (vol24h - 10000) / 4500));
+  
+  // Liquidity: bid/ask present (10pts)
+  const liquidityScore = bid > 0 && ask > 0 ? 10 : 0;
+  
+  const okxExecutionScore = trendScore + spreadScore + volumeScore + liquidityScore;
+
+  // ── Determine final score and signal source ──
+  let finalScore = 0;
+  let signalSource = 'NONE';
+  let confidence = 0;
+  let decisionReason = '';
+
+  if (polygonStatus === 'OK') {
+    // Polygon OK: hybrid scoring 60% signal + 40% execution
+    finalScore = (polygonScore * 0.60) + (okxExecutionScore * 0.40);
+    signalSource = 'POLYGON+OKX';
+    confidence = 100;
+    decisionReason = `Polygon ${polygonTrendConfirmed ? 'uptrend' : 'downtrend'} confirmed, OKX exec=${okxExecutionScore.toFixed(0)}/95`;
+  } else {
+    // Polygon unavailable: OKX fallback only (reduced confidence)
+    finalScore = okxExecutionScore;
+    signalSource = 'OKX_FALLBACK';
+    confidence = 80;
+    decisionReason = `Polygon unavailable (${polygonStatus}), using OKX execution score`;
+  }
+
+  finalScore = parseFloat(Math.min(100, Math.max(0, finalScore)).toFixed(1));
+
+  // Minimum threshold varies by mode and signal source
+  const minQuality = balanceMode === 'SMALL' 
+    ? (signalSource === 'OKX_FALLBACK' ? 15 : 20)
+    : (signalSource === 'OKX_FALLBACK' ? 30 : 40);
+  
+  if (finalScore < minQuality) {
+    return {
+      ok: false,
+      reason: `score ${finalScore} < ${minQuality} (${signalSource})`,
+      score: finalScore,
+      signalSource,
+      polygonStatus,
+      okxStatus: 'OK',
+      confidence,
+      components: { polygonScore, trendScore, spreadScore, volumeScore, liquidityScore }
+    };
+  }
+
+  return {
+    ok: true,
+    spreadPct,
+    last,
+    bid,
+    ask,
+    score: finalScore,
+    signalSource,
+    polygonStatus,
+    polygonResultsCount: polygonData.resultsCount,
+    okxStatus: 'OK',
+    confidence,
+    decisionReason,
+    components: { polygonScore, trendScore, spreadScore, volumeScore, liquidityScore }
+  };
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -665,13 +775,13 @@ Deno.serve(async (req) => {
         console.log(`[SCALP] Aggression reduced: ${recentConsecLosses} consec losses → mult=${aggMult}x`);
       }
 
-      // ── Fee-aware candidate scoring (OKX-only, pass balance mode) ──
-      const candidates = [];
-      for (const pair of ALLOWED_PAIRS) {
-        if (activePairNow.has(pair)) continue;
+      // ── Fee-aware candidate scoring (Polygon primary + OKX fallback) ──
+       const candidates = [];
+       for (const pair of ALLOWED_PAIRS) {
+         if (activePairNow.has(pair)) continue;
 
-        const score = scalpScore(pair, tickerMap[pair], balanceMode);
-        if (!score.ok) { console.log(`[SCALP] SKIP ${pair}: ${score.reason} (score=${score.score})`); continue; }
+         const score = await scalpScore(pair, tickerMap[pair], balanceMode);
+         if (!score.ok) { console.log(`[SCALP] SKIP ${pair}: ${score.reason} (score=${score.score}, signal=${score.signalSource})`); continue; }
 
         const cooled = await isInCooldown(base44, pair);
         if (cooled) { console.log(`[SCALP] SKIP ${pair}: cooldown`); continue; }
@@ -711,8 +821,8 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        console.log(`[SCALP] CANDIDATE ${pair}: score=${score.score} amount=${sizing.amount} USDT spread=${score.spreadPct.toFixed(4)}% requiredMove=${sizing.analysis.requiredPriceMovePercent}% netAtTP=${sizing.analysis.netProfitAtTP}`);
-        candidates.push({ pair, ...score, sizing });
+        console.log(`[SCALP] CANDIDATE ${pair}: score=${score.score} (${score.signalSource}) amount=${sizing.amount} USDT spread=${score.spreadPct.toFixed(4)}% confidence=${score.confidence}%`);
+         candidates.push({ pair, ...score, sizing });
       }
 
       if (candidates.length === 0) {
@@ -771,6 +881,17 @@ Deno.serve(async (req) => {
 
     const finalPositions = await getActivePositions(base44);
      const finalCapital = analyzeCapitalReserve(freeUsdt, finalPositions, tickerMap);
+
+     // Extract signal diagnostics from best candidate
+     const signalDiagnostics = buyResult?.signalSource ? {
+       signalSource: buyResult.signalSource,
+       polygonStatus: buyResult.polygonStatus,
+       polygonResultsCount: buyResult.polygonResultsCount,
+       okxStatus: buyResult.okxStatus,
+       confidence: buyResult.confidence,
+       decisionReason: buyResult.decisionReason
+     } : null;
+
      return Response.json({
        mode: 'scalp',
        balanceMode,
@@ -780,6 +901,7 @@ Deno.serve(async (req) => {
        maxPositions: effectiveMaxPos,
        capitalReserve: finalCapital,
        optimizerMetrics,
+       signalDiagnostics,
        positionDiagnostics: sellDetails,
        sizingPreview,
        smallBalanceModeConfig: balanceMode === 'SMALL' ? {
