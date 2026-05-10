@@ -85,69 +85,123 @@ Deno.serve(async (req) => {
     const apiSecret = await decryptOkx(conn.api_secret_encrypted);
     const passphrase = await decryptOkx(conn.encryption_iv);
 
-    // Fetch all filled orders from OKX
-    const ordersRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/trade/orders-history?state=filled&limit=100');
+    // Fetch fills from OKX (last 24 hours, SPOT only, USDT pairs)
+    console.log('[SYNC_LEDGER] Fetching OKX fills with pagination');
+    
+    const allFills = [];
+    let after = '';
+    let pageCount = 0;
 
-    if (ordersRes.code !== '0' || !ordersRes.data) {
-      console.error('[SYNC_LEDGER] OKX API error:', ordersRes.msg);
-      return Response.json({ error: 'OKX API error', msg: ordersRes.msg }, { status: 400 });
+    // Pagination loop (OKX returns up to 100 per page)
+    while (true) {
+      const path = after 
+        ? `/api/v5/trade/fills?instType=SPOT&limit=100&after=${after}`
+        : '/api/v5/trade/fills?instType=SPOT&limit=100';
+      
+      const res = await okxRequest(apiKey, apiSecret, passphrase, 'GET', path);
+
+      if (res.code !== '0') {
+        console.error('[SYNC_LEDGER] OKX fills API error:', res.code, res.msg);
+        return Response.json({
+          success: false,
+          error: res.code,
+          message: res.msg,
+          endpoint: '/api/v5/trade/fills',
+          httpStatus: 403
+        }, { status: 403 });
+      }
+
+      const fills = res.data || [];
+      console.log(`[SYNC_LEDGER] Page ${pageCount + 1}: fetched ${fills.length} fills`);
+      
+      if (fills.length === 0) break;
+      
+      allFills.push(...fills);
+      pageCount++;
+      
+      // OKX returns in newest-first order, get last ID for next page
+      if (fills.length < 100) break;
+      after = fills[fills.length - 1].billId;
     }
 
-    const rawOrders = ordersRes.data || [];
-    console.log(`[SYNC_LEDGER] Fetched ${rawOrders.length} filled orders from OKX`);
+    console.log(`[SYNC_LEDGER] Total fills from OKX: ${allFills.length} across ${pageCount} pages`);
 
     // Map to OXXOrderLedger
-    const ledgerEntries = rawOrders
-      .filter(o => o.state === 'filled') // Only filled
-      .map(o => {
-        const side = o.side === 'buy' ? 'buy' : 'sell';
-        const accFillSz = parseFloat(o.accFillSz || 0);
-        const avgPx = parseFloat(o.avgPx || 0);
+    const ledgerEntries = allFills
+      .filter(f => f.state === 'filled' && f.instId && f.instId.endsWith('-USDT'))
+      .map(f => {
+        const side = f.side === 'buy' ? 'buy' : 'sell';
+        const accFillSz = parseFloat(f.sz || 0);
+        const avgPx = parseFloat(f.fillPrice || 0);
         const quoteUSDT = accFillSz * avgPx;
-        const fee = Math.abs(parseFloat(o.fee || 0));
+        const fee = Math.abs(parseFloat(f.fee || 0));
 
         // Determine robotId based on symbol
-        let robotId = 'legacy';
-        if (o.instId === 'ETH-USDT' || o.instId === 'SOL-USDT') {
+        let robotId = 'alphaScalper';
+        if (f.instId === 'ETH-USDT' || f.instId === 'SOL-USDT') {
           robotId = 'robot1';
         }
 
         return {
-          ordId: o.ordId,
-          instId: o.instId,
+          ordId: f.ordId,
+          instId: f.instId,
           side,
           avgPx,
           accFillSz,
           quoteUSDT,
           fee,
-          feeCcy: o.feeCcy || 'USDT',
-          timestamp: new Date(parseInt(o.uTime)).toISOString(),
+          feeCcy: f.feeCcy || 'USDT',
+          timestamp: new Date(parseInt(f.fillTime)).toISOString(),
           robotId,
           verified: true,
-          state: 'filled'
+          state: 'filled',
+          exchange: 'okx',
+          source: 'okx_real_sync'
         };
       });
 
-    // Check which are already in ledger
-    const existingOrdIds = new Set();
+    console.log(`[SYNC_LEDGER] Mapped ${ledgerEntries.length} valid ledger entries`);
+
+    // Get existing fills from ledger
     const existing = await base44.asServiceRole.entities.OXXOrderLedger.list();
-    existing.forEach(e => existingOrdIds.add(e.ordId));
+    const upsertKeys = new Set();
+    existing.forEach(e => {
+      upsertKeys.add(`${e.exchange || 'okx'}|${e.ordId}|${e.instId}|${e.side}|${e.timestamp}`);
+    });
 
-    // Only insert new ones
-    const toInsert = ledgerEntries.filter(e => !existingOrdIds.has(e.ordId));
+    // Partition: new vs existing
+    const toCreate = [];
+    let skipCount = 0;
 
-    if (toInsert.length > 0) {
-      await base44.asServiceRole.entities.OXXOrderLedger.bulkCreate(toInsert);
-      console.log(`[SYNC_LEDGER] Inserted ${toInsert.length} new orders`);
-    } else {
-      console.log('[SYNC_LEDGER] No new orders');
+    for (const entry of ledgerEntries) {
+      const key = `okx|${entry.ordId}|${entry.instId}|${entry.side}|${entry.timestamp}`;
+      if (!upsertKeys.has(key)) {
+        toCreate.push(entry);
+      } else {
+        skipCount++;
+      }
     }
+
+    // Bulk create new ones
+    if (toCreate.length > 0) {
+      const chunkSize = 50;
+      for (let i = 0; i < toCreate.length; i += chunkSize) {
+        const chunk = toCreate.slice(i, i + chunkSize);
+        await base44.asServiceRole.entities.OXXOrderLedger.bulkCreate(chunk);
+        console.log(`[SYNC_LEDGER] Created batch of ${chunk.length}`);
+      }
+    }
+
+    console.log(`[SYNC_LEDGER] Sync complete: created=${toCreate.length} skipped=${skipCount}`);
 
     return Response.json({
       success: true,
-      totalFromOKX: rawOrders.length,
-      newInserted: toInsert.length,
-      existingSkipped: existingOrdIds.size
+      fillsFetchedFromOKX: allFills.length,
+      validEntries: ledgerEntries.length,
+      upsertedNew: toCreate.length,
+      duplicatesSkipped: skipCount,
+      existingTotal: existing.length,
+      syncedAt: new Date().toISOString()
     });
   } catch (error) {
     console.error('[SYNC_LEDGER] Error:', error.message);

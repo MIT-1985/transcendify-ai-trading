@@ -15,6 +15,7 @@ import ConnectOKX from './pages/ConnectOKX';
 import PaymentSuccess from './pages/PaymentSuccess';
 import OKXDashboard from './pages/OKXDashboard';
 import CleanDashboard from './components/dashboard/CleanDashboard';
+import OKXDataSync from './pages/OKXDataSync';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -63,6 +64,11 @@ const AuthenticatedApp = () => {
       <Route path="/clean-dashboard" element={
         <LayoutWrapper currentPageName="CleanDashboard">
           <CleanDashboard />
+        </LayoutWrapper>
+      } />
+      <Route path="/OKXDataSync" element={
+        <LayoutWrapper currentPageName="OKXDataSync">
+          <OKXDataSync />
         </LayoutWrapper>
       } />
       <Route path="/" element={

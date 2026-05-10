@@ -42,22 +42,37 @@ export default function Dashboard() {
     refetchInterval: 5000
   });
 
-  // Live Balance
-  const { data: balance = {}, isLoading: loadBalance } = useQuery({
+  // Live Balance - REAL OKX DATA ONLY
+  const { data: okxBalance = {}, isLoading: loadBalance, isError: balanceError } = useQuery({
     queryKey: ['okx-live-balance', user?.email],
     queryFn: async () => {
-      const res = await base44.functions.invoke('getSuzanaBalance', {});
+      const res = await base44.functions.invoke('okxLiveBalance', {});
       const d = res.data || {};
-      const map = { totalEquity: d.balance_usdt || 0, freeUSDT: 0 };
-      for (const b of (d.balances || [])) {
-        map[b.asset] = b.free;
-        if (b.asset === 'USDT') map.freeUSDT = b.free;
+      
+      // If fetch failed, return error state (not $0)
+      if (!d.success) {
+        return {
+          success: false,
+          totalEquityUSDT: 'UNKNOWN',
+          freeUSDT: 'UNKNOWN',
+          assets: [],
+          error: d.error || 'UNKNOWN',
+          message: d.message || 'Failed to fetch balance'
+        };
       }
-      return map;
+      
+      return {
+        success: true,
+        totalEquityUSDT: d.totalEquityUSDT,
+        freeUSDT: d.freeUSDT,
+        assets: d.assets || [],
+        assetCount: d.assetCount || 0,
+        fetchedAt: d.fetchedAt
+      };
     },
     enabled: !!user,
-    staleTime: 15000,
-    refetchInterval: 30000
+    staleTime: 20000,
+    refetchInterval: 45000
   });
 
   // OKX Ledger (clean, non-duplicate fills only)
@@ -155,13 +170,13 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto space-y-6">
 
-        {/* SECTION 1: BIG LIVE CLOCK */}
-        <div className={`rounded-2xl p-8 border-2 ${killSwitchStatus === 'ACTIVE' ? 'border-red-600 bg-red-950/30' : (auditReport?.profit_metrics?.net_pnl || 0) >= 0 ? 'border-emerald-500 bg-emerald-950/30' : 'border-red-500 bg-red-950/30'} shadow-2xl`}>
+        {/* SECTION 1: BIG LIVE CLOCK - REAL OKX DATA */}
+        <div className={`rounded-2xl p-8 border-2 ${killSwitchStatus === 'ACTIVE' ? 'border-red-600 bg-red-950/30' : (auditReport?.profit_metrics?.net_pnl_after_fees || 0) >= 0 ? 'border-emerald-500 bg-emerald-950/30' : 'border-red-500 bg-red-950/30'} shadow-2xl`}>
           <div className="text-center space-y-4">
-            <div className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Clean Verified Profit</div>
+            <div className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Net P&L (OKX Real Trades)</div>
             
-            <div className={`text-6xl font-black font-mono ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : (auditReport?.profit_metrics?.net_pnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {(auditReport?.profit_metrics?.net_pnl || 0) >= 0 ? '+' : ''}{(auditReport?.profit_metrics?.net_pnl || 0).toFixed(4)} USDT
+            <div className={`text-6xl font-black font-mono ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : (auditReport?.profit_metrics?.net_pnl_after_fees || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {(auditReport?.profit_metrics?.net_pnl_after_fees || 0) >= 0 ? '+' : ''}{(auditReport?.profit_metrics?.net_pnl_after_fees || 0).toFixed(4)} USDT
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mt-8">
@@ -199,56 +214,50 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* SECTION 2: ACCOUNT SUMMARY (BALANCE + ACCOUNTING SEPARATE) */}
+        {/* SECTION 2: ACCOUNT SUMMARY - REAL OKX DATA ONLY */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          {/* OKX Balance - shows LIVE or UNVERIFIED */}
-          <div className={`border rounded-xl p-6 ${auditReport?.data_source_status?.okx_balance_fetch_success ? 'bg-emerald-900/20 border-emerald-600' : 'bg-yellow-900/20 border-yellow-600'}`}>
+          {/* OKX Balance - LIVE or LIVE FAILED ERROR */}
+          <div className={`border rounded-xl p-6 ${okxBalance?.success ? 'bg-emerald-900/20 border-emerald-600' : 'bg-red-900/20 border-red-600'}`}>
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-5 h-5 text-yellow-500" />
               <div className="text-xs text-slate-500 uppercase">
-                {auditReport?.data_source_status?.okx_balance_fetch_success ? 'Total Equity (LIVE)' : 'Total Equity (UNVERIFIED)'}
+                {okxBalance?.success ? 'Total Equity (LIVE)' : 'Total Equity (FAILED)'}
               </div>
             </div>
-            {!auditReport ? (
+            {loadBalance ? (
               <Skeleton className="h-10 bg-slate-800" />
+            ) : okxBalance?.success ? (
+              <div className="text-3xl font-bold text-white">${okxBalance.totalEquityUSDT}</div>
             ) : (
-              <>
-                <div className="text-3xl font-bold text-white">
-                  {auditReport?.data_source_status?.okx_balance_fetch_success 
-                    ? `$${auditReport.okx_live_balance?.total_equity_usdt || 0}`
-                    : 'UNKNOWN'}
-                </div>
-                {!auditReport?.data_source_status?.okx_balance_fetch_success && (
-                  <div className="text-xs text-yellow-400 mt-2">Error: {auditReport.okx_live_balance?.http_status}</div>
-                )}
-              </>
+              <div className="text-lg font-bold text-red-400">OKX_ERROR</div>
+            )}
+            {!okxBalance?.success && (
+              <div className="text-xs text-red-300 mt-2">{okxBalance?.message}</div>
             )}
           </div>
 
-          {/* Free USDT - shows LIVE or UNVERIFIED */}
-          <div className={`border rounded-xl p-6 ${auditReport?.data_source_status?.okx_balance_fetch_success ? 'bg-emerald-900/20 border-emerald-600' : 'bg-yellow-900/20 border-yellow-600'}`}>
+          {/* Free USDT - LIVE or FAILED */}
+          <div className={`border rounded-xl p-6 ${okxBalance?.success ? 'bg-emerald-900/20 border-emerald-600' : 'bg-red-900/20 border-red-600'}`}>
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-5 h-5 text-emerald-500" />
               <div className="text-xs text-slate-500 uppercase">
-                {auditReport?.data_source_status?.okx_balance_fetch_success ? 'Free USDT (LIVE)' : 'Free USDT (UNVERIFIED)'}
+                {okxBalance?.success ? 'Free USDT (LIVE)' : 'Free USDT (FAILED)'}
               </div>
             </div>
-            {!auditReport ? (
+            {loadBalance ? (
               <Skeleton className="h-10 bg-slate-800" />
+            ) : okxBalance?.success ? (
+              <div className="text-3xl font-bold text-emerald-400">${okxBalance.freeUSDT}</div>
             ) : (
-              <div className="text-3xl font-bold text-emerald-400">
-                {auditReport?.data_source_status?.okx_balance_fetch_success 
-                  ? `$${auditReport.okx_live_balance?.free_usdt || 0}`
-                  : 'UNKNOWN'}
-              </div>
+              <div className="text-lg font-bold text-red-400">UNKNOWN</div>
             )}
           </div>
 
-          {/* Accounting: Net P&L from VerifiedTrade */}
+          {/* Accounting: Net P&L from VerifiedTrade (real OKX trades only) */}
           <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-5 h-5 text-blue-500" />
-              <div className="text-xs text-slate-500 uppercase">Net P&L (Clean)</div>
+              <div className="text-xs text-slate-500 uppercase">Net P&L (OKX Real)</div>
             </div>
             {!auditReport ? (
               <Skeleton className="h-10 bg-slate-800" />
@@ -259,16 +268,16 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Accounting: Clean Trades from VerifiedTrade count */}
+          {/* Accounting: Verified Trade Count from OKXOrderLedger */}
           <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
             <div className="flex items-center gap-2 mb-2">
               <Activity className="w-5 h-5 text-cyan-500" />
-              <div className="text-xs text-slate-500 uppercase">Clean Trades</div>
+              <div className="text-xs text-slate-500 uppercase">Verified Trades</div>
             </div>
-            {!auditReport ? (
+            {!ledger ? (
               <Skeleton className="h-10 bg-slate-800" />
             ) : (
-              <div className="text-3xl font-bold text-cyan-400">{auditReport.trade_counts?.clean_trades_final_count || 0}</div>
+              <div className="text-3xl font-bold text-cyan-400">{ledger.length}</div>
             )}
           </div>
         </div>
