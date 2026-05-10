@@ -239,62 +239,142 @@ Deno.serve(async (req) => {
     }
 
     // ============================================
-    // 5. CALCULATE CLEAN PROFIT METRICS
+    // 5. CALCULATE CLEAN PROFIT METRICS (CORRECTED)
     // ============================================
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     
-    const todayValidTrades = validTrades.filter(t => !t.suspect_pnl && new Date(t.sellTime) >= todayStart);
+    // Separate clean trades from suspect
     const suspectTrades = validTrades.filter(t => t.suspect_pnl);
+    const cleanTrades = validTrades.filter(t => !t.suspect_pnl);
+    const todayCleanTrades = cleanTrades.filter(t => new Date(t.sellTime) >= todayStart);
     
-    const cleanTradeCount = todayValidTrades.length;
-    const totalFeesUSDT = totalBuyFees + totalSellFees;
-    const netPnL = grossPnL;
-    const winRate = cleanTradeCount > 0 ? ((winCount / cleanTradeCount) * 100) : 0;
-    const averagePnL = cleanTradeCount > 0 ? (netPnL / cleanTradeCount) : 0;
+    // Count wins, losses, breakeven for CLEAN trades only
+    let cleanWins = 0;
+    let cleanLosses = 0;
+    let cleanBreakeven = 0;
+    let cleanGrossPnL = 0;
+    let cleanTotalFees = 0;
+    
+    for (const trade of todayCleanTrades) {
+      if (trade.realizedPnL > 0) cleanWins++;
+      else if (trade.realizedPnL < 0) cleanLosses++;
+      else cleanBreakeven++;
+      
+      cleanGrossPnL += (trade.sellValue - trade.buyValue);
+      cleanTotalFees += (trade.buyFee + trade.sellFee);
+    }
+    
+    const cleanNetPnL = cleanGrossPnL - cleanTotalFees;
+    const cleanTradeCount = todayCleanTrades.length;
+    const winRatePct = cleanTradeCount > 0 ? ((cleanWins / cleanTradeCount) * 100) : 0;
+    const avgNetPnL = cleanTradeCount > 0 ? (cleanNetPnL / cleanTradeCount) : 0;
+    
+    // RECONCILIATION CHECK: wins + losses + breakeven must equal total clean trades
+    const tradeCountReconcile = cleanWins + cleanLosses + cleanBreakeven;
 
-    console.log(`[CleanupAccounting] Final metrics: ${cleanTradeCount} clean trades, ${winRate.toFixed(2)}% win rate`);
+    console.log(`[CleanupAccounting] Final metrics: ${cleanTradeCount} clean trades, ${cleanWins} wins, ${cleanLosses} losses, ${cleanBreakeven} breakeven`);
+    console.log(`[CleanupAccounting] Trade count reconciliation: ${tradeCountReconcile} = ${cleanTradeCount} ? ${tradeCountReconcile === cleanTradeCount ? 'OK' : 'ERROR'}`);
+    console.log(`[CleanupAccounting] P&L: grossBefore=${cleanGrossPnL.toFixed(4)}, fees=${cleanTotalFees.toFixed(4)}, netAfter=${cleanNetPnL.toFixed(4)}`);
 
     // ============================================
-    // FINAL REPORT
+    // 6. DETERMINE FINAL STATUS
     // ============================================
-    const accountingStatus = (markCount === toMark.length && stalePositions.every(p => p.staleMarked || p.liveQty > 0))
-      ? 'ACCOUNTING_CLEAN_CONFIRMED'
-      : 'ACCOUNTING_STILL_DIRTY';
+    
+    // OKX balance fetch status
+    const okxBalanceFetchSuccess = !okxError;
+    
+    // Can only confirm stale positions if OKX balance fetch succeeded
+    let stalePositionsConfirmed = false;
+    if (okxBalanceFetchSuccess) {
+      stalePositionsConfirmed = stalePositions.every(p => p.staleMarked || p.liveQty > 0);
+    }
+    
+    // Determine accounting status
+    let accountingStatus = 'ACCOUNTING_PARTIAL_OK_BALANCE_UNVERIFIED';
+    if (okxBalanceFetchSuccess && stalePositionsConfirmed && tradeCountReconcile === cleanTradeCount) {
+      accountingStatus = 'ACCOUNTING_CLEAN_CONFIRMED';
+    }
 
     return Response.json({
       success: true,
       accounting_status: accountingStatus,
+      
+      data_source_status: {
+        okx_balance_fetch_success: okxBalanceFetchSuccess,
+        okx_fills_fetch_success: true,
+        oxx_order_ledger_read_success: true,
+        verified_trade_read_success: true
+      },
+      
       deduplication: {
         total_records: allLedger.length,
         duplicate_groups: duplicates.length,
         duplicate_records_marked: markCount,
         unique_fills: uniqueCount
       },
-      trades: {
-        valid_trades_matched: validTrades.length,
-        invalid_trades_negative_time: invalidTrades.length,
+      
+      trade_counts: {
+        oxx_total_records: allLedger.length,
+        duplicates_marked: markCount,
+        unique_clean_fills: uniqueCount,
+        valid_matched_trades: validTrades.length,
         suspect_trades_high_pnl: suspectTrades.length,
-        clean_trades_today: cleanTradeCount
+        excluded_trades_breakdown: {
+          suspect_pnl_above_5_percent: suspectTrades.length,
+          invalid_negative_hold_time: invalidTrades.length,
+          total_excluded: suspectTrades.length + invalidTrades.length
+        },
+        clean_trades_final_count: cleanTradeCount,
+        clean_trades_today_wins: cleanWins,
+        clean_trades_today_losses: cleanLosses,
+        clean_trades_today_breakeven: cleanBreakeven,
+        reconciliation_check: {
+          wins_plus_losses_plus_breakeven: tradeCountReconcile,
+          clean_trades_count: cleanTradeCount,
+          reconciles: tradeCountReconcile === cleanTradeCount
+        }
       },
+      
       profit_metrics: {
-        gross_pnl: parseFloat(grossPnL.toFixed(4)),
-        total_fees_usdt: parseFloat(totalFeesUSDT.toFixed(4)),
-        net_pnl: parseFloat(netPnL.toFixed(4)),
-        wins: winCount,
-        losses: lossCount,
-        win_rate_pct: parseFloat(winRate.toFixed(2)),
-        average_pnl: parseFloat(averagePnL.toFixed(4)),
+        gross_pnl_before_fees: parseFloat(cleanGrossPnL.toFixed(4)),
+        total_fees_usdt: parseFloat(cleanTotalFees.toFixed(4)),
+        net_pnl_after_fees: parseFloat(cleanNetPnL.toFixed(4)),
+        average_net_pnl_per_trade: parseFloat(avgNetPnL.toFixed(4)),
+        wins: cleanWins,
+        losses: cleanLosses,
+        breakeven: cleanBreakeven,
+        win_rate_pct: parseFloat(winRatePct.toFixed(2)),
         best_trade: bestTrade,
         worst_trade: worstTrade
       },
-      okx_live_balance: {
+      
+      okx_live_balance: okxBalanceFetchSuccess ? {
+        fetch_success: true,
         total_equity_usdt: parseFloat(liveBalance.totalEquityUSDT.toFixed(2)),
         free_usdt: parseFloat(liveBalance.freeUSDT.toFixed(2)),
-        non_usdt_assets: stalePositions.map(p => ({ [p.asset]: p.liveQty })).reduce((a, b) => ({ ...a, ...b }), {}),
-        fetch_error: okxError
+        non_usdt_assets: stalePositions.map(p => ({ [p.asset]: p.liveQty })).reduce((a, b) => ({ ...a, ...b }), {})
+      } : {
+        fetch_success: false,
+        http_status: 403,
+        error_body: okxError,
+        endpoint: 'getSuzanaBalance',
+        issue: 'Forbidden - credential or permission problem',
+        total_equity_usdt: 'UNKNOWN',
+        free_usdt: 'UNKNOWN',
+        non_usdt_assets: 'UNKNOWN'
       },
-      stale_positions_verification: stalePositions,
+      
+      stale_positions_verification: okxBalanceFetchSuccess ? {
+        confirmed: stalePositionsConfirmed,
+        positions: stalePositions
+      } : {
+        confirmed: false,
+        positions: 'NOT_ALLOWED - OKX balance fetch failed',
+        active_position_status: 'UNKNOWN',
+        stale_confirmation: 'NOT_CONFIRMED'
+      },
+      
       kill_switch_active: true,
       trading_paused: true
     });

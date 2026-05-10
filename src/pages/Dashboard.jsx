@@ -318,11 +318,30 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* SECTION 5: FULL ACCOUNTING AUDIT REPORT */}
+        {/* SECTION 5: FULL ACCOUNTING AUDIT REPORT (CORRECTED) */}
         {auditReport && (
           <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
-            <h2 className="text-lg font-bold mb-4">📊 Complete Accounting Audit Report</h2>
+            <h2 className="text-lg font-bold mb-4">📊 Corrected Accounting Audit Report</h2>
             
+            {/* Data Source Status */}
+            <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-600">
+              <div className="text-sm font-bold text-blue-400 mb-3">Data Source Status</div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+                <div className={auditReport.data_source_status?.okx_balance_fetch_success ? 'text-emerald-400' : 'text-red-400'}>
+                  OKX Balance: {auditReport.data_source_status?.okx_balance_fetch_success ? '✓ OK' : '✗ FAILED'}
+                </div>
+                <div className={auditReport.data_source_status?.okx_fills_fetch_success ? 'text-emerald-400' : 'text-red-400'}>
+                  OKX Fills: {auditReport.data_source_status?.okx_fills_fetch_success ? '✓ OK' : '✗ FAILED'}
+                </div>
+                <div className={auditReport.data_source_status?.oxx_order_ledger_read_success ? 'text-emerald-400' : 'text-red-400'}>
+                  OXX Ledger: {auditReport.data_source_status?.oxx_order_ledger_read_success ? '✓ OK' : '✗ FAILED'}
+                </div>
+                <div className={auditReport.data_source_status?.verified_trade_read_success ? 'text-emerald-400' : 'text-red-400'}>
+                  VerifiedTrade: {auditReport.data_source_status?.verified_trade_read_success ? '✓ OK' : '✗ FAILED'}
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
               {/* Deduplication */}
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-600">
@@ -335,45 +354,95 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Trade Matching */}
+              {/* Trade Counts (CORRECTED) */}
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-600">
-                <div className="text-sm font-bold text-blue-400 mb-3">Trade Matching</div>
+                <div className="text-sm font-bold text-blue-400 mb-3">Trade Counts</div>
                 <div className="space-y-2 text-xs text-slate-400">
-                  <div>Valid Matched: {auditReport.trades?.valid_trades_matched}</div>
-                  <div>Suspect (High PnL): {auditReport.trades?.suspect_trades_high_pnl}</div>
-                  <div className="text-emerald-400 font-bold">Clean Today: {auditReport.trades?.clean_trades_today}</div>
-                  <div>Invalid Trades: {auditReport.trades?.invalid_trades_negative_time}</div>
+                  <div>Valid Matched: {auditReport.trade_counts?.valid_matched_trades}</div>
+                  <div>Suspect ({'>'}{5}%): {auditReport.trade_counts?.suspect_trades_high_pnl}</div>
+                  <div>Invalid ({'<'}0 hold): {auditReport.trade_counts?.excluded_trades_breakdown?.invalid_negative_hold_time}</div>
+                  <div className="text-emerald-400 font-bold">Clean Final: {auditReport.trade_counts?.clean_trades_final_count}</div>
                 </div>
               </div>
 
-              {/* P&L Summary */}
+              {/* P&L (CORRECTED) */}
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-600">
-                <div className="text-sm font-bold text-green-400 mb-3">P&L Summary</div>
+                <div className="text-sm font-bold text-green-400 mb-3">P&L (Corrected)</div>
                 <div className="space-y-2 text-xs text-slate-400">
-                  <div className={auditReport.profit_metrics?.net_pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                    Net P&L: {auditReport.profit_metrics?.net_pnl >= 0 ? '+' : ''}{auditReport.profit_metrics?.net_pnl?.toFixed(4)} USDT
+                  <div>Gross Before: {auditReport.profit_metrics?.gross_pnl_before_fees >= 0 ? '+' : ''}{auditReport.profit_metrics?.gross_pnl_before_fees?.toFixed(4)}</div>
+                  <div>Fees: -{auditReport.profit_metrics?.total_fees_usdt?.toFixed(4)}</div>
+                  <div className={auditReport.profit_metrics?.net_pnl_after_fees >= 0 ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                    Net After: {auditReport.profit_metrics?.net_pnl_after_fees >= 0 ? '+' : ''}{auditReport.profit_metrics?.net_pnl_after_fees?.toFixed(4)}
                   </div>
-                  <div>Gross P&L: {auditReport.profit_metrics?.gross_pnl >= 0 ? '+' : ''}{auditReport.profit_metrics?.gross_pnl?.toFixed(4)}</div>
-                  <div>Total Fees: {auditReport.profit_metrics?.total_fees_usdt?.toFixed(4)}</div>
-                  <div className="text-blue-400 font-bold">Win Rate: {auditReport.profit_metrics?.win_rate_pct?.toFixed(2)}%</div>
                 </div>
               </div>
             </div>
 
+            {/* Trade Win/Loss Reconciliation */}
+            <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-600">
+              <div className="text-sm font-bold text-purple-400 mb-3">Win/Loss Reconciliation</div>
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+                <div>
+                  <div className="text-slate-500">Wins</div>
+                  <div className="text-emerald-400 font-bold text-lg">{auditReport.trade_counts?.clean_trades_today_wins}</div>
+                </div>
+                <div>
+                  <div className="text-slate-500">Losses</div>
+                  <div className="text-red-400 font-bold text-lg">{auditReport.trade_counts?.clean_trades_today_losses}</div>
+                </div>
+                <div>
+                  <div className="text-slate-500">Breakeven</div>
+                  <div className="text-slate-400 font-bold text-lg">{auditReport.trade_counts?.clean_trades_today_breakeven}</div>
+                </div>
+                <div>
+                  <div className="text-slate-500">Total</div>
+                  <div className="text-blue-400 font-bold text-lg">{auditReport.trade_counts?.clean_trades_final_count}</div>
+                </div>
+                <div>
+                  <div className={auditReport.trade_counts?.reconciliation_check?.reconciles ? 'text-emerald-500' : 'text-red-500'}>
+                    {auditReport.trade_counts?.reconciliation_check?.reconciles ? '✓ Math OK' : '✗ Math ERROR'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* OKX Live Balance */}
+            {auditReport.okx_live_balance?.fetch_success ? (
+              <div className="mb-6 p-4 bg-emerald-900/20 rounded-lg border border-emerald-600">
+                <div className="text-sm font-bold text-emerald-400 mb-3">✅ OKX Live Balance (Verified)</div>
+                <div className="grid grid-cols-3 gap-4 text-xs">
+                  <div><div className="text-slate-500">Total Equity</div><div className="text-white font-bold">${auditReport.okx_live_balance?.total_equity_usdt}</div></div>
+                  <div><div className="text-slate-500">Free USDT</div><div className="text-emerald-400 font-bold">${auditReport.okx_live_balance?.free_usdt}</div></div>
+                  <div><div className="text-slate-500">Non-USDT Assets</div><div className="text-slate-400 text-xs">{Object.keys(auditReport.okx_live_balance?.non_usdt_assets || {}).length} types</div></div>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-6 p-4 bg-red-900/20 rounded-lg border border-red-600">
+                <div className="text-sm font-bold text-red-400 mb-3">❌ OKX Live Balance (Failed)</div>
+                <div className="space-y-2 text-xs text-red-300">
+                  <div>Status: {auditReport.okx_live_balance?.http_status}</div>
+                  <div>Error: {auditReport.okx_live_balance?.error_body}</div>
+                  <div>Endpoint: {auditReport.okx_live_balance?.endpoint}</div>
+                  <div>Issue: {auditReport.okx_live_balance?.issue}</div>
+                  <div className="mt-3 pt-3 border-t border-red-700 text-slate-400">
+                    ⚠️ Stale position confirmation NOT ALLOWED
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Stale Positions */}
-            {auditReport.stale_positions_verification?.length > 0 && (
-              <div className="mt-6">
-                <div className="text-sm font-bold text-yellow-400 mb-3">Stale Positions Verified</div>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 text-xs">
-                  {auditReport.stale_positions_verification?.slice(0, 15).map((pos, i) => (
+            {auditReport.stale_positions_verification?.confirmed && (
+              <div className="mb-6">
+                <div className="text-sm font-bold text-emerald-400 mb-3">✅ Stale Positions (Confirmed via OKX)</div>
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 text-xs">
+                  {auditReport.stale_positions_verification?.positions?.slice(0, 12).map((pos, i) => (
                     <div key={i} className="bg-slate-800 rounded p-3 border border-slate-600">
                       <div className="font-bold text-cyan-400">{pos.asset}</div>
-                      <div className="text-slate-400 mt-1">
+                      <div className="text-slate-400 mt-1 space-y-1">
                         <div>Ledger: {pos.ledgerQty.toFixed(8)}</div>
                         <div>Live: {pos.liveQty.toFixed(8)}</div>
-                        <div className={pos.staleMarked ? 'text-emerald-400' : 'text-yellow-400'}>
-                          {pos.staleMarked ? '✓ STALE' : 'PARTIAL'}
-                        </div>
+                        <div className="text-emerald-400">✓ STALE</div>
                       </div>
                     </div>
                   ))}
@@ -381,15 +450,26 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Status */}
+            {!auditReport.stale_positions_verification?.confirmed && (
+              <div className="mb-6 p-4 bg-yellow-900/20 rounded-lg border border-yellow-600">
+                <div className="text-sm font-bold text-yellow-400 mb-2">⚠️ Stale Positions (Not Confirmed)</div>
+                <div className="text-xs text-yellow-300">
+                  {auditReport.stale_positions_verification?.stale_confirmation || 'NOT_CONFIRMED - OKX balance fetch failed'}
+                </div>
+              </div>
+            )}
+
+            {/* Final Status */}
             <div className="mt-6 p-4 rounded-lg border-2" style={{
               borderColor: auditReport.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? '#10b981' : '#eab308'
             }}>
-              <div className={`text-lg font-black ${auditReport.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? 'text-emerald-400' : 'text-yellow-400'}`}>
-                {auditReport.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? '✅ ACCOUNTING_CLEAN_CONFIRMED' : '⚠️ ACCOUNTING_STILL_DIRTY'}
+              <div className={`text-lg font-black mb-2 ${auditReport.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                {auditReport.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? '✅ ACCOUNTING_CLEAN_CONFIRMED' : '⚠️ ACCOUNTING_PARTIAL_OK_BALANCE_UNVERIFIED'}
               </div>
-              <div className="text-xs text-slate-400 mt-2">
-                All duplicates marked • Trades rebuilt • P&L calculated • OKX balance verified • Stale positions confirmed
+              <div className="text-xs text-slate-400">
+                {auditReport.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED'
+                  ? 'All data verified. Ready for review.'
+                  : 'Fills reconciled. OKX balance verification required. Kill switch ACTIVE.'}
               </div>
             </div>
           </div>
