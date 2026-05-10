@@ -27,13 +27,13 @@ export default function Dashboard() {
 
   const sessionStartRef = React.useRef(new Date());
 
-  // Verified Trades (both robot1 and alphaScalper)
+  // Verified Trades (clean only - exclude suspect_pnl)
   const { data: verifiedTrades = [], isLoading: loadVerified } = useQuery({
     queryKey: ['robot1-verified', user?.email],
     queryFn: async () => {
       const all = await base44.asServiceRole.entities.VerifiedTrade.list();
       return all
-        .filter(t => (t.robotId === 'robot1' || t.robotId === 'alphaScalper') && ALLOWED_PAIRS.includes(t.instId) && t.status === 'closed')
+        .filter(t => (t.robotId === 'robot1' || t.robotId === 'alphaScalper') && ALLOWED_PAIRS.includes(t.instId) && t.status === 'closed' && !t.suspect_pnl)
         .sort((a, b) => new Date(b.sellTime).getTime() - new Date(a.sellTime).getTime());
     },
     enabled: !!user,
@@ -59,13 +59,13 @@ export default function Dashboard() {
     refetchInterval: 30000
   });
 
-  // OKX Ledger (both robot1 and alphaScalper)
+  // OKX Ledger (clean, non-duplicate fills only)
   const { data: ledger = [], isLoading: loadLedger } = useQuery({
     queryKey: ['oxx-ledger', user?.email],
     queryFn: async () => {
       const all = await base44.asServiceRole.entities.OXXOrderLedger.list();
       return all
-        .filter(o => (o.robotId === 'robot1' || o.robotId === 'alphaScalper') && ALLOWED_PAIRS.includes(o.instId) && o.verified === true)
+        .filter(o => (o.robotId === 'robot1' || o.robotId === 'alphaScalper') && ALLOWED_PAIRS.includes(o.instId) && o.verified === true && !o.duplicate)
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     },
     enabled: !!user,
@@ -134,7 +134,8 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto mb-6 bg-red-950/90 border-2 border-red-600 rounded-2xl p-6 text-center">
           <div className="text-2xl font-black text-red-400 mb-2">🛑 TRADING HARD PAUSED</div>
           <div className="text-sm text-red-300">KILL SWITCH ACTIVE — No BUY/SELL orders allowed</div>
-          <div className="text-xs text-red-400 mt-2">Status: PAUSED_ACCOUNTING_MISMATCH</div>
+          <div className="text-xs text-red-400 mt-2">Status: PAUSED_KILL_SWITCH</div>
+          <div className="text-xs text-yellow-400 mt-2">📊 Accounting cleaned: Duplicates marked, suspect trades excluded, ledger deduplicated</div>
         </div>
       )}
 
