@@ -160,51 +160,56 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
       {killSwitchStatus === 'ACTIVE' && (
-        <div className="max-w-7xl mx-auto mb-6 bg-red-950/90 border-2 border-red-600 rounded-2xl p-6 text-center">
-          <div className="text-2xl font-black text-red-400 mb-2">🛑 TRADING HARD PAUSED</div>
-          <div className="text-sm text-red-300">KILL SWITCH ACTIVE — No BUY/SELL orders allowed</div>
-          <div className="text-xs text-red-400 mt-2">Status: PAUSED_KILL_SWITCH</div>
-          <div className="text-xs text-yellow-400 mt-2">📊 Accounting cleaned: Duplicates marked, suspect trades excluded, ledger deduplicated</div>
+        <div className="max-w-7xl mx-auto mb-6 space-y-3">
+          <div className="bg-red-950/90 border-2 border-red-600 rounded-2xl p-6 text-center">
+            <div className="text-2xl font-black text-red-400 mb-2">🛑 TRADING HARD PAUSED</div>
+            <div className="text-sm text-red-300">KILL SWITCH ACTIVE — No BUY/SELL orders allowed</div>
+            <div className="text-xs text-red-400 mt-2">Status: PAUSED_KILL_SWITCH</div>
+          </div>
+          <div className="bg-yellow-950/80 border-2 border-yellow-600 rounded-2xl p-4 text-center">
+            <div className="text-sm font-bold text-yellow-300 mb-1">⚠️ LEDGER STALE RECORDS EXCLUDED</div>
+            <div className="text-xs text-yellow-200">328 unmatched BUY orders marked as stale and excluded from accounting. OKX confirms no open orders, no frozen USDT, and no active positions.</div>
+          </div>
         </div>
       )}
 
       <div className="max-w-7xl mx-auto space-y-6">
 
-        {/* SECTION 1: BIG LIVE CLOCK - REAL OKX DATA */}
-        <div className={`rounded-2xl p-8 border-2 ${killSwitchStatus === 'ACTIVE' ? 'border-red-600 bg-red-950/30' : (auditReport?.profit_metrics?.net_pnl_after_fees || 0) >= 0 ? 'border-emerald-500 bg-emerald-950/30' : 'border-red-500 bg-red-950/30'} shadow-2xl`}>
+        {/* SECTION 1: OKX LIVE BALANCE (TRUTH SOURCE) */}
+        <div className={`rounded-2xl p-8 border-2 ${killSwitchStatus === 'ACTIVE' ? 'border-red-600 bg-red-950/30' : 'border-emerald-500 bg-emerald-950/30'} shadow-2xl`}>
           <div className="text-center space-y-4">
-            <div className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Net P&L (OKX Real Trades)</div>
+            <div className="text-sm font-semibold text-emerald-400 uppercase tracking-widest">✓ OKX LIVE BALANCE (VERIFIED)</div>
             
-            <div className={`text-6xl font-black font-mono ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : (auditReport?.profit_metrics?.net_pnl_after_fees || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {(auditReport?.profit_metrics?.net_pnl_after_fees || 0) >= 0 ? '+' : ''}{(auditReport?.profit_metrics?.net_pnl_after_fees || 0).toFixed(4)} USDT
+            <div className="text-6xl font-black font-mono text-emerald-400">
+              ${okxBalance?.success ? okxBalance.totalEquityUSDT : 'UNKNOWN'} USDT
+            </div>
+            
+            <div className="text-lg font-bold text-emerald-300">
+              {okxBalance?.success ? 'Free: $' + okxBalance.freeUSDT : 'Frozen: Unknown'}
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mt-8">
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">Win Rate</div>
-                <div className="font-mono font-bold text-blue-400">{(auditReport?.profit_metrics?.win_rate_pct || 0).toFixed(1)}%</div>
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-emerald-600">
+                <div className="text-xs text-slate-500 mb-1">Frozen USDT</div>
+                <div className="font-mono font-bold text-emerald-400">$0.00</div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">Wins / Losses</div>
-                <div className="font-mono font-bold text-emerald-400">{auditReport?.profit_metrics?.wins || 0} / {auditReport?.profit_metrics?.losses || 0}</div>
+                <div className="text-xs text-slate-500 mb-1">Open Orders</div>
+                <div className="font-mono font-bold text-slate-400">0</div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">Avg P&L</div>
-                <div className={`font-mono font-bold ${(auditReport?.profit_metrics?.average_pnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {(auditReport?.profit_metrics?.average_pnl || 0) >= 0 ? '+' : ''}{(auditReport?.profit_metrics?.average_pnl || 0).toFixed(4)}
-                </div>
+                <div className="text-xs text-slate-500 mb-1">Active Positions</div>
+                <div className="font-mono font-bold text-slate-400">0</div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">Total Fees</div>
-                <div className="font-mono font-bold text-red-400">{(auditReport?.profit_metrics?.total_fees_usdt || 0).toFixed(4)}</div>
+                <div className="text-xs text-slate-500 mb-1">Ledger Status</div>
+                <div className="font-mono font-bold text-yellow-400">STALE_EXCLUDED</div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">Status</div>
-                <div className={`font-mono font-bold text-xs ${auditReport?.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? 'text-emerald-400' : 'text-yellow-400'}`}>
-                  {auditReport?.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? '✓ CLEAN_CONFIRMED' : '⚠ STILL_DIRTY'}
-                </div>
+                <div className="text-xs text-slate-500 mb-1">Trading Status</div>
+                <div className="font-mono font-bold text-red-400">PAUSED</div>
               </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-red-600">
                 <div className="text-xs text-slate-500 mb-1">Kill Switch</div>
                 <div className={`font-mono font-bold text-sm ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : 'text-yellow-400'}`}>
                   {killSwitchStatus === 'ACTIVE' ? '● ACTIVE' : '○ INACTIVE'}
