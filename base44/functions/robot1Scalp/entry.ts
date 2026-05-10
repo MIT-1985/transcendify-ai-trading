@@ -541,12 +541,13 @@ async function scalpScore(pair, ticker, balanceMode = 'NORMAL') {
 // ─── Log execution to Robot1ExecutionLog ───────────────────────────────────────
 async function logExecution(base44, decision, reason, selectedPair, score, tradeAllowed, rejectionReason, okxStatus, polygonStatus) {
   try {
+    const scoreNum = score !== null && score !== undefined ? parseFloat(Number(score).toFixed(2)) : null;
     await base44.asServiceRole.entities.Robot1ExecutionLog.create({
       execution_time: new Date().toISOString(),
       decision,
       reason,
       selectedPair: selectedPair || null,
-      score: score !== undefined ? parseFloat(score.toFixed(2)) : null,
+      score: scoreNum,
       tradeAllowed: tradeAllowed ?? false,
       rejectionReason: rejectionReason || null,
       okx_status: okxStatus || 'UNKNOWN',
