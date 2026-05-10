@@ -52,50 +52,58 @@ async function getPolygonSignal() {
   const apiKey = Deno.env.get('POLYGON_API_KEY');
   if (!apiKey) throw new Error('POLYGON_API_KEY not set');
 
-  // Fetch latest 1m candles for trend, momentum, volume
+  // Use hourly candles over last 3 days — supported by Polygon free tier
+  const toDate = new Date();
+  const fromDate = new Date(toDate.getTime() - 3 * 24 * 60 * 60 * 1000);
+  const from = fromDate.toISOString().slice(0, 10);
+  const to = toDate.toISOString().slice(0, 10);
+
   const candlesRes = await fetch(
-    `https://api.polygon.io/v2/aggs/ticker/X:ETHUSD/range/1/minute/${new Date(Date.now() - 60*60*1000).toISOString().slice(0,10)}/${new Date().toISOString().slice(0,10)}?limit=100&apikey=${apiKey}`
+    `https://api.polygon.io/v2/aggs/ticker/X:ETHUSD/range/1/hour/${from}/${to}?adjusted=true&sort=asc&limit=72&apiKey=${apiKey}`
   );
   const candlesData = await candlesRes.json();
 
-  if (!candlesData.results || candlesData.results.length === 0) {
-    return { trend: 'NEUTRAL', momentum: 0, volume: 0, volatility: 0, signal: null };
+  if (!candlesData.results || candlesData.results.length < 5) {
+    console.log(`[ROBOT1] Polygon returned ${candlesData.results?.length || 0} candles — using OKX-only mode`);
+    return { trend: 'NEUTRAL', momentum: 0, volume: 0, volatility: 0, signal: null, polygonPrice: null };
   }
 
-  const candles = candlesData.results.slice(-10); // Last 10 candles
+  const candles = candlesData.results.slice(-20); // Last 20 hourly candles
   const closes = candles.map(c => c.c);
   const volumes = candles.map(c => c.v || 0);
 
-  // Trend: check if last 3 closes are higher
+  // Trend: last 3 closes rising
   const isUptrend = closes.slice(-3).every((c, i, arr) => !i || c > arr[i - 1]);
 
-  // Momentum: % change from oldest to newest
-  const momentum = ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100;
+  // Momentum: % change over last 10 candles
+  const momentum = ((closes[closes.length - 1] - closes[closes.length - 10]) / closes[closes.length - 10]) * 100;
 
-  // Volume: average of last 5 candles vs older 5
+  // Volume ratio: recent 5 vs prior 5
   const recentVol = volumes.slice(-5).reduce((a, b) => a + b, 0) / 5;
   const olderVol = volumes.slice(-10, -5).reduce((a, b) => a + b, 0) / 5;
   const volumeRatio = recentVol / (olderVol || 1);
 
-  // Volatility: standard deviation of last 5 closes
-  const recentCloses = closes.slice(-5);
+  // Volatility: std dev of last 10 closes
+  const recentCloses = closes.slice(-10);
   const mean = recentCloses.reduce((a, b) => a + b) / recentCloses.length;
   const variance = recentCloses.reduce((sum, c) => sum + Math.pow(c - mean, 2), 0) / recentCloses.length;
   const volatility = Math.sqrt(variance);
+  const volatilityPct = (volatility / mean) * 100; // as % of price
 
-  // Candle confirmation: last candle close > open
   const lastCandle = candles[candles.length - 1];
   const isBullishCandle = lastCandle.c > lastCandle.o;
 
-  // Signal: BUY if uptrend, positive momentum, high volume, low volatility, bullish candle
-  const signal = isUptrend && momentum > 0.1 && volumeRatio > 1.2 && volatility < 1.5 && isBullishCandle ? 'BUY' :
-                 !isUptrend && momentum < -0.1 && volatility > 1.5 ? 'SELL' : null;
+  // BUY: uptrend + positive momentum + volume rising + low volatility + bullish candle
+  const signal = isUptrend && momentum > 0.3 && volumeRatio > 1.1 && volatilityPct < 2.0 && isBullishCandle ? 'BUY' :
+                 !isUptrend && momentum < -0.3 && volatilityPct > 1.5 ? 'SELL' : null;
+
+  console.log(`[ROBOT1] Polygon candles=${candles.length} trend=${isUptrend?'UP':'DOWN'} momentum=${momentum.toFixed(3)}% volRatio=${volumeRatio.toFixed(2)} volatilityPct=${volatilityPct.toFixed(3)}% bullish=${isBullishCandle} → signal=${signal}`);
 
   return {
     trend: isUptrend ? 'UP' : 'DOWN',
     momentum: parseFloat(momentum.toFixed(3)),
     volume: parseFloat(volumeRatio.toFixed(2)),
-    volatility: parseFloat(volatility.toFixed(4)),
+    volatility: parseFloat(volatilityPct.toFixed(4)),
     candle: isBullishCandle ? 'BULLISH' : 'BEARISH',
     signal: signal,
     polygonPrice: parseFloat(lastCandle.c.toFixed(2))

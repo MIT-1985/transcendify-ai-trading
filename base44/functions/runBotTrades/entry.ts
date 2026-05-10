@@ -237,7 +237,23 @@ Deno.serve(async (req) => {
         // ---- ROBOT 1: ONLY ETH-USDT OR SOL-USDT ----
         const ALLOWED_PAIRS = ['ETH-USDT', 'SOL-USDT'];
         const symbol = ALLOWED_PAIRS[Math.floor(Math.random() * ALLOWED_PAIRS.length)];
-        
+
+        // Fetch OKX balance to get freeUsdt
+        let freeUsdt = 0;
+        let balanceDetails = [];
+        if (conn) {
+          try {
+            const bApiKey = await decryptOkx(conn.api_key_encrypted);
+            const bApiSecret = await decryptOkx(conn.api_secret_encrypted);
+            const bPassphrase = await decryptOkx(conn.encryption_iv);
+            const balRes = await okxRequest(bApiKey, bApiSecret, bPassphrase, 'GET', '/api/v5/account/balance');
+            balanceDetails = balRes.data?.[0]?.details || [];
+            freeUsdt = parseFloat(balanceDetails.find(d => d.ccy === 'USDT')?.availBal || 0);
+          } catch (e) {
+            console.log(`[runBotTrades] Balance fetch failed: ${e.message}`);
+          }
+        }
+
         console.log(`[BOT_DECISION] User=${userEmail} pair=${symbol} freeUSDT=${freeUsdt.toFixed(2)}`);
 
         // Fetch real OKX price for the instrument
