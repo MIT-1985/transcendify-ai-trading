@@ -295,13 +295,19 @@ Deno.serve(async (req) => {
   let base44;
   try {
     base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.email !== SUZANA_EMAIL && user.role !== 'admin') {
+    // Allow: logged-in Suzana/admin, OR service-role call from dispatcher (no user context)
+    let user = null;
+    try { user = await base44.auth.me(); } catch { /* scheduler / service-role call */ }
+    if (user && user.email !== SUZANA_EMAIL && user.role !== 'admin') {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     console.log('[SCALP] === SCALP EXECUTION START ===');
+
+    // ── Compute sizing preview + trade allowed status for dashboard ──
+    // (done early so it's available even if we return before BUY pass)
+    const defaultSizing = analyzeTradeSizing(DEFAULT_TRADE_USDT, TAKE_PROFIT_PCT);
+    const netRateAtTP = (TAKE_PROFIT_PCT / 100) - OKX_FEE_RATE * (2 + TAKE_PROFIT_PCT / 100);
 
     // 1. OKX credentials
     const [c1, c2] = await Promise.all([

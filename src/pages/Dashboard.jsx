@@ -9,6 +9,7 @@ import Robot1Panel from '@/components/dashboard/Robot1Panel';
 import PairScoringTable from '@/components/dashboard/PairScoringTable';
 import Robot1LivePnL from '@/components/dashboard/Robot1LivePnL';
 import SecondOptimizer from '@/components/dashboard/SecondOptimizer';
+import Robot1ModePanel from '@/components/dashboard/Robot1ModePanel.jsx';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -125,6 +126,9 @@ export default function Dashboard() {
               </div>
             )}
         </section>
+
+        {/* Mode & Scheduler Panel */}
+        <Robot1ModePanel />
 
         {/* 2. Second Optimizer */}
         <SecondOptimizer />
