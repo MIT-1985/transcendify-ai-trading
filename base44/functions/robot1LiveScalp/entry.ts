@@ -4,7 +4,7 @@ const MASTER_SECRET = Deno.env.get('BASE44_APP_ID') || 'okx-master-secret';
 const POLYGON_API_KEY = Deno.env.get('POLYGON_API_KEY');
 
 const ALLOWED_PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT', 'BNB-USDT', 'ADA-USDT', 'LINK-USDT', 'AVAX-USDT', 'LTC-USDT', 'SUI-USDT', 'NEAR-USDT'];
-const TRADE_AMOUNT_USDT = 15;
+const TRADE_AMOUNT_USDT = 10;
 const MIN_FREE_USDT = 60;
 
 // ==================== CRYPTO ====================
@@ -246,6 +246,11 @@ Deno.serve(async (req) => {
     }
 
     const buyOrdId = buyRes.data?.[0]?.ordId;
+    if (!buyOrdId) {
+      execution.blockers.push('BUY response missing ordId');
+      return Response.json(execution, { status: 200 });
+    }
+
     execution.buy_order = { ordId: buyOrdId, status: 'pending' };
 
     // ========== VERIFY BUY FILL ==========
@@ -269,25 +274,26 @@ Deno.serve(async (req) => {
         }
       }
       
-      if (buyFilled && parseFloat(buyFilled.accFillSz || 0) > 0) break;
+      if (buyFilled && parseFloat(buyFilled.accFillSz || 0) > 0 && buyFilled.side === 'buy') break;
       await new Promise(r => setTimeout(r, 250));
     }
 
-    if (!buyFilled || !buyFilled.accFillSz || parseFloat(buyFilled.accFillSz) === 0) {
-      execution.blockers.push('BUY did not fill within 5 seconds');
+    if (!buyFilled || !buyFilled.accFillSz || parseFloat(buyFilled.accFillSz) === 0 || buyFilled.side !== 'buy') {
+      execution.blockers.push(`BUY verification failed: side=${buyFilled?.side}, accFillSz=${buyFilled?.accFillSz}`);
       return Response.json(execution, { status: 200 });
     }
 
     execution.buy_order = {
       ordId: buyFilled.ordId,
       state: 'filled',
+      side: buyFilled.side,
       avgPx: parseFloat(buyFilled.avgPx),
       accFillSz: parseFloat(buyFilled.accFillSz),
       fee: parseFloat(buyFilled.fee || 0),
       feeCcy: buyFilled.feeCcy
     };
 
-    // Save to ledger
+    // Save BUY to ledger
     await base44.asServiceRole.entities.OXXOrderLedger.create({
       ordId: buyFilled.ordId,
       instId: tradeable.pair,
@@ -303,7 +309,7 @@ Deno.serve(async (req) => {
       state: 'filled'
     });
 
-    // ========== PLACE SELL (immediate profit-taking) ==========
+    // ========== PLACE SELL (after BUY verified) ==========
     const baseAsset = tradeable.pair.split('-')[0];
     const buyBaseQty = parseFloat(buyFilled.accFillSz);
     const feeAmount = Math.abs(parseFloat(buyFilled.fee || 0));
@@ -323,7 +329,7 @@ Deno.serve(async (req) => {
       sz: sellQty
     });
 
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 300));
 
     const sellRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST',
       '/api/v5/trade/order', sellOrderBody);
@@ -334,6 +340,17 @@ Deno.serve(async (req) => {
     }
 
     const sellOrdId = sellRes.data?.[0]?.ordId;
+    if (!sellOrdId) {
+      execution.blockers.push('SELL response missing ordId');
+      return Response.json(execution, { status: 200 });
+    }
+
+    // VALIDATE: BUY and SELL must be different ordIds
+    if (buyOrdId === sellOrdId) {
+      execution.blockers.push(`ERROR_DUPLICATE_ORDER_ID: buyOrdId=${buyOrdId} === sellOrdId=${sellOrdId}`);
+      return Response.json(execution, { status: 200 });
+    }
+
     execution.sell_order = { ordId: sellOrdId, status: 'pending' };
 
     // ========== VERIFY SELL FILL ==========
@@ -357,18 +374,19 @@ Deno.serve(async (req) => {
         }
       }
       
-      if (sellFilled && parseFloat(sellFilled.accFillSz || 0) > 0) break;
+      if (sellFilled && parseFloat(sellFilled.accFillSz || 0) > 0 && sellFilled.side === 'sell') break;
       await new Promise(r => setTimeout(r, 250));
     }
 
-    if (!sellFilled || !sellFilled.accFillSz || parseFloat(sellFilled.accFillSz) === 0) {
-      execution.blockers.push('SELL did not fill within 5 seconds');
+    if (!sellFilled || !sellFilled.accFillSz || parseFloat(sellFilled.accFillSz) === 0 || sellFilled.side !== 'sell') {
+      execution.blockers.push(`SELL verification failed: side=${sellFilled?.side}, accFillSz=${sellFilled?.accFillSz}`);
       return Response.json(execution, { status: 200 });
     }
 
     execution.sell_order = {
       ordId: sellFilled.ordId,
       state: 'filled',
+      side: sellFilled.side,
       avgPx: parseFloat(sellFilled.avgPx),
       accFillSz: parseFloat(sellFilled.accFillSz),
       fee: parseFloat(sellFilled.fee || 0),
@@ -391,7 +409,7 @@ Deno.serve(async (req) => {
       state: 'filled'
     });
 
-    // ========== CREATE VERIFIED TRADE ==========
+    // ========== CREATE VERIFIED TRADE (only after both verified with unique ordIds) ==========
     const realizedPnL = (sellFilled.avgPx * parseFloat(sellFilled.accFillSz)) - (buyFilled.avgPx * parseFloat(buyFilled.accFillSz)) - parseFloat(buyFilled.fee) - parseFloat(sellFilled.fee);
     
     await base44.asServiceRole.entities.VerifiedTrade.create({
@@ -418,6 +436,8 @@ Deno.serve(async (req) => {
     execution.active_clock_started = true;
     execution.cycle_result = {
       pair: tradeable.pair,
+      buy_ordId: buyFilled.ordId,
+      sell_ordId: sellFilled.ordId,
       buy_price: parseFloat(buyFilled.avgPx),
       sell_price: parseFloat(sellFilled.avgPx),
       quantity: parseFloat(buyFilled.accFillSz),
@@ -428,7 +448,7 @@ Deno.serve(async (req) => {
       holding_ms: new Date(parseInt(sellFilled.fillTime)).getTime() - new Date(parseInt(buyFilled.fillTime)).getTime()
     };
 
-    console.log(`[LIVE_SCALP] ✓ ${tradeable.pair} BUY@${parseFloat(buyFilled.avgPx).toFixed(2)} SELL@${parseFloat(sellFilled.avgPx).toFixed(2)} PnL=${realizedPnL.toFixed(4)}`);
+    console.log(`[LIVE_SCALP] ✓ ${tradeable.pair} BUY[${buyFilled.ordId}]@${parseFloat(buyFilled.avgPx).toFixed(2)} SELL[${sellFilled.ordId}]@${parseFloat(sellFilled.avgPx).toFixed(2)} PnL=${realizedPnL.toFixed(4)}`);
 
     return Response.json(execution, { status: 200 });
 
