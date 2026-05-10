@@ -77,26 +77,43 @@ export default function LastRobotActionPanel() {
           <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
             <div className="text-xs text-slate-400 mb-1">Reason</div>
             <div className="text-xs text-slate-300 break-words">
-              {lastExecution.reason.substring(0, 120)}
-              {lastExecution.reason.length > 120 ? '...' : ''}
+              {lastExecution.reason.substring(0, 150)}
+              {lastExecution.reason.length > 150 ? '...' : ''}
             </div>
           </div>
         ) : null}
 
         {/* Selected Pair */}
-        {lastExecution.position_symbol ? (
+        {lastExecution.selectedPair ? (
           <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-            <div className="text-xs text-slate-400 mb-1">Selected Pair</div>
-            <div className="text-lg font-bold text-blue-400">{lastExecution.position_symbol}</div>
+            <div className="text-xs text-slate-400 mb-1">Pair</div>
+            <div className="text-lg font-bold text-blue-400">{lastExecution.selectedPair}</div>
           </div>
         ) : null}
 
-        {/* Last Order ID */}
-        {lastExecution.last_order_id ? (
+        {/* Score */}
+        {lastExecution.score !== null && lastExecution.score !== undefined ? (
           <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-            <div className="text-xs text-slate-400 mb-1">Last Order ID</div>
-            <div className="text-xs font-mono text-slate-300 break-all">
-              {lastExecution.last_order_id}
+            <div className="text-xs text-slate-400 mb-1">Score</div>
+            <div className="text-sm font-mono font-bold text-cyan-400">{parseFloat(lastExecution.score).toFixed(2)}</div>
+          </div>
+        ) : null}
+
+        {/* Trade Allowed */}
+        <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+          <div className="text-xs text-slate-400 mb-1">Trade Allowed</div>
+          <div className={`text-sm font-bold ${lastExecution.tradeAllowed ? 'text-emerald-400' : 'text-red-400'}`}>
+            {lastExecution.tradeAllowed ? '✓ YES' : '✗ NO'}
+          </div>
+        </div>
+
+        {/* Rejection Reason */}
+        {lastExecution.rejectionReason ? (
+          <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+            <div className="text-xs text-slate-400 mb-1">Rejection Reason</div>
+            <div className="text-xs text-slate-300 break-words">
+              {lastExecution.rejectionReason.substring(0, 150)}
+              {lastExecution.rejectionReason.length > 150 ? '...' : ''}
             </div>
           </div>
         ) : null}
@@ -105,19 +122,17 @@ export default function LastRobotActionPanel() {
         <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
           <div className="text-xs text-slate-400 mb-1">OKX Status</div>
           <div className={`text-sm font-bold ${statusColor}`}>
-            {lastExecution.okx_status}
+            {lastExecution.okx_status || 'UNKNOWN'}
           </div>
         </div>
 
-        {/* Error Message */}
-        {lastExecution.error_message ? (
-          <div className="bg-red-900/20 rounded-lg p-3 border border-red-700/30">
-            <div className="text-xs text-red-400 mb-1">Error</div>
-            <div className="text-xs text-red-300 break-words">
-              {lastExecution.error_message}
-            </div>
+        {/* Polygon Status */}
+        <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+          <div className="text-xs text-slate-400 mb-1">Polygon Status</div>
+          <div className="text-sm font-bold text-purple-400">
+            {lastExecution.polygon_status || 'UNKNOWN'}
           </div>
-        ) : null}
+        </div>
       </div>
     </div>
   );
