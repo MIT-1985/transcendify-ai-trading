@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import Robot1Panel from '@/components/dashboard/Robot1Panel';
 import PairScoringTable from '@/components/dashboard/PairScoringTable';
 import Robot1LivePnL from '@/components/dashboard/Robot1LivePnL';
+import SecondOptimizer from '@/components/dashboard/SecondOptimizer';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -54,7 +55,7 @@ export default function Dashboard() {
   const { data: robot1Trades = [], refetch: refetchVerified, isLoading: loadVerified } = useQuery({
     queryKey: ['robot1-verified', user?.email],
     queryFn: async () => {
-      const all = await base44.asServiceRole.entities.VerifiedTrade.list();
+      const all = await base44.entities.VerifiedTrade.list();
       return all
         .filter(t => t.robotId === 'robot1' && ALLOWED_PAIRS.includes(t.instId))
         .sort((a, b) => new Date(b.sellTime).getTime() - new Date(a.sellTime).getTime());
@@ -67,7 +68,7 @@ export default function Dashboard() {
   const { data: ledger = [], refetch: refetchLedger, isLoading: loadLedger } = useQuery({
     queryKey: ['oxx-ledger', user?.email],
     queryFn: async () => {
-      const all = await base44.asServiceRole.entities.OXXOrderLedger.list();
+      const all = await base44.entities.OXXOrderLedger.list();
       return all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     },
     enabled: !!user,
@@ -125,7 +126,10 @@ export default function Dashboard() {
             )}
         </section>
 
-        {/* 2. Robot 1 Live P&L */}
+        {/* 2. Second Optimizer */}
+        <SecondOptimizer />
+
+        {/* 2b. Robot 1 Live P&L */}
         <Robot1LivePnL />
 
         {/* 2b. Robot 1 Scalping Mode */}
