@@ -348,6 +348,27 @@ Deno.serve(async (req) => {
 
     console.log(`[R1] === EXECUTION START v2 (multi-pair) ===`);
 
+    // ── KILL SWITCH CHECK (BEFORE ANY EXECUTION LOGIC) ────────────────────────
+    const switches = await base44.asServiceRole.entities.TradingKillSwitch.list();
+    const killSwitch = switches && switches.length > 0 ? switches[0] : null;
+    if (killSwitch?.enabled) {
+      console.log(`[R1] KILL SWITCH ACTIVE — blocking all execution`);
+      return Response.json({
+        command: 'PAUSED_KILL_SWITCH',
+        tradeAllowed: false,
+        reason: killSwitch.reason || 'Global kill switch active. No BUY/SELL allowed.',
+        okxOrderEndpointCalled: false,
+        ordIdCreated: false,
+        activePositions: [],
+        pairScores: [],
+        sells: [],
+        buy: null,
+        freeUsdt: 0,
+        positionCount: 0,
+        maxPositions: 0
+      });
+    }
+
     // ── 1. OKX credentials ────────────────────────────────────────────────────
     const [c1, c2] = await Promise.all([
       base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: SUZANA_EMAIL, exchange: 'okx' }),
