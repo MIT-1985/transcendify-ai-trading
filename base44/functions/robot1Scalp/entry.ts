@@ -435,7 +435,9 @@ function scalpScore(pair, ticker, balanceMode = 'NORMAL') {
   const last     = parseFloat(ticker.last || 0);
   const open24h  = parseFloat(ticker.open24h || last);
   const vol24h   = parseFloat(ticker.vol24h || 0);
-  const spreadPct = bid > 0 ? (ask - bid) / bid * 100 : 99;
+  // Correct spread: ((ask - bid) / midpoint) * 100
+  const mid = (bid + ask) / 2;
+  const spreadPct = mid > 0 ? ((ask - bid) / mid) * 100 : 99;
 
   // Hard filters
   if (spreadPct > MAX_SPREAD_PCT) return { ok: false, reason: `spread ${spreadPct.toFixed(4)}% > ${MAX_SPREAD_PCT}%`, score: 0 };

@@ -17,14 +17,14 @@ import RobotLiveClockProfit from '@/components/dashboard/RobotLiveClockProfit';
 import LastRobotActionPanel from '@/components/dashboard/LastRobotActionPanel';
 import WhyNoTradePanel from '@/components/dashboard/WhyNoTradePanel';
 import ManualScalpTrigger from '@/components/dashboard/ManualScalpTrigger';
+import BlockerDiagnostics from '@/components/dashboard/BlockerDiagnostics';
+import SchedulerStatus from '@/components/dashboard/SchedulerStatus';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [syncStatus, setSyncStatus] = useState('idle');
   const [pairScores, setPairScores] = useState([]);
   const [scoresLoading, setScoresLoading] = useState(false);
-  const [scalpRunning, setScalpRunning] = useState(false);
-  const [scalpResult, setScalpResult] = useState(null);
 
   const handleSync = async () => {
     setSyncStatus('syncing');
@@ -146,6 +146,12 @@ export default function Dashboard() {
         {/* LIVE PROOF: Why No Trade */}
         <WhyNoTradePanel />
 
+        {/* Blocker Diagnostics */}
+        <BlockerDiagnostics />
+
+        {/* Consistent Scheduler Status */}
+        <SchedulerStatus />
+
         {/* Mode & Scheduler Panel */}
         <Robot1ModePanel />
 
@@ -164,173 +170,7 @@ export default function Dashboard() {
         {/* 2b. Robot 1 Live P&L */}
         <Robot1LivePnL />
 
-        {/* 2b. Robot 1 Scalping Mode */}
-        <section className="bg-slate-900/50 border border-purple-700/40 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Zap className="w-4 h-4 text-purple-400" />
-              <h2 className="font-bold text-sm">Robot 1 — Scalping Mode</h2>
-              <span className="text-xs text-slate-500 ml-1">TP=0.18% · SL=-0.18% · µTrail@0.07%/0.08%/0.04% · minNet=0.02 USDT · Cooldown=30s</span>
-            </div>
-            <Button
-              size="sm"
-              disabled={scalpRunning}
-              onClick={async () => {
-                setScalpRunning(true);
-                setScalpResult(null);
-                try {
-                  const res = await base44.functions.invoke('robot1Scalp', {});
-                  setScalpResult(res.data);
-                } catch (e) {
-                  setScalpResult({ error: e.message });
-                } finally {
-                  setScalpRunning(false);
-                }
-              }}
-              className="bg-purple-700 hover:bg-purple-600 text-white text-xs h-8 px-3 gap-1.5"
-            >
-              <Zap className="w-3 h-3" />
-              {scalpRunning ? 'Running…' : 'Run Scalp'}
-            </Button>
-          </div>
-          {scalpResult && (
-            <div className="mt-2 space-y-2">
-              {/* Main status line */}
-              <div className={`rounded-lg px-3 py-2 border text-xs ${
-                scalpResult.error ? 'bg-red-900/30 border-red-700 text-red-300' :
-                scalpResult.buy?.decision === 'BUY_EXECUTED' ? 'bg-emerald-900/30 border-emerald-700 text-emerald-300' :
-                scalpResult.sells?.length > 0 ? 'bg-blue-900/30 border-blue-700 text-blue-300' :
-                'bg-slate-800/50 border-slate-600 text-slate-300'
-              }`}>
-                {scalpResult.error ? `Error: ${scalpResult.error}` :
-                 scalpResult.sells?.length > 0 ? `✓ SOLD ${scalpResult.sells.map(s => s.pair).join(', ')} [${scalpResult.sells.map(s => s.exitMode).join(', ')}] → back to USDT` :
-                 scalpResult.buy?.decision === 'BUY_EXECUTED' ? `✓ BUY ${scalpResult.buy.pair} @ $${scalpResult.buy.avgPx} · ${scalpResult.buy.usedUSDT} USDT${scalpResult.buy.tradeSizeScaled ? ' [SCALED]' : ''}` :
-                 `WAIT · ${scalpResult.positionCount}/${scalpResult.maxPositions} positions · $${scalpResult.freeUsdt?.toFixed(2)} free`}
-              </div>
-              {/* BUY sizing diagnostics */}
-              {scalpResult.buy?.decision === 'BUY_EXECUTED' && scalpResult.buy.sizing && (
-                <div className="text-xs bg-emerald-900/20 rounded-lg p-3 border border-emerald-700/40">
-                  <div className="text-emerald-400 font-bold mb-2">Trade Sizing Analysis</div>
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="bg-slate-900/60 rounded p-2">
-                      <div className="text-slate-500 mb-0.5">Required Move %</div>
-                      <div className="font-mono font-bold text-yellow-400">{scalpResult.buy.sizing.requiredPriceMovePercent?.toFixed(4)}%</div>
-                    </div>
-                    <div className="bg-slate-900/60 rounded p-2">
-                      <div className="text-slate-500 mb-0.5">Min Trade For Profit</div>
-                      <div className="font-mono font-bold text-cyan-400">{scalpResult.buy.sizing.minTradeAmountForProfit?.toFixed(2)} USDT</div>
-                    </div>
-                    <div className="bg-slate-900/60 rounded p-2">
-                      <div className="text-slate-500 mb-0.5">Est. Fees</div>
-                      <div className="font-mono font-bold text-red-400">{scalpResult.buy.sizing.estimatedFees?.toFixed(4)} USDT</div>
-                    </div>
-                    <div className="bg-slate-900/60 rounded p-2">
-                      <div className="text-slate-500 mb-0.5">Net Profit @ TP</div>
-                      <div className={`font-mono font-bold ${scalpResult.buy.sizing.expectedNetProfitAtTP >= 0.02 ? 'text-emerald-400' : 'text-yellow-400'}`}>{scalpResult.buy.sizing.expectedNetProfitAtTP?.toFixed(4)} USDT</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {/* TP below fees global warning */}
-              {scalpResult.sizingPreview && Object.values(scalpResult.sizingPreview).some(s => s.tpBelowFees) && (
-                <div className="text-xs bg-red-900/30 border border-red-600 rounded-lg px-3 py-2 text-red-300 font-semibold">
-                  ⚠️ Current TP ({scalpResult.config?.TAKE_PROFIT_PCT}%) is below round-trip fees (~{(scalpResult.config?.OKX_FEE_RATE * 200).toFixed(2)}%). Trading disabled until TP &gt; fees.
-                </div>
-              )}
-              {/* Sizing preview table for all pairs */}
-              {scalpResult.sizingPreview && Object.keys(scalpResult.sizingPreview).length > 0 && (
-                <div className="text-xs bg-slate-900/40 rounded-lg p-3 border border-slate-700/50">
-                  <div className="text-slate-400 font-bold mb-2">Fee Sizing Preview — default {scalpResult.config?.DEFAULT_TRADE_USDT ?? 20} USDT</div>
-                  <table className="w-full">
-                    <thead>
-                      <tr className="text-slate-600 border-b border-slate-800">
-                        <th className="text-left py-1">Pair</th>
-                        <th className="text-right py-1">Required Move %</th>
-                        <th className="text-right py-1">Min Trade USDT</th>
-                        <th className="text-right py-1">Est. Fees</th>
-                        <th className="text-right py-1">Net @ TP</th>
-                        <th className="text-right py-1">Viable</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(scalpResult.sizingPreview).map(([pair, s]) => (
-                        <tr key={pair} className="border-b border-slate-800/30">
-                          <td className="py-1 font-bold">{pair}</td>
-                          <td className={`py-1 text-right font-mono ${s.requiredPriceMovePercent > scalpResult.config?.TAKE_PROFIT_PCT ? 'text-red-400' : 'text-yellow-400'}`}>{s.requiredPriceMovePercent?.toFixed(4)}%</td>
-                          <td className="py-1 text-right font-mono text-cyan-400">{s.minTradeAmountForProfit?.toFixed(2)}</td>
-                          <td className="py-1 text-right font-mono text-red-400">{s.estimatedFees?.toFixed(4)}</td>
-                          <td className={`py-1 text-right font-mono ${s.netProfitAtTP >= 0.02 ? 'text-emerald-400' : 'text-yellow-400'}`}>{s.netProfitAtTP?.toFixed(4)}</td>
-                          <td className={`py-1 text-right font-bold ${s.viable ? 'text-emerald-400' : 'text-red-400'}`}>{s.viable ? '✓' : s.tpBelowFees ? '✗ TP<fees' : '✗'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {/* Per-position diagnostics */}
-              {scalpResult.positionDiagnostics?.map((d, i) => (
-                <div key={i} className="text-xs bg-slate-900/40 rounded-lg p-3 border border-slate-700/50 space-y-2">
-                  {/* Row 1: identity + exit mode */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="font-bold text-white text-sm">{d.pair}</span>
-                      <span className="font-mono text-slate-400">${d.entryPx?.toFixed(2)} → ${d.currentPx?.toFixed(2)}</span>
-                    </div>
-                    <div className={`font-bold text-sm px-2 py-0.5 rounded ${
-                      d.exitMode === 'TP' ? 'bg-emerald-900/50 text-emerald-300' :
-                      d.exitMode === 'MICRO_TRAIL' ? 'bg-yellow-900/50 text-yellow-300' :
-                      d.exitMode === 'TRAIL' ? 'bg-blue-900/50 text-blue-300' :
-                      d.exitMode === 'SL' ? 'bg-red-900/50 text-red-300' :
-                      d.exitMode === 'WAIT_NET_TOO_LOW' ? 'bg-orange-900/40 text-orange-400' :
-                      'bg-slate-800 text-slate-400'
-                    }`}>
-                      Exit Mode: {d.exitMode}
-                    </div>
-                  </div>
-                  {/* Row 2: the 5 required metrics */}
-                  <div className="grid grid-cols-5 gap-2">
-                    <div className="bg-slate-800/60 rounded p-2">
-                      <div className="text-slate-500 mb-0.5">P&L %</div>
-                      <div className={`font-mono font-bold ${d.pnlPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {d.pnlPercent >= 0 ? '+' : ''}{d.pnlPercent?.toFixed(4)}%
-                      </div>
-                    </div>
-                    <div className="bg-slate-800/60 rounded p-2">
-                      <div className="text-slate-500 mb-0.5">Best PnL %</div>
-                      <div className="font-mono font-bold text-purple-400">
-                        {d.bestPnlPercent?.toFixed(4)}%
-                      </div>
-                    </div>
-                    <div className="bg-slate-800/60 rounded p-2">
-                      <div className="text-slate-500 mb-0.5">Trailing Dist</div>
-                      <div className="font-mono font-bold text-cyan-400">
-                        {d.trailingDistance?.toFixed(4)}%
-                      </div>
-                    </div>
-                    <div className="bg-slate-800/60 rounded p-2">
-                      <div className="text-slate-500 mb-0.5">Micro Trail</div>
-                      <div className={`font-bold ${d.microTrailingActive ? 'text-yellow-400' : 'text-slate-500'}`}>
-                        {d.microTrailingActive ? '✓ ACTIVE' : '✗ off'}
-                      </div>
-                    </div>
-                    <div className="bg-slate-800/60 rounded p-2">
-                      <div className="text-slate-500 mb-0.5">Net PnL After Fees</div>
-                      <div className={`font-mono font-bold ${d.netPnL >= 0.02 ? 'text-emerald-400' : d.netPnL >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
-                        {d.netPnL >= 0 ? '+' : ''}{d.netPnL?.toFixed(4)} U
-                      </div>
-                    </div>
-                  </div>
-                  {/* Row 3: fees + ordId */}
-                  <div className="flex gap-4 text-slate-500">
-                    <span>Est. Fees: <span className="text-yellow-400 font-mono">{d.estimatedFees?.toFixed(4)} USDT</span></span>
-                    <span>Gross: <span className={`font-mono ${d.grossPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{d.grossPnL >= 0 ? '+' : ''}{d.grossPnL?.toFixed(4)}</span></span>
-                    <span className="ml-auto font-mono text-slate-600 truncate max-w-xs">ordId: …{d.buyOrdId?.slice(-12)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+
 
         {/* 3. Robot 1 Live Status (scheduler) */}
         <Robot1Panel onRunResult={(data) => { if (data?.pairScores) setPairScores(data.pairScores); }} />
