@@ -199,10 +199,10 @@ export default function AlphaScalperRuntime({ enabled = true }) {
         setExecution(prev => ({
           ...prev,
           timestamp: new Date(),
-          runtimeActive: true,
-          lastCommand: result.decision || 'IDLE',
+          runtimeActive: !result.command?.includes('PAUSED'),
+          lastCommand: result.command || result.decision || 'IDLE',
           tradeAllowed: result.tradeAllowed || false,
-          blocker: result.blocker || null,
+          blocker: result.reason || result.blocker || null,
           buyOrdId: result.buy_order?.ordId || null,
           sellOrdId: result.sell_order?.ordId || null,
           realizedPnL: result.realizedPnL || 0

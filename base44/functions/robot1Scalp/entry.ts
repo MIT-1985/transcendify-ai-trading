@@ -587,6 +587,20 @@ Deno.serve(async (req) => {
 
     console.log('[SCALP] === SCALP EXECUTION START ===');
 
+    // ========== KILL SWITCH CHECK ==========
+    const switches = await base44.asServiceRole.entities.TradingKillSwitch.list();
+    const killSwitch = switches && switches.length > 0 ? switches[0] : null;
+    
+    if (killSwitch && killSwitch.enabled) {
+      console.log('[SCALP] KILL SWITCH ACTIVE — No trading allowed');
+      return Response.json({
+        command: 'PAUSED_KILL_SWITCH',
+        tradeAllowed: false,
+        reason: killSwitch.reason || 'Global kill switch active. No BUY/SELL allowed.',
+        status: 'BLOCKED'
+      }, { status: 200 });
+    }
+
     // 1. OKX credentials
     const [c1, c2] = await Promise.all([
       base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: SUZANA_EMAIL, exchange: 'okx' }),

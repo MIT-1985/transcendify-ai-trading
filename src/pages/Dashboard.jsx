@@ -112,8 +112,30 @@ export default function Dashboard() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const [killSwitchStatus, setKillSwitchStatus] = useState('CHECKING');
+
+  useEffect(() => {
+    const checkKillSwitch = async () => {
+      try {
+        const res = await base44.functions.invoke('checkKillSwitch', {});
+        setKillSwitchStatus(res.data?.kill_switch_active ? 'ACTIVE' : 'INACTIVE');
+      } catch (e) {
+        setKillSwitchStatus('ERROR');
+      }
+    };
+    checkKillSwitch();
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
+      {killSwitchStatus === 'ACTIVE' && (
+        <div className="max-w-7xl mx-auto mb-6 bg-red-950/90 border-2 border-red-600 rounded-2xl p-6 text-center">
+          <div className="text-2xl font-black text-red-400 mb-2">🛑 TRADING HARD PAUSED</div>
+          <div className="text-sm text-red-300">KILL SWITCH ACTIVE — No BUY/SELL orders allowed</div>
+          <div className="text-xs text-red-400 mt-2">Status: PAUSED_ACCOUNTING_MISMATCH</div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* SECTION 1: BIG LIVE CLOCK */}

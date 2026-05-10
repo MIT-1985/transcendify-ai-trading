@@ -1,0 +1,41 @@
+{
+  "name": "TradingKillSwitch",
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Global kill switch - when true, NO trading is allowed"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Why kill switch is active"
+    },
+    "activated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the kill switch was activated"
+    },
+    "last_checked": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last verification timestamp"
+    },
+    "okx_equity_at_pause": {
+      "type": "number",
+      "description": "OKX equity when pause was triggered"
+    },
+    "verification_status": {
+      "type": "string",
+      "enum": [
+        "VERIFIED_PAUSED",
+        "EMERGENCY_PAUSE",
+        "PENDING_VERIFICATION"
+      ],
+      "default": "EMERGENCY_PAUSE"
+    }
+  },
+  "required": [
+    "enabled"
+  ]
+}

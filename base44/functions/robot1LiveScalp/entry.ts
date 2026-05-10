@@ -182,6 +182,19 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // ========== KILL SWITCH CHECK ==========
+    const switches = await base44.asServiceRole.entities.TradingKillSwitch.list();
+    const killSwitch = switches && switches.length > 0 ? switches[0] : null;
+    
+    if (killSwitch && killSwitch.enabled) {
+      return Response.json({
+        command: 'PAUSED_KILL_SWITCH',
+        tradeAllowed: false,
+        reason: killSwitch.reason || 'Global kill switch active. No BUY/SELL allowed.',
+        status: 'BLOCKED'
+      }, { status: 200 });
+    }
+
     const execution = {
       timestamp: new Date().toISOString(),
       user_email: user.email,
