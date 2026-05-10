@@ -9,7 +9,7 @@ import Robot1Panel from '@/components/dashboard/Robot1Panel';
 import PairScoringTable from '@/components/dashboard/PairScoringTable';
 import Robot1LivePnL from '@/components/dashboard/Robot1LivePnL';
 import SecondOptimizer from '@/components/dashboard/SecondOptimizer';
-import Robot1ModePanel from '@/components/dashboard/Robot1ModePanel.jsx';
+import Robot1ModePanel from '@/components/dashboard/Robot1ModePanel';
 
 export default function Dashboard() {
   const { user } = useAuth();
