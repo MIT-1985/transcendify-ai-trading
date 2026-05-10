@@ -1,0 +1,66 @@
+{
+  "name": "RobotKPILog",
+  "type": "object",
+  "properties": {
+    "pair": {
+      "type": "string",
+      "description": "Trading pair"
+    },
+    "kpi": {
+      "type": "number",
+      "description": "Composite KPI score (0-1)"
+    },
+    "win": {
+      "type": "boolean",
+      "description": "Trade won or lost"
+    },
+    "realizedPnL": {
+      "type": "number",
+      "description": "Realized profit/loss in USDT"
+    },
+    "exitMode": {
+      "type": "string",
+      "enum": [
+        "TP",
+        "SL",
+        "TRAIL",
+        "MICRO_TRAIL",
+        "DEAD_POSITION"
+      ],
+      "description": "How trade exited"
+    },
+    "scores": {
+      "type": "object",
+      "description": "Component KPI scores",
+      "properties": {
+        "winRate": {
+          "type": "number"
+        },
+        "feeEfficiency": {
+          "type": "number"
+        },
+        "speed": {
+          "type": "number"
+        },
+        "drawdown": {
+          "type": "number"
+        },
+        "capital": {
+          "type": "number"
+        }
+      }
+    },
+    "constantsChanged": {
+      "type": "object",
+      "description": "Which constants were modified"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "pair",
+    "kpi"
+  ]
+}

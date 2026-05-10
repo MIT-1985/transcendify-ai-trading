@@ -1,0 +1,62 @@
+{
+  "name": "OptimizingConstants",
+  "type": "object",
+  "properties": {
+    "botId": {
+      "type": "string",
+      "description": "Robot ID (robot1, etc)"
+    },
+    "K_TP": {
+      "type": "number",
+      "description": "Take profit percentage",
+      "default": 0.25
+    },
+    "K_SL": {
+      "type": "number",
+      "description": "Stop loss percentage",
+      "default": -0.18
+    },
+    "K_SPREAD": {
+      "type": "number",
+      "description": "Max spread percentage",
+      "default": 0.05
+    },
+    "K_HOLD": {
+      "type": "number",
+      "description": "Max hold time in minutes",
+      "default": 5
+    },
+    "K_SIZE": {
+      "type": "number",
+      "description": "Trade amount multiplier",
+      "default": 1.0
+    },
+    "K_QUALITY": {
+      "type": "number",
+      "description": "Minimum scalp quality score (0-100)",
+      "default": 50
+    },
+    "K_RESERVE": {
+      "type": "number",
+      "description": "Minimum free capital percent",
+      "default": 0.3
+    },
+    "K_COOLDOWN": {
+      "type": "number",
+      "description": "Cooldown seconds between trades",
+      "default": 30
+    },
+    "epoch": {
+      "type": "number",
+      "description": "Optimization epoch/version",
+      "default": 1
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "botId"
+  ]
+}

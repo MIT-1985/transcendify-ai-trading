@@ -12,6 +12,7 @@ import SecondOptimizer from '@/components/dashboard/SecondOptimizer';
 import Robot1ModePanel from '@/components/dashboard/Robot1ModePanel';
 import CapitalReservePanel from '@/components/dashboard/CapitalReservePanel';
 import ScalpOptimizerPanel from '@/components/dashboard/ScalpOptimizerPanel';
+import OptimizationEngine from '@/components/dashboard/OptimizationEngine';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -134,6 +135,9 @@ export default function Dashboard() {
 
         {/* Capital Reserve Manager */}
         <CapitalReservePanel />
+
+        {/* Optimization Engine (Adaptive Constants) */}
+        <OptimizationEngine />
 
         {/* Final Optimizer Metrics */}
         <ScalpOptimizerPanel />
