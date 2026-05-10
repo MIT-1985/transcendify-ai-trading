@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
-const TEST_PAIR = 'ETH-USDT';
+const TEST_PAIR = 'DOGE-USDT';
 
 // ==================== CRYPTO UTILITIES ====================
 const MASTER_SECRET = Deno.env.get('BASE44_APP_ID') || 'okx-master-secret';
@@ -118,9 +118,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    const BUY_AMOUNT_USDT = 110; // Fixed $110 test amount
-    if (usdtBal < BUY_AMOUNT_USDT) {
-      report.errors.push(`Insufficient balance: ${usdtBal} USDT (need ${BUY_AMOUNT_USDT})`);
+    // Use available balance, minimum $10
+    const BUY_AMOUNT_USDT = Math.max(10, Math.min(usdtBal - 0.5, 80));
+    if (usdtBal < 10) {
+      report.errors.push(`Insufficient balance: ${usdtBal} USDT (need $10 minimum)`);
       return Response.json({ ...report, cycle_status: 'FAILED' }, { status: 400 });
     }
 
@@ -135,6 +136,7 @@ Deno.serve(async (req) => {
 
     const currentPrice = parseFloat(tickRes.data[0].last);
     const buyQty = (BUY_AMOUNT_USDT / currentPrice).toFixed(8);
+    console.log(`[VERIFY] ${TEST_PAIR} price=${currentPrice} qty=${buyQty} amount=${BUY_AMOUNT_USDT}`);
 
     report.next_action = `Placing BUY order for ${buyQty} ${TEST_PAIR}...`;
 
@@ -145,7 +147,7 @@ Deno.serve(async (req) => {
       ordType: 'market',
       tdMode: 'cash',
       tgtCcy: 'quote_ccy',
-      sz: buyQty
+      sz: BUY_AMOUNT_USDT.toString()
     });
 
     const buyRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST',
