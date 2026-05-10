@@ -426,21 +426,43 @@ function aggressionMultiplier(recentLosses) {
   return 0.55;
 }
 
-// ─── Score pair for scalping ──────────────────────────────────────────────────
-function scalpScore(pair, ticker) {
-  if (!ticker) return { ok: false, reason: 'no ticker' };
+// ─── OKX-only pair scoring (no Polygon required) ────────────────────────────
+// Uses only OKX data: last price, 24h trend, spread, volume
+function scalpScore(pair, ticker, balanceMode = 'NORMAL') {
+  if (!ticker) return { ok: false, reason: 'no ticker', score: 0 };
   const bid      = parseFloat(ticker.bidPx || 0);
   const ask      = parseFloat(ticker.askPx || 0);
   const last     = parseFloat(ticker.last || 0);
   const open24h  = parseFloat(ticker.open24h || last);
+  const vol24h   = parseFloat(ticker.vol24h || 0);
   const spreadPct = bid > 0 ? (ask - bid) / bid * 100 : 99;
 
-  if (spreadPct > MAX_SPREAD_PCT) return { ok: false, reason: `spread ${spreadPct.toFixed(4)}% > ${MAX_SPREAD_PCT}%` };
-  if (last <= open24h) return { ok: false, reason: `24h trend negative (last=${last} open24h=${open24h})` };
-  const vol24h = parseFloat(ticker.vol24h || 0);
-  if (vol24h < 100) return { ok: false, reason: `volume too low (vol24h=${vol24h})` };
+  // Hard filters
+  if (spreadPct > MAX_SPREAD_PCT) return { ok: false, reason: `spread ${spreadPct.toFixed(4)}% > ${MAX_SPREAD_PCT}%`, score: 0 };
+  if (vol24h < 100) return { ok: false, reason: `volume too low (vol24h=${vol24h})`, score: 0 };
 
-  return { ok: true, spreadPct, last, bid, ask };
+  // OKX-only scoring (0-100)
+  // Trend component: +40pts if 24h trend positive
+  const trendScore = last > open24h ? 40 : 20;
+  
+  // Spread component: tighter spread = higher score (max 30pts)
+  const spreadScore = Math.max(0, 30 - (spreadPct * 500)); // tight spread rewards
+  
+  // Volume component: higher volume = higher score (max 20pts, normalized)
+  const volumeScore = Math.min(20, (vol24h / 1000) * 20);
+  
+  // Liquidity component: bid/ask presence (10pts if both present)
+  const liquidityScore = bid > 0 && ask > 0 ? 10 : 0;
+
+  const qualityScore = parseFloat((trendScore + spreadScore + volumeScore + liquidityScore).toFixed(1));
+  
+  // Minimum quality threshold depends on balance mode
+  const minQuality = balanceMode === 'SMALL' ? 25 : 50;
+  if (qualityScore < minQuality) {
+    return { ok: false, reason: `quality ${qualityScore.toFixed(1)} < ${minQuality}`, score: qualityScore };
+  }
+
+  return { ok: true, spreadPct, last, bid, ask, score: qualityScore };
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -641,13 +663,13 @@ Deno.serve(async (req) => {
         console.log(`[SCALP] Aggression reduced: ${recentConsecLosses} consec losses → mult=${aggMult}x`);
       }
 
-      // ── Fee-aware candidate scoring ──
+      // ── Fee-aware candidate scoring (OKX-only, pass balance mode) ──
       const candidates = [];
       for (const pair of ALLOWED_PAIRS) {
         if (activePairNow.has(pair)) continue;
 
-        const score = scalpScore(pair, tickerMap[pair]);
-        if (!score.ok) { console.log(`[SCALP] SKIP ${pair}: ${score.reason}`); continue; }
+        const score = scalpScore(pair, tickerMap[pair], balanceMode);
+        if (!score.ok) { console.log(`[SCALP] SKIP ${pair}: ${score.reason} (score=${score.score})`); continue; }
 
         const cooled = await isInCooldown(base44, pair);
         if (cooled) { console.log(`[SCALP] SKIP ${pair}: cooldown`); continue; }
@@ -687,7 +709,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        console.log(`[SCALP] CANDIDATE ${pair}: amount=${sizing.amount} USDT scaled=${sizing.scaled} requiredMove=${sizing.analysis.requiredPriceMovePercent}% netAtTP=${sizing.analysis.netProfitAtTP} minTrade=${sizing.analysis.minTradeAmountForProfit}`);
+        console.log(`[SCALP] CANDIDATE ${pair}: score=${score.score} amount=${sizing.amount} USDT spread=${score.spreadPct.toFixed(4)}% requiredMove=${sizing.analysis.requiredPriceMovePercent}% netAtTP=${sizing.analysis.netProfitAtTP}`);
         candidates.push({ pair, ...score, sizing });
       }
 
@@ -695,7 +717,8 @@ Deno.serve(async (req) => {
         console.log('[SCALP] WAIT: no eligible candidates');
         buyResult = { decision: 'WAIT_NO_CANDIDATES' };
       } else {
-        const best = candidates.sort((a, b) => a.spreadPct - b.spreadPct)[0];
+        // Sort by quality score (highest first), then by spread (tightest first)
+        const best = candidates.sort((a, b) => (b.score - a.score) || (a.spreadPct - b.spreadPct))[0];
         const buyUsdtAmount = parseFloat(best.sizing.amount.toFixed(2));
 
         console.log(`[SCALP] BUY ${best.pair} amount=${buyUsdtAmount} USDT scaled=${best.sizing.scaled} netAtTP=${best.sizing.analysis.netProfitAtTP}`);
