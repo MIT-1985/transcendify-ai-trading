@@ -230,18 +230,31 @@ Deno.serve(async (req) => {
       return Response.json({ ...report, cycle_status: 'FAILED' }, { status: 400 });
     }
 
-    report.next_action = `BUY filled! Placing SELL for ${buyFilled.accFillSz} ${TEST_PAIR}...`;
+    // ========== STEP 2: CALCULATE SELLABLE QUANTITY ==========
+    // Get base asset symbol from pair (e.g., DOGE from DOGE-USDT)
+    const baseAsset = TEST_PAIR.split('-')[0];
+    
+    // Calculate sellable quantity: accFillSz - abs(fee) if feeCcy == base asset
+    let buyBaseQty = parseFloat(buyFilled.accFillSz);
+    const feeAmount = Math.abs(parseFloat(buyFilled.fee || 0));
+    if (buyFilled.feeCcy === baseAsset) {
+      buyBaseQty -= feeAmount;
+    }
+    
+    const sellQty = buyBaseQty.toFixed(8); // Keep 8 decimals for base asset
+    
+    report.next_action = `BUY filled ${buyFilled.accFillSz} ${baseAsset}. Fee ${feeAmount} ${buyFilled.feeCcy}. Sellable: ${sellQty}. Placing SELL...`;
+    console.log(`[VERIFY] SELL calc: accFillSz=${buyFilled.accFillSz}, fee=${feeAmount}, feeCcy=${buyFilled.feeCcy}, sellQty=${sellQty}`);
 
     // ========== STEP 2: PLACE SELL ORDER ==========
-    const sellQty = buyFilled.accFillSz; // Sell exact amount that was bought
-    
+    // For SELL: DO NOT use tgtCcy (that would interpret sz as USDT instead of base asset)
+    // sz must be base asset quantity (e.g., SOL, DOGE, not USDT)
     const sellOrderBody = JSON.stringify({
       instId: TEST_PAIR,
       side: 'sell',
       ordType: 'market',
       tdMode: 'cash',
-      tgtCcy: 'quote_ccy',
-      sz: sellQty
+      sz: sellQty  // This is base asset quantity, NOT USDT
     });
 
     const sellRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST',
@@ -269,9 +282,13 @@ Deno.serve(async (req) => {
     report.sell_order = {
       ordId: sellOrdId,
       pair: TEST_PAIR,
-      qty: sellQty,
+      qty_requested: sellQty,
+      qty_type: 'base_asset_after_fee_deduction',
       state: 'pending'
     };
+    
+    console.log(`[VERIFY_SELL_REQUEST] ordId=${sellOrdId}, instId=${TEST_PAIR}, sz=${sellQty} (string)`);
+    console.log(`[VERIFY_SELL_REQUEST] Body: ${sellOrderBody}`);
 
     report.next_action = 'Waiting for SELL fill...';
     await new Promise(r => setTimeout(r, 1000));

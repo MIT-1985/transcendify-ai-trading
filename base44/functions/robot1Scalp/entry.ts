@@ -300,7 +300,23 @@ async function saveVerifiedTrade(base44, buyOrd, sellOrd) {
 
 // ─── Execute SELL ─────────────────────────────────────────────────────────────
 async function executeSell(base44, apiKey, apiSecret, passphrase, pos, reason) {
-  const sellBody = JSON.stringify({ instId: pos.instId, tdMode: 'cash', side: 'sell', ordType: 'market', sz: pos.qty.toString() });
+  // Calculate sellable quantity: qty - (fee if feeCcy is base asset)
+  const baseAsset = pos.instId.split('-')[0];
+  let sellableQty = pos.qty;
+  
+  // If fee was in base asset, subtract it (e.g., SOL fee reduces SOL to sell)
+  // Fetch the buy ledger entry to check the fee currency
+  const buyOrdRecs = await base44.asServiceRole.entities.OXXOrderLedger.filter({ ordId: pos.buyOrdId });
+  if (buyOrdRecs[0]) {
+    const buyRecord = buyOrdRecs[0];
+    if (buyRecord.feeCcy === baseAsset) {
+      const buyFeeAmount = Math.abs(buyRecord.fee || 0);
+      sellableQty = Math.max(0, pos.qty - buyFeeAmount);
+      console.log(`[SCALP] SELL sizing: qty=${pos.qty}, buyFee=${buyFeeAmount} ${baseAsset}, sellableQty=${sellableQty}`);
+    }
+  }
+  
+  const sellBody = JSON.stringify({ instId: pos.instId, tdMode: 'cash', side: 'sell', ordType: 'market', sz: sellableQty.toFixed(8) });
   const sellRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST', '/api/v5/trade/order', sellBody);
   if (sellRes.code !== '0') {
     console.error(`[SCALP] SELL rejected ${pos.instId}: ${sellRes.msg}`);
@@ -321,8 +337,8 @@ async function executeSell(base44, apiKey, apiSecret, passphrase, pos, reason) {
     timestamp: new Date(parseInt(fill.fillTime || fill.uTime || Date.now())).toISOString()
   };
   await saveToLedger(base44, sellFill);
-  const buyLedger = await base44.asServiceRole.entities.OXXOrderLedger.filter({ ordId: pos.buyOrdId });
-  if (buyLedger[0]) await saveVerifiedTrade(base44, buyLedger[0], sellFill);
+  const buyOrdRecs2 = await base44.asServiceRole.entities.OXXOrderLedger.filter({ ordId: pos.buyOrdId });
+  if (buyOrdRecs2[0]) await saveVerifiedTrade(base44, buyOrdRecs2[0], sellFill);
   console.log(`[SCALP] SELL DONE ${pos.instId} ordId=${sellOrdId} px=${sellFill.avgPx} reason=${reason}`);
   return { ok: true, sellFill, sellOrdId, reason };
 }
