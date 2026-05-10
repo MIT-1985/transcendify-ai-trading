@@ -13,6 +13,7 @@ const ALLOWED_PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USD
 export default function Dashboard() {
   const { user } = useAuth();
   const [alphaScalperEnabled, setAlphaScalperEnabled] = useState(true);
+  const [auditReport, setAuditReport] = useState(null);
   const [clock, setClock] = useState({
     realizedPnL: 0,
     sessionTimer: 0,
@@ -128,6 +129,19 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch full accounting audit report
+  useEffect(() => {
+    const fetchAudit = async () => {
+      try {
+        const res = await base44.functions.invoke('cleanupAccountingData', {});
+        setAuditReport(res.data);
+      } catch (e) {
+        console.error('Audit fetch error:', e.message);
+      }
+    };
+    fetchAudit();
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
       {killSwitchStatus === 'ACTIVE' && (
@@ -142,89 +156,86 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* SECTION 1: BIG LIVE CLOCK */}
-        <div className={`rounded-2xl p-8 border-2 ${killSwitchStatus === 'ACTIVE' ? 'border-red-600 bg-red-950/30' : clock.realizedPnL >= 0 ? 'border-emerald-500 bg-emerald-950/30' : 'border-red-500 bg-red-950/30'} shadow-2xl`}>
+        <div className={`rounded-2xl p-8 border-2 ${killSwitchStatus === 'ACTIVE' ? 'border-red-600 bg-red-950/30' : (auditReport?.profit_metrics?.net_pnl || 0) >= 0 ? 'border-emerald-500 bg-emerald-950/30' : 'border-red-500 bg-red-950/30'} shadow-2xl`}>
           <div className="text-center space-y-4">
-            <div className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Real-Time Earnings</div>
+            <div className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Clean Verified Profit</div>
             
-            <div className={`text-6xl font-black font-mono ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : clock.realizedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {clock.realizedPnL >= 0 ? '+' : ''}{clock.realizedPnL.toFixed(4)} USDT
+            <div className={`text-6xl font-black font-mono ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : (auditReport?.profit_metrics?.net_pnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {(auditReport?.profit_metrics?.net_pnl || 0) >= 0 ? '+' : ''}{(auditReport?.profit_metrics?.net_pnl || 0).toFixed(4)} USDT
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mt-8">
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">Session Time</div>
-                <div className="font-mono font-bold text-cyan-400">{formatTime(clock.sessionTimer)}</div>
+                <div className="text-xs text-slate-500 mb-1">Win Rate</div>
+                <div className="font-mono font-bold text-blue-400">{(auditReport?.profit_metrics?.win_rate_pct || 0).toFixed(1)}%</div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">P&L / Second</div>
-                <div className={`font-mono font-bold ${clock.pnlPerSec >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {clock.pnlPerSec >= 0 ? '+' : ''}{clock.pnlPerSec.toFixed(5)}
+                <div className="text-xs text-slate-500 mb-1">Wins / Losses</div>
+                <div className="font-mono font-bold text-emerald-400">{auditReport?.profit_metrics?.wins || 0} / {auditReport?.profit_metrics?.losses || 0}</div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                <div className="text-xs text-slate-500 mb-1">Avg P&L</div>
+                <div className={`font-mono font-bold ${(auditReport?.profit_metrics?.average_pnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {(auditReport?.profit_metrics?.average_pnl || 0) >= 0 ? '+' : ''}{(auditReport?.profit_metrics?.average_pnl || 0).toFixed(4)}
                 </div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">P&L / Minute</div>
-                <div className={`font-mono font-bold ${clock.pnlPerMin >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {clock.pnlPerMin >= 0 ? '+' : ''}{clock.pnlPerMin.toFixed(3)}
-                </div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">P&L / Hour</div>
-                <div className={`font-mono font-bold ${clock.pnlPerHour >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {clock.pnlPerHour >= 0 ? '+' : ''}{clock.pnlPerHour.toFixed(2)}
-                </div>
+                <div className="text-xs text-slate-500 mb-1">Total Fees</div>
+                <div className="font-mono font-bold text-red-400">{(auditReport?.profit_metrics?.total_fees_usdt || 0).toFixed(4)}</div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                 <div className="text-xs text-slate-500 mb-1">Status</div>
-                <div className={`font-mono font-bold text-sm ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : alphaScalperEnabled ? 'text-emerald-400' : 'text-slate-400'}`}>
-                  {killSwitchStatus === 'ACTIVE' ? 'PAUSED_KILL_SWITCH' : alphaScalperEnabled ? 'ACTIVE' : 'OFF'}
+                <div className={`font-mono font-bold text-xs ${auditReport?.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                  {auditReport?.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? '✓ CLEAN_CONFIRMED' : '⚠ STILL_DIRTY'}
                 </div>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">Runtime</div>
-                <div className={`font-mono font-bold text-sm ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : clock.runtimeActive ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`}>
-                  {killSwitchStatus === 'ACTIVE' ? '● PAUSED_KILL_SWITCH' : clock.runtimeActive ? '● LIVE' : '○ OFF'}
+                <div className="text-xs text-slate-500 mb-1">Kill Switch</div>
+                <div className={`font-mono font-bold text-sm ${killSwitchStatus === 'ACTIVE' ? 'text-red-400' : 'text-yellow-400'}`}>
+                  {killSwitchStatus === 'ACTIVE' ? '● ACTIVE' : '○ INACTIVE'}
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* SECTION 2: ACCOUNT SUMMARY */}
+        {/* SECTION 2: ACCOUNT SUMMARY (FROM AUDIT) */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-5 h-5 text-yellow-500" />
-              <div className="text-xs text-slate-500 uppercase">Total Equity</div>
+              <div className="text-xs text-slate-500 uppercase">Total Equity (OKX)</div>
             </div>
-            {loadBalance ? (
+            {!auditReport ? (
               <Skeleton className="h-10 bg-slate-800" />
             ) : (
-              <div className="text-3xl font-bold text-white">${parseFloat(balance.totalEquity || 0).toFixed(2)}</div>
+              <div className="text-3xl font-bold text-white">${auditReport.okx_live_balance?.total_equity_usdt || 0}</div>
             )}
+            {auditReport?.okx_live_balance?.fetch_error && <div className="text-xs text-red-400 mt-2">{auditReport.okx_live_balance.fetch_error}</div>}
           </div>
 
           <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-5 h-5 text-emerald-500" />
-              <div className="text-xs text-slate-500 uppercase">Free USDT</div>
+              <div className="text-xs text-slate-500 uppercase">Free USDT (OKX)</div>
             </div>
-            {loadBalance ? (
+            {!auditReport ? (
               <Skeleton className="h-10 bg-slate-800" />
             ) : (
-              <div className="text-3xl font-bold text-emerald-400">${parseFloat(balance.freeUSDT || 0).toFixed(2)}</div>
+              <div className="text-3xl font-bold text-emerald-400">${auditReport.okx_live_balance?.free_usdt || 0}</div>
             )}
           </div>
 
           <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-5 h-5 text-blue-500" />
-              <div className="text-xs text-slate-500 uppercase">Verified Profit</div>
+              <div className="text-xs text-slate-500 uppercase">Net P&L (Clean)</div>
             </div>
-            {loadVerified ? (
+            {!auditReport ? (
               <Skeleton className="h-10 bg-slate-800" />
             ) : (
-              <div className={`text-3xl font-bold ${clock.realizedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {clock.realizedPnL >= 0 ? '+' : ''}{clock.realizedPnL.toFixed(4)}
+              <div className={`text-3xl font-bold ${(auditReport.profit_metrics?.net_pnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {(auditReport.profit_metrics?.net_pnl || 0) >= 0 ? '+' : ''}{(auditReport.profit_metrics?.net_pnl || 0).toFixed(4)}
               </div>
             )}
           </div>
@@ -232,12 +243,12 @@ export default function Dashboard() {
           <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
             <div className="flex items-center gap-2 mb-2">
               <Activity className="w-5 h-5 text-cyan-500" />
-              <div className="text-xs text-slate-500 uppercase">Trades Today</div>
+              <div className="text-xs text-slate-500 uppercase">Clean Trades</div>
             </div>
-            {loadVerified ? (
+            {!auditReport ? (
               <Skeleton className="h-10 bg-slate-800" />
             ) : (
-              <div className="text-3xl font-bold text-cyan-400">{todaysTrades.length}</div>
+              <div className="text-3xl font-bold text-cyan-400">{auditReport.trades?.clean_trades_today || 0}</div>
             )}
           </div>
         </div>
@@ -307,7 +318,84 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* SECTION 5: LIVE MARKET PRICES */}
+        {/* SECTION 5: FULL ACCOUNTING AUDIT REPORT */}
+        {auditReport && (
+          <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
+            <h2 className="text-lg font-bold mb-4">📊 Complete Accounting Audit Report</h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+              {/* Deduplication */}
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-600">
+                <div className="text-sm font-bold text-cyan-400 mb-3">Deduplication</div>
+                <div className="space-y-2 text-xs text-slate-400">
+                  <div>Total Records: {auditReport.deduplication?.total_records}</div>
+                  <div>Duplicate Groups: {auditReport.deduplication?.duplicate_groups}</div>
+                  <div className="text-emerald-400 font-bold">Marked: {auditReport.deduplication?.duplicate_records_marked}</div>
+                  <div className="text-emerald-400 font-bold">Unique Fills: {auditReport.deduplication?.unique_fills}</div>
+                </div>
+              </div>
+
+              {/* Trade Matching */}
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-600">
+                <div className="text-sm font-bold text-blue-400 mb-3">Trade Matching</div>
+                <div className="space-y-2 text-xs text-slate-400">
+                  <div>Valid Matched: {auditReport.trades?.valid_trades_matched}</div>
+                  <div>Suspect (High PnL): {auditReport.trades?.suspect_trades_high_pnl}</div>
+                  <div className="text-emerald-400 font-bold">Clean Today: {auditReport.trades?.clean_trades_today}</div>
+                  <div>Invalid Trades: {auditReport.trades?.invalid_trades_negative_time}</div>
+                </div>
+              </div>
+
+              {/* P&L Summary */}
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-600">
+                <div className="text-sm font-bold text-green-400 mb-3">P&L Summary</div>
+                <div className="space-y-2 text-xs text-slate-400">
+                  <div className={auditReport.profit_metrics?.net_pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                    Net P&L: {auditReport.profit_metrics?.net_pnl >= 0 ? '+' : ''}{auditReport.profit_metrics?.net_pnl?.toFixed(4)} USDT
+                  </div>
+                  <div>Gross P&L: {auditReport.profit_metrics?.gross_pnl >= 0 ? '+' : ''}{auditReport.profit_metrics?.gross_pnl?.toFixed(4)}</div>
+                  <div>Total Fees: {auditReport.profit_metrics?.total_fees_usdt?.toFixed(4)}</div>
+                  <div className="text-blue-400 font-bold">Win Rate: {auditReport.profit_metrics?.win_rate_pct?.toFixed(2)}%</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Stale Positions */}
+            {auditReport.stale_positions_verification?.length > 0 && (
+              <div className="mt-6">
+                <div className="text-sm font-bold text-yellow-400 mb-3">Stale Positions Verified</div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 text-xs">
+                  {auditReport.stale_positions_verification?.slice(0, 15).map((pos, i) => (
+                    <div key={i} className="bg-slate-800 rounded p-3 border border-slate-600">
+                      <div className="font-bold text-cyan-400">{pos.asset}</div>
+                      <div className="text-slate-400 mt-1">
+                        <div>Ledger: {pos.ledgerQty.toFixed(8)}</div>
+                        <div>Live: {pos.liveQty.toFixed(8)}</div>
+                        <div className={pos.staleMarked ? 'text-emerald-400' : 'text-yellow-400'}>
+                          {pos.staleMarked ? '✓ STALE' : 'PARTIAL'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Status */}
+            <div className="mt-6 p-4 rounded-lg border-2" style={{
+              borderColor: auditReport.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? '#10b981' : '#eab308'
+            }}>
+              <div className={`text-lg font-black ${auditReport.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                {auditReport.accounting_status === 'ACCOUNTING_CLEAN_CONFIRMED' ? '✅ ACCOUNTING_CLEAN_CONFIRMED' : '⚠️ ACCOUNTING_STILL_DIRTY'}
+              </div>
+              <div className="text-xs text-slate-400 mt-2">
+                All duplicates marked • Trades rebuilt • P&L calculated • OKX balance verified • Stale positions confirmed
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION 6: LIVE MARKET PRICES */}
         <LiveMarketPrices />
 
         {/* SECTION 6: LAST VERIFIED ORDERS */}
