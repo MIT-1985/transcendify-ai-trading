@@ -172,9 +172,63 @@ export default function Dashboard() {
               }`}>
                 {scalpResult.error ? `Error: ${scalpResult.error}` :
                  scalpResult.sells?.length > 0 ? `✓ SOLD ${scalpResult.sells.map(s => s.pair).join(', ')} [${scalpResult.sells.map(s => s.exitMode).join(', ')}] → back to USDT` :
-                 scalpResult.buy?.decision === 'BUY_EXECUTED' ? `✓ BUY ${scalpResult.buy.pair} @ $${scalpResult.buy.avgPx} · ${scalpResult.buy.usedUSDT} USDT` :
+                 scalpResult.buy?.decision === 'BUY_EXECUTED' ? `✓ BUY ${scalpResult.buy.pair} @ $${scalpResult.buy.avgPx} · ${scalpResult.buy.usedUSDT} USDT${scalpResult.buy.tradeSizeScaled ? ' [SCALED]' : ''}` :
                  `WAIT · ${scalpResult.positionCount}/${scalpResult.maxPositions} positions · $${scalpResult.freeUsdt?.toFixed(2)} free`}
               </div>
+              {/* BUY sizing diagnostics */}
+              {scalpResult.buy?.decision === 'BUY_EXECUTED' && scalpResult.buy.sizing && (
+                <div className="text-xs bg-emerald-900/20 rounded-lg p-3 border border-emerald-700/40">
+                  <div className="text-emerald-400 font-bold mb-2">Trade Sizing Analysis</div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="bg-slate-900/60 rounded p-2">
+                      <div className="text-slate-500 mb-0.5">Required Move %</div>
+                      <div className="font-mono font-bold text-yellow-400">{scalpResult.buy.sizing.requiredPriceMovePercent?.toFixed(4)}%</div>
+                    </div>
+                    <div className="bg-slate-900/60 rounded p-2">
+                      <div className="text-slate-500 mb-0.5">Min Trade For Profit</div>
+                      <div className="font-mono font-bold text-cyan-400">{scalpResult.buy.sizing.minTradeAmountForProfit?.toFixed(2)} USDT</div>
+                    </div>
+                    <div className="bg-slate-900/60 rounded p-2">
+                      <div className="text-slate-500 mb-0.5">Est. Fees</div>
+                      <div className="font-mono font-bold text-red-400">{scalpResult.buy.sizing.estimatedFees?.toFixed(4)} USDT</div>
+                    </div>
+                    <div className="bg-slate-900/60 rounded p-2">
+                      <div className="text-slate-500 mb-0.5">Net Profit @ TP</div>
+                      <div className={`font-mono font-bold ${scalpResult.buy.sizing.expectedNetProfitAtTP >= 0.02 ? 'text-emerald-400' : 'text-yellow-400'}`}>{scalpResult.buy.sizing.expectedNetProfitAtTP?.toFixed(4)} USDT</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Sizing preview table for all pairs */}
+              {scalpResult.sizingPreview && Object.keys(scalpResult.sizingPreview).length > 0 && (
+                <div className="text-xs bg-slate-900/40 rounded-lg p-3 border border-slate-700/50">
+                  <div className="text-slate-400 font-bold mb-2">Fee Sizing Preview — default {scalpResult.config?.DEFAULT_TRADE_USDT ?? 20} USDT</div>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-slate-600 border-b border-slate-800">
+                        <th className="text-left py-1">Pair</th>
+                        <th className="text-right py-1">Required Move %</th>
+                        <th className="text-right py-1">Min Trade USDT</th>
+                        <th className="text-right py-1">Est. Fees</th>
+                        <th className="text-right py-1">Net @ TP</th>
+                        <th className="text-right py-1">Viable</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(scalpResult.sizingPreview).map(([pair, s]) => (
+                        <tr key={pair} className="border-b border-slate-800/30">
+                          <td className="py-1 font-bold">{pair}</td>
+                          <td className={`py-1 text-right font-mono ${s.requiredPriceMovePercent > scalpResult.config?.TAKE_PROFIT_PCT ? 'text-red-400' : 'text-yellow-400'}`}>{s.requiredPriceMovePercent?.toFixed(4)}%</td>
+                          <td className="py-1 text-right font-mono text-cyan-400">{s.minTradeAmountForProfit?.toFixed(2)}</td>
+                          <td className="py-1 text-right font-mono text-red-400">{s.estimatedFees?.toFixed(4)}</td>
+                          <td className={`py-1 text-right font-mono ${s.netProfitAtTP >= 0.02 ? 'text-emerald-400' : 'text-yellow-400'}`}>{s.netProfitAtTP?.toFixed(4)}</td>
+                          <td className={`py-1 text-right font-bold ${s.viable ? 'text-emerald-400' : 'text-red-400'}`}>{s.viable ? '✓' : '✗'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               {/* Per-position diagnostics */}
               {scalpResult.positionDiagnostics?.map((d, i) => (
                 <div key={i} className="text-xs bg-slate-900/40 rounded-lg p-3 border border-slate-700/50 space-y-2">
