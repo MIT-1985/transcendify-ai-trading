@@ -199,33 +199,52 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* SECTION 2: ACCOUNT SUMMARY (FROM AUDIT) */}
+        {/* SECTION 2: ACCOUNT SUMMARY (BALANCE + ACCOUNTING SEPARATE) */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
+          {/* OKX Balance - shows LIVE or UNVERIFIED */}
+          <div className={`border rounded-xl p-6 ${auditReport?.data_source_status?.okx_balance_fetch_success ? 'bg-emerald-900/20 border-emerald-600' : 'bg-yellow-900/20 border-yellow-600'}`}>
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-5 h-5 text-yellow-500" />
-              <div className="text-xs text-slate-500 uppercase">Total Equity (OKX)</div>
+              <div className="text-xs text-slate-500 uppercase">
+                {auditReport?.data_source_status?.okx_balance_fetch_success ? 'Total Equity (LIVE)' : 'Total Equity (UNVERIFIED)'}
+              </div>
             </div>
             {!auditReport ? (
               <Skeleton className="h-10 bg-slate-800" />
             ) : (
-              <div className="text-3xl font-bold text-white">${auditReport.okx_live_balance?.total_equity_usdt || 0}</div>
+              <>
+                <div className="text-3xl font-bold text-white">
+                  {auditReport?.data_source_status?.okx_balance_fetch_success 
+                    ? `$${auditReport.okx_live_balance?.total_equity_usdt || 0}`
+                    : 'UNKNOWN'}
+                </div>
+                {!auditReport?.data_source_status?.okx_balance_fetch_success && (
+                  <div className="text-xs text-yellow-400 mt-2">Error: {auditReport.okx_live_balance?.http_status}</div>
+                )}
+              </>
             )}
-            {auditReport?.okx_live_balance?.fetch_error && <div className="text-xs text-red-400 mt-2">{auditReport.okx_live_balance.fetch_error}</div>}
           </div>
 
-          <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
+          {/* Free USDT - shows LIVE or UNVERIFIED */}
+          <div className={`border rounded-xl p-6 ${auditReport?.data_source_status?.okx_balance_fetch_success ? 'bg-emerald-900/20 border-emerald-600' : 'bg-yellow-900/20 border-yellow-600'}`}>
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-5 h-5 text-emerald-500" />
-              <div className="text-xs text-slate-500 uppercase">Free USDT (OKX)</div>
+              <div className="text-xs text-slate-500 uppercase">
+                {auditReport?.data_source_status?.okx_balance_fetch_success ? 'Free USDT (LIVE)' : 'Free USDT (UNVERIFIED)'}
+              </div>
             </div>
             {!auditReport ? (
               <Skeleton className="h-10 bg-slate-800" />
             ) : (
-              <div className="text-3xl font-bold text-emerald-400">${auditReport.okx_live_balance?.free_usdt || 0}</div>
+              <div className="text-3xl font-bold text-emerald-400">
+                {auditReport?.data_source_status?.okx_balance_fetch_success 
+                  ? `$${auditReport.okx_live_balance?.free_usdt || 0}`
+                  : 'UNKNOWN'}
+              </div>
             )}
           </div>
 
+          {/* Accounting: Net P&L from VerifiedTrade */}
           <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-5 h-5 text-blue-500" />
@@ -234,12 +253,13 @@ export default function Dashboard() {
             {!auditReport ? (
               <Skeleton className="h-10 bg-slate-800" />
             ) : (
-              <div className={`text-3xl font-bold ${(auditReport.profit_metrics?.net_pnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {(auditReport.profit_metrics?.net_pnl || 0) >= 0 ? '+' : ''}{(auditReport.profit_metrics?.net_pnl || 0).toFixed(4)}
+              <div className={`text-3xl font-bold ${(auditReport.profit_metrics?.net_pnl_after_fees || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {(auditReport.profit_metrics?.net_pnl_after_fees || 0) >= 0 ? '+' : ''}{(auditReport.profit_metrics?.net_pnl_after_fees || 0).toFixed(4)}
               </div>
             )}
           </div>
 
+          {/* Accounting: Clean Trades from VerifiedTrade count */}
           <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
             <div className="flex items-center gap-2 mb-2">
               <Activity className="w-5 h-5 text-cyan-500" />
@@ -248,45 +268,64 @@ export default function Dashboard() {
             {!auditReport ? (
               <Skeleton className="h-10 bg-slate-800" />
             ) : (
-              <div className="text-3xl font-bold text-cyan-400">{auditReport.trades?.clean_trades_today || 0}</div>
+              <div className="text-3xl font-bold text-cyan-400">{auditReport.trade_counts?.clean_trades_final_count || 0}</div>
             )}
           </div>
         </div>
 
         {/* SECTION 3: ALPHA SCALPER STATUS */}
-        <AlphaScalperRuntime enabled={alphaScalperEnabled} />
+        {killSwitchStatus === 'ACTIVE' ? (
+          <div className="bg-red-950/30 border-2 border-red-600 rounded-2xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-red-400">Alpha Scalper Runtime</h3>
+                <div className="text-xs text-red-300 mt-1">Status: PAUSED_KILL_SWITCH</div>
+              </div>
+              <div className="bg-red-900/50 text-red-400 px-4 py-2 rounded font-bold text-sm">
+                ● PAUSED
+              </div>
+            </div>
+          </div>
+        ) : (
+          <AlphaScalperRuntime enabled={alphaScalperEnabled} />
+        )}
 
         <div className="flex gap-3">
-          <Button
-            onClick={() => setAlphaScalperEnabled(true)}
-            disabled={alphaScalperEnabled || killSwitchStatus === 'ACTIVE'}
-            className="gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50"
-          >
-            <Play className="w-4 h-4" />
-            Start Alpha Scalper
-          </Button>
-          <Button
-            onClick={() => setAlphaScalperEnabled(false)}
-            disabled={!alphaScalperEnabled}
-            className="gap-2 bg-red-700 hover:bg-red-600 disabled:opacity-50"
-          >
-            <Pause className="w-4 h-4" />
-            Pause Alpha Scalper
-          </Button>
-          <Button
-            onClick={async () => {
-              try {
-                await base44.functions.invoke('robot1LiveScalp', {});
-              } catch (e) {
-                console.error(e);
-              }
-            }}
-            disabled={killSwitchStatus === 'ACTIVE'}
-            className="gap-2 bg-blue-700 hover:bg-blue-600 ml-auto disabled:opacity-50"
-          >
-            <Zap className="w-4 h-4" />
-            Run One Cycle
-          </Button>
+          {killSwitchStatus !== 'ACTIVE' && (
+            <Button
+              onClick={() => setAlphaScalperEnabled(true)}
+              disabled={alphaScalperEnabled}
+              className="gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50"
+            >
+              <Play className="w-4 h-4" />
+              Start Alpha Scalper
+            </Button>
+          )}
+          {killSwitchStatus !== 'ACTIVE' && (
+            <Button
+              onClick={() => setAlphaScalperEnabled(false)}
+              disabled={!alphaScalperEnabled}
+              className="gap-2 bg-red-700 hover:bg-red-600 disabled:opacity-50"
+            >
+              <Pause className="w-4 h-4" />
+              Pause Alpha Scalper
+            </Button>
+          )}
+          {killSwitchStatus !== 'ACTIVE' && (
+            <Button
+              onClick={async () => {
+                try {
+                  await base44.functions.invoke('robot1LiveScalp', {});
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
+              className="gap-2 bg-blue-700 hover:bg-blue-600 ml-auto"
+            >
+              <Zap className="w-4 h-4" />
+              Run One Cycle
+            </Button>
+          )}
         </div>
 
         {/* SECTION 4: ACTIVE BOTS */}
