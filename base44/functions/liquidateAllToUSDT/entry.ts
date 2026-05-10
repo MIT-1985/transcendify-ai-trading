@@ -1,6 +1,7 @@
 /**
  * Liquidate All Crypto to USDT
  * Sells all non-USDT holdings at market price on OKX
+ * Full audit trail: before balance → sells → after balance → OXXOrderLedger
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
@@ -50,6 +51,22 @@ async function okxRequest(apiKey, secret, passphrase, method, path, bodyStr = ''
   return res.json();
 }
 
+async function fetchOkxBalance(apiKey, secret, passphrase) {
+  const res = await okxRequest(apiKey, secret, passphrase, 'GET', '/api/v5/account/balance');
+  if (res.code !== '0') throw new Error(`Balance fetch failed: ${res.msg}`);
+  const details = res.data?.[0]?.details || [];
+  const balances = {};
+  let totalEquity = 0;
+  for (const d of details) {
+    const bal = parseFloat(d.availBal || 0);
+    if (bal > 0) {
+      balances[d.ccy] = bal;
+      if (d.ccy === 'USDT') totalEquity += bal;
+    }
+  }
+  return { balances, totalEquity, raw: res.data?.[0] };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -58,7 +75,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    console.log('[LIQUIDATE] === Starting liquidation to USDT ===');
+    console.log('[LIQUIDATE] === Starting full liquidation ===');
 
     // Fetch OKX connection
     const [c1, c2] = await Promise.all([
@@ -76,83 +93,149 @@ Deno.serve(async (req) => {
       decryptOkx(conn.encryption_iv)
     ]);
 
-    // Get current balance
-    const balRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance');
-    const details = balRes.data?.[0]?.details || [];
+    // 1. BEFORE balance
+    console.log('[LIQUIDATE] Fetching BEFORE balance...');
+    const { balances: beforeBalances, totalEquity: beforeEquity } = await fetchOkxBalance(apiKey, apiSecret, passphrase);
+    console.log('[LIQUIDATE] BEFORE:', beforeBalances);
 
-    const liquidations = [];
-    const errors = [];
+    const sells = [];
+    const failedSells = [];
 
-    for (const detail of details) {
-      const asset = detail.ccy;
-      if (asset === 'USDT') continue; // Skip USDT
+    // 2. SELLS
+    for (const [asset, qty] of Object.entries(beforeBalances)) {
+      if (asset === 'USDT' || qty <= 0) continue;
 
-      const availableBal = parseFloat(detail.availBal || 0);
-      if (availableBal <= 0) continue; // Skip zero balances
-
-      // Determine trading pair
       const pair = `${asset}-USDT`;
-      console.log(`[LIQUIDATE] Selling ${asset}: ${availableBal} → ${pair}`);
+      console.log(`[LIQUIDATE] Selling ${asset}: ${qty} → ${pair}`);
 
-      // Market sell
       const sellBody = JSON.stringify({
         instId: pair,
         tdMode: 'cash',
         side: 'sell',
         ordType: 'market',
-        sz: availableBal.toString()
+        sz: qty.toString()
       });
 
       try {
         const sellRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST', '/api/v5/trade/order', sellBody);
+        
         if (sellRes.code !== '0') {
-          console.error(`[LIQUIDATE] ${pair} FAILED: ${sellRes.msg}`);
-          errors.push({ pair, reason: sellRes.msg });
+          console.error(`[LIQUIDATE] ${pair} FAILED: code=${sellRes.code}, msg=${sellRes.msg}`);
+          failedSells.push({
+            instId: pair,
+            qty,
+            code: sellRes.code,
+            message: sellRes.msg,
+            raw: sellRes
+          });
           continue;
         }
 
         const ordId = sellRes.data?.[0]?.ordId;
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 800));
 
+        // Verify order fill
         const verify = await okxRequest(apiKey, apiSecret, passphrase, 'GET', `/api/v5/trade/order?instId=${pair}&ordId=${ordId}`);
         const fill = verify.data?.[0];
 
         if (fill && fill.state === 'filled') {
-          liquidations.push({
+          const sellRecord = {
             asset,
             pair,
-            qty: availableBal,
+            qty,
             ordId,
             avgPx: parseFloat(fill.avgPx || 0),
-            usdt: parseFloat(fill.avgPx || 0) * availableBal,
+            accFillSz: parseFloat(fill.accFillSz || 0),
+            fillNotionalUSDT: parseFloat(fill.notionalUsd || 0),
             fee: parseFloat(fill.fee || 0),
-            timestamp: new Date().toISOString()
-          });
-          console.log(`[LIQUIDATE] ✓ ${pair} sold: ${availableBal} @ ${fill.avgPx} USDT`);
+            feeCcy: fill.feeCcy || 'USDT',
+            timestamp: new Date(fill.uTime).toISOString()
+          };
+          sells.push(sellRecord);
+          console.log(`[LIQUIDATE] ✓ ${pair}: ${qty} @ ${fill.avgPx} = ${fill.notionalUsd} USDT, fee=${fill.fee}`);
         } else {
-          errors.push({ pair, reason: `Not filled: state=${fill?.state}` });
+          failedSells.push({
+            instId: pair,
+            qty,
+            code: 'NOT_FILLED',
+            message: `Order state: ${fill?.state || 'unknown'}`,
+            raw: fill
+          });
         }
       } catch (e) {
-        errors.push({ pair, reason: e.message });
+        console.error(`[LIQUIDATE] Exception on ${pair}:`, e.message);
+        failedSells.push({
+          instId: pair,
+          qty,
+          code: 'EXCEPTION',
+          message: e.message,
+          raw: null
+        });
       }
     }
 
-    // Final balance
-    const finalBal = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance');
-    const finalDetails = finalBal.data?.[0]?.details || [];
-    const finalUSDT = parseFloat(finalDetails.find(d => d.ccy === 'USDT')?.availBal || 0);
+    // 3. Save SELL orders to OXXOrderLedger
+    let ledgerCount = 0;
+    for (const sell of sells) {
+      try {
+        await base44.asServiceRole.entities.OXXOrderLedger.create({
+          ordId: sell.ordId,
+          instId: sell.pair,
+          side: 'sell',
+          avgPx: sell.avgPx,
+          accFillSz: sell.accFillSz,
+          quoteUSDT: sell.fillNotionalUSDT,
+          fee: sell.fee,
+          feeCcy: sell.feeCcy,
+          timestamp: sell.timestamp,
+          robotId: 'manual_liquidation',
+          verified: true,
+          state: 'filled'
+        });
+        ledgerCount++;
+        console.log(`[LIQUIDATE] Saved to ledger: ${sell.pair} ordId=${sell.ordId}`);
+      } catch (e) {
+        console.error(`[LIQUIDATE] Failed to save ledger for ${sell.pair}:`, e.message);
+      }
+    }
+
+    // 4. AFTER balance
+    await new Promise(r => setTimeout(r, 1000));
+    console.log('[LIQUIDATE] Fetching AFTER balance...');
+    const { balances: afterBalances, totalEquity: afterEquity } = await fetchOkxBalance(apiKey, apiSecret, passphrase);
+    console.log('[LIQUIDATE] AFTER:', afterBalances);
 
     return Response.json({
       status: 'completed',
-      liquidated: liquidations.length,
-      errors: errors.length,
-      liquidations,
-      errors,
-      finalUSDTBalance: finalUSDT
+      before: {
+        balances: beforeBalances,
+        totalEquityUSDT: beforeEquity
+      },
+      sells: sells.map(s => ({
+        asset: s.asset,
+        instId: s.pair,
+        qty: s.qty,
+        ordId: s.ordId,
+        avgPx: s.avgPx,
+        filledUSDT: s.fillNotionalUSDT,
+        fee: s.fee,
+        feeCcy: s.feeCcy
+      })),
+      failed: failedSells,
+      after: {
+        balances: afterBalances,
+        totalEquityUSDT: afterEquity
+      },
+      ledgerSaved: ledgerCount,
+      summary: {
+        successfulSells: sells.length,
+        failedSells: failedSells.length,
+        ledgerRecords: ledgerCount
+      }
     });
 
   } catch (err) {
     console.error(`[LIQUIDATE] Exception: ${err.message}`);
-    return Response.json({ error: err.message }, { status: 500 });
+    return Response.json({ error: err.message, stack: err.stack }, { status: 500 });
   }
 });
