@@ -5,26 +5,17 @@ import { useAuth } from '@/lib/AuthContext';
 import { Wallet, TrendingUp, Activity, Zap } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import Robot1Panel from '@/components/dashboard/Robot1Panel';
-import PairScoringTable from '@/components/dashboard/PairScoringTable';
-import Robot1LivePnL from '@/components/dashboard/Robot1LivePnL';
-import SecondOptimizer from '@/components/dashboard/SecondOptimizer';
-import Robot1ModePanel from '@/components/dashboard/Robot1ModePanel';
-import CapitalReservePanel from '@/components/dashboard/CapitalReservePanel';
-import ScalpOptimizerPanel from '@/components/dashboard/ScalpOptimizerPanel';
-import OptimizationEngine from '@/components/dashboard/OptimizationEngine';
 import RobotLiveClockProfit from '@/components/dashboard/RobotLiveClockProfit';
 import LastRobotActionPanel from '@/components/dashboard/LastRobotActionPanel';
+import ManualScalpTriggerV2 from '@/components/dashboard/ManualScalpTriggerV2';
 import WhyNoTradePanel from '@/components/dashboard/WhyNoTradePanel';
-import ManualScalpTrigger from '@/components/dashboard/ManualScalpTrigger';
 import BlockerDiagnosticsDetailed from '@/components/dashboard/BlockerDiagnosticsDetailed';
 import SchedulerStatus from '@/components/dashboard/SchedulerStatus';
+import Robot1LivePnL from '@/components/dashboard/Robot1LivePnL';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [syncStatus, setSyncStatus] = useState('idle');
-  const [pairScores, setPairScores] = useState([]);
-  const [scoresLoading, setScoresLoading] = useState(false);
 
   const handleSync = async () => {
     setSyncStatus('syncing');
@@ -140,50 +131,20 @@ export default function Dashboard() {
         {/* LIVE PROOF: Last Robot Action */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <LastRobotActionPanel />
-          <ManualScalpTrigger />
+          <ManualScalpTriggerV2 />
         </div>
 
         {/* LIVE PROOF: Why No Trade */}
         <WhyNoTradePanel />
 
-        {/* Exact OKX Ticker Analysis */}
+        {/* Exact OKX Ticker Analysis (Real Spreads) */}
         <BlockerDiagnosticsDetailed />
 
-        {/* Consistent Scheduler Status */}
+        {/* Scheduler Status */}
         <SchedulerStatus />
 
-        {/* Mode & Scheduler Panel */}
-        <Robot1ModePanel />
-
-        {/* Capital Reserve Manager */}
-        <CapitalReservePanel />
-
-        {/* Optimization Engine (Adaptive Constants) */}
-        <OptimizationEngine />
-
-        {/* Final Optimizer Metrics */}
-        <ScalpOptimizerPanel />
-
-        {/* 2. Second Optimizer */}
-        <SecondOptimizer />
-
-        {/* 2b. Robot 1 Live P&L */}
+        {/* Live P&L */}
         <Robot1LivePnL />
-
-
-
-        {/* 3. Robot 1 Live Status (scheduler) */}
-        <Robot1Panel onRunResult={(data) => { if (data?.pairScores) setPairScores(data.pairScores); }} />
-
-        {/* 2b. Pair Scoring */}
-        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-4 h-4 text-purple-400" />
-            <h2 className="font-bold text-sm">Pair Scoring — Last Run</h2>
-            <span className="ml-auto text-xs text-slate-500">score ≥ 40 required to BUY</span>
-          </div>
-          <PairScoringTable pairScores={pairScores} isLoading={scoresLoading} />
-        </section>
 
         {/* 3. Robot 1 Verified Trades */}
         <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
