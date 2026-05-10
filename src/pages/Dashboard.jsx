@@ -6,7 +6,7 @@ import { Wallet, TrendingUp, Activity } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Robot1Panel from '@/components/dashboard/Robot1Panel';
-import PairScoringTable from '@/components/dashboard/PairScoringTable.jsx';
+import PairScoringTable from '@/components/dashboard/PairScoringTable';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -34,7 +34,14 @@ export default function Dashboard() {
     queryKey: ['okx-live-balance', user?.email],
     queryFn: async () => {
       const res = await base44.functions.invoke('getSuzanaBalance', {});
-      return res.data || {};
+      const d = res.data || {};
+      // Flatten balances array into a lookup map for easy access
+      const map = { totalEquity: d.balance_usdt, freeUSDT: 0 };
+      for (const b of (d.balances || [])) {
+        map[b.asset] = b.free;
+        if (b.asset === 'USDT') map.freeUSDT = b.free;
+      }
+      return map;
     },
     enabled: !!user,
     staleTime: 30000
@@ -96,12 +103,15 @@ export default function Dashboard() {
           </div>
           {loadBalance ? <Skeleton className="h-16 bg-slate-800" /> :
             balance.error ? <div className="text-red-400 text-xs">{balance.error}</div> : (
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-4 lg:grid-cols-7 gap-3">
                 {[
                   { label: 'Total Equity', value: `$${parseFloat(balance.totalEquity || 0).toFixed(2)}`, color: 'text-emerald-400' },
                   { label: 'Free USDT', value: `$${parseFloat(balance.freeUSDT || 0).toFixed(2)}`, color: 'text-white' },
+                  { label: 'BTC', value: parseFloat(balance.BTC || 0).toFixed(6), color: 'text-yellow-400' },
                   { label: 'ETH', value: parseFloat(balance.ETH || 0).toFixed(6), color: 'text-white' },
                   { label: 'SOL', value: parseFloat(balance.SOL || 0).toFixed(4), color: 'text-white' },
+                  { label: 'DOGE', value: parseFloat(balance.DOGE || 0).toFixed(2), color: 'text-white' },
+                  { label: 'XRP', value: parseFloat(balance.XRP || 0).toFixed(2), color: 'text-white' },
                 ].map(({ label, value, color }) => (
                   <div key={label} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
                     <div className="text-xs text-slate-500 mb-1">{label}</div>
@@ -130,7 +140,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-4 h-4 text-emerald-400" />
             <h2 className="font-bold text-sm">Robot 1 Verified Trades</h2>
-            <span className="ml-auto text-xs text-slate-500">ETH-USDT / SOL-USDT only</span>
+            <span className="ml-auto text-xs text-slate-500">BTC / ETH / SOL / DOGE / XRP · all 5 pairs</span>
           </div>
           {loadVerified ? <Skeleton className="h-24 bg-slate-800" /> :
             robot1Trades.length === 0 ? (
