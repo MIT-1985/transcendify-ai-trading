@@ -29,16 +29,19 @@ const SMALL_MODE_MAX_POSITIONS = 1;    // only 1 position at a time
 const SMALL_MODE_MIN_FREE_PCT = 0.10;  // keep 10% free minimum (relaxed)
 const SMALL_MODE_MIN_NET_PROFIT = 0.003; // 0.3¢ minimum net profit (reduced)
 
-const TAKE_PROFIT_PCT        = 0.25;   // 0.25% TP (must exceed round-trip fees ~0.20%)
-const STOP_LOSS_PCT          = -0.18;  // -0.18% SL
-const TRAILING_STOP_PCT      = 0.08;   // trail from peak once near TP
-const MICRO_TRAIL_ENTER_PCT  = 0.12;   // activate micro-trail when pnl >= this
-const MICRO_TRAIL_PEAK_PCT   = 0.13;   // require bestPnl >= this before trailing
-const MICRO_TRAIL_DROP_PCT   = 0.05;   // sell if price drops 0.05% from best
+// ─── PERCENT CONVENTION: Decimal format (0.35 = 0.35%, not 35%) ────
+// Display: `${value.toFixed(2)}%`
+// Logic: pnlPercent >= TAKE_PROFIT_PCT (NO multiplication by 100)
+const TAKE_PROFIT_PCT        = 0.35;   // 0.35% TP (decimal)
+const STOP_LOSS_PCT          = -0.20;  // -0.20% SL (decimal)
+const TRAILING_STOP_PCT      = 0.08;   // 0.08% trail from peak
+const MICRO_TRAIL_ENTER_PCT  = 0.12;   // 0.12% activate micro-trail
+const MICRO_TRAIL_PEAK_PCT   = 0.13;   // 0.13% require bestPnl
+const MICRO_TRAIL_DROP_PCT   = 0.05;   // 0.05% sell if drops from best
 
-// SMALL BALANCE MODE exit thresholds (tighter TP/SL)
-const SMALL_MODE_TAKE_PROFIT = 0.35;   // 0.35% TP (higher target for micro-cap)
-const SMALL_MODE_STOP_LOSS   = -0.20;  // -0.20% SL (slightly tighter)
+// SMALL BALANCE MODE exit thresholds
+const SMALL_MODE_TAKE_PROFIT = 0.35;   // 0.35% TP (micro-cap mode)
+const SMALL_MODE_STOP_LOSS   = -0.20;  // -0.20% SL (tight stop)
 const MAX_SPREAD_PCT         = 0.08;   // tight spread gate
 const OKX_FEE_RATE           = 0.001;  // 0.1% taker per side
 const MAX_POSITIONS          = MAX_SIMULTANEOUS_POS;
@@ -103,33 +106,24 @@ async function fetchAllTickers(apiKey, secret, passphrase) {
 }
 
 // ─── Fee-aware trade sizing ───────────────────────────────────────────────────
-// Analyzes whether a given USDT amount makes the trade viable at TP after fees.
-//
-// Math:
-//   grossProfit  = tradeUSDT * (tpPct/100)
-//   buyFee       = tradeUSDT * OKX_FEE_RATE
-//   sellFee      = tradeUSDT * (1 + tpPct/100) * OKX_FEE_RATE
-//   totalFees    = buyFee + sellFee
-//   netProfitAtTP = grossProfit - totalFees
-//
-//   For netProfitAtTP >= MIN_NET:
-//     tradeUSDT >= MIN_NET / ( (tpPct/100) - OKX_FEE_RATE*(2 + tpPct/100) )
+// tpPct is in DECIMAL format (0.35 = 0.35%, not 35%)
 function analyzeTradeSizing(tradeUSDT, tpPct, minNetProfit = MIN_NET_PROFIT_USDT) {
+  // Convert decimal percent to ratio: 0.35% → 0.0035
+  const tpRatio = tpPct / 100;
+  
   const estimatedBuyFee  = tradeUSDT * OKX_FEE_RATE;
-  const estimatedSellFee = tradeUSDT * (1 + tpPct / 100) * OKX_FEE_RATE;
+  const estimatedSellFee = tradeUSDT * (1 + tpRatio) * OKX_FEE_RATE;
   const estimatedFees    = estimatedBuyFee + estimatedSellFee;
-  const grossProfitAtTP  = tradeUSDT * (tpPct / 100);
+  const grossProfitAtTP  = tradeUSDT * tpRatio;
   const netProfitAtTP    = grossProfitAtTP - estimatedFees;
 
-  // Break-even: what % move covers fees alone
+  // Break-even: what % move (decimal) covers fees alone
   const breakEvenMovePct = (estimatedFees / tradeUSDT) * 100;
   // Required move to also clear minNetProfit
   const requiredPriceMovePercent = ((estimatedFees + minNetProfit) / tradeUSDT) * 100;
 
   // Minimum trade size that makes TP viable
-  // netRateAtTP = gross% - fee% = (tpPct/100) - OKX_FEE_RATE*(2 + tpPct/100)
-  // If <= 0, TP is below round-trip fees — structurally impossible regardless of size
-  const netRateAtTP = (tpPct / 100) - OKX_FEE_RATE * (2 + tpPct / 100);
+  const netRateAtTP = tpRatio - OKX_FEE_RATE * (2 + tpRatio);
   const tpBelowFees = netRateAtTP <= 0;
   const minTradeAmountForProfit = tpBelowFees
     ? null
@@ -152,21 +146,18 @@ function analyzeTradeSizing(tradeUSDT, tpPct, minNetProfit = MIN_NET_PROFIT_USDT
 }
 
 // ─── Dead position detection ─────────────────────────────────────────────────
-// A position is "dead" if it's been held too long with no progress toward TP
-const DEAD_POSITION_MINUTES = 15;    // max hold time before forced exit
-const DEAD_POSITION_MIN_PNL = -0.05; // exit only if pnl% > this (avoid cutting at bad SL)
+const DEAD_POSITION_MINUTES = 15;
+const DEAD_POSITION_MIN_PNL = -0.05;
 
 function isDeadPosition(pos, pnlPct) {
   if (!pos.buyTimestamp) return false;
   const holdMs = Date.now() - new Date(pos.buyTimestamp).getTime();
   const holdMin = holdMs / 60000;
-  // Dead: held > 15 min AND stuck between SL and +0% (no progress)
   return holdMin >= DEAD_POSITION_MINUTES && pnlPct > DEAD_POSITION_MIN_PNL && pnlPct < 0.05;
 }
 
 // ─── Capital Reserve Analysis ─────────────────────────────────────────────────
 function analyzeCapitalReserve(freeUsdt, activePositions, tickerMap) {
-  // Estimate locked capital = sum of position values at current price
   let lockedCapital = 0;
   const capitalLockedByPair = {};
   for (const pos of activePositions) {
@@ -180,7 +171,6 @@ function analyzeCapitalReserve(freeUsdt, activePositions, tickerMap) {
   const lockedCapitalPct   = totalCapital > 0 ? lockedCapital / totalCapital : 0;
   const capitalRecovery    = freeCapitalPct < CAPITAL_RECOVERY_PCT;
   const availableTradeSlots = Math.max(0, MAX_SIMULTANEOUS_POS - activePositions.length);
-  // Efficiency: how many opportunities are viable (slots open + enough free capital)
   const capitalEfficiencyScore = parseFloat(
     (Math.min(freeCapitalPct / PREFERRED_FREE_PCT, 1) * 100).toFixed(1)
   );
@@ -200,12 +190,10 @@ function analyzeCapitalReserve(freeUsdt, activePositions, tickerMap) {
 
 // Decide trade amount: respects capital reserve rules
 function computeTradeAmount(freeUsdt, totalCapital, capitalRecoveryMode) {
-  // In recovery mode reduce position size to accelerate capital release
   const maxPct  = capitalRecoveryMode ? 0.15 : MAX_POSITION_PCT;
-  const balanceCap = totalCapital * maxPct;   // % of total, not just free
+  const balanceCap = totalCapital * maxPct;
   const hardCap    = Math.min(MAX_TRADE_USDT, balanceCap);
 
-  // Must keep MIN_FREE_CAPITAL_PCT of total free after the trade
   const maxAllowedByReserve = freeUsdt - (totalCapital * MIN_FREE_CAPITAL_PCT);
   const effectiveCap = Math.min(hardCap, maxAllowedByReserve);
 
@@ -217,13 +205,11 @@ function computeTradeAmount(freeUsdt, totalCapital, capitalRecoveryMode) {
     };
   }
 
-  // 1. Try default
   const defaultA = analyzeTradeSizing(DEFAULT_TRADE_USDT, TAKE_PROFIT_PCT);
   if (defaultA.viable && DEFAULT_TRADE_USDT <= effectiveCap) {
     return { amount: DEFAULT_TRADE_USDT, analysis: defaultA, scaled: false, rejected: false };
   }
 
-  // 2. Scale up to minimum required (+ 5% buffer), capped at effectiveCap
   const minReq = defaultA.minTradeAmountForProfit;
   if (minReq !== Infinity && minReq <= effectiveCap) {
     const scaledAmount = parseFloat(Math.min(minReq * 1.05, effectiveCap).toFixed(2));
@@ -231,7 +217,6 @@ function computeTradeAmount(freeUsdt, totalCapital, capitalRecoveryMode) {
     return { amount: scaledAmount, analysis: scaledA, scaled: true, rejected: false };
   }
 
-  // 3. Cannot make trade viable within effective cap → reject
   const capAnalysis = analyzeTradeSizing(Math.max(effectiveCap, 0.01), TAKE_PROFIT_PCT);
   return {
     amount: 0,
@@ -352,7 +337,6 @@ async function isInCooldown(base44, pair) {
 }
 
 // ─── Optimizer Metrics ────────────────────────────────────────────────────────
-// Computes all 9 optimizer KPIs from VerifiedTrade history
 async function computeOptimizerMetrics(base44) {
   const allTrades = await base44.asServiceRole.entities.VerifiedTrade.filter({ robotId: 'robot1' });
   const now = Date.now();
@@ -362,13 +346,9 @@ async function computeOptimizerMetrics(base44) {
   const todayTrades = allTrades.filter(t => t.sellTime && new Date(t.sellTime) >= todayStart);
   const week7Trades = allTrades.filter(t => t.sellTime && new Date(t.sellTime).getTime() >= sevenDaysAgo);
 
-  // realizedPnLToday
   const realizedPnLToday = todayTrades.reduce((s, t) => s + (t.realizedPnL || 0), 0);
-
-  // realizedPnL7D
   const realizedPnL7D = week7Trades.reduce((s, t) => s + (t.realizedPnL || 0), 0);
 
-  // rollingWinRate (last 50 trades)
   const last50 = allTrades
     .filter(t => t.sellTime)
     .sort((a, b) => new Date(b.sellTime) - new Date(a.sellTime))
@@ -376,7 +356,6 @@ async function computeOptimizerMetrics(base44) {
   const wins = last50.filter(t => t.realizedPnL > 0).length;
   const rollingWinRate = last50.length > 0 ? parseFloat((wins / last50.length * 100).toFixed(1)) : 0;
 
-  // rollingDrawdown: max consecutive losses in last 50
   let maxDD = 0, curDD = 0;
   for (const t of last50) {
     if ((t.realizedPnL || 0) < 0) { curDD++; maxDD = Math.max(maxDD, curDD); }
@@ -384,23 +363,19 @@ async function computeOptimizerMetrics(base44) {
   }
   const rollingDrawdown = maxDD;
 
-  // avgCycleDuration (ms → seconds, last 50 closed trades)
   const durations = last50.filter(t => t.holdingMs > 0).map(t => t.holdingMs);
   const avgCycleDuration = durations.length > 0
     ? parseFloat((durations.reduce((s, d) => s + d, 0) / durations.length / 1000).toFixed(1))
     : 0;
 
-  // feeEfficiencyRatio: totalPnL / totalFeesPaid (last 50)
   const totalGross = last50.reduce((s, t) => s + ((t.sellValue || 0) - (t.buyValue || 0)), 0);
   const totalFees = last50.reduce((s, t) => s + (t.buyFee || 0) + (t.sellFee || 0), 0);
   const feeEfficiencyRatio = totalFees > 0 ? parseFloat((totalGross / totalFees).toFixed(2)) : 0;
 
-  // scalpQualityScore: composite 0-100
-  // Weights: winRate (40) + feeEfficiency (30) + drawdown penalty (20) + cycleDuration bonus (10)
   const winScore = Math.min(rollingWinRate, 100) * 0.40;
-  const feeScore = Math.min(Math.max(feeEfficiencyRatio * 20, 0), 30); // 1.5x = 30pts
+  const feeScore = Math.min(Math.max(feeEfficiencyRatio * 20, 0), 30);
   const ddPenalty = Math.min(rollingDrawdown * 5, 20);
-  const cycleBonus = avgCycleDuration > 0 && avgCycleDuration < 120 ? 10 : 5; // fast cycles = bonus
+  const cycleBonus = avgCycleDuration > 0 && avgCycleDuration < 120 ? 10 : 5;
   const scalpQualityScore = parseFloat(Math.max(0, Math.min(100, winScore + feeScore - ddPenalty + cycleBonus)).toFixed(1));
 
   return {
@@ -417,23 +392,21 @@ async function computeOptimizerMetrics(base44) {
   };
 }
 
-// ─── Aggression scaling: reduce trade size after losses ───────────────────────
+// ─── Aggression scaling ───────────────────────────────────────────────────────
 function aggressionMultiplier(recentLosses) {
-  // 0 losses → 1.0x, 1 loss → 0.85x, 2 → 0.70x, 3+ → 0.55x (minimum)
   if (recentLosses <= 0) return 1.0;
   if (recentLosses === 1) return 0.85;
   if (recentLosses === 2) return 0.70;
   return 0.55;
 }
 
-// ─── Fetch Polygon candles with timeout (primary signal source) ────────────
+// ─── Fetch Polygon candles with timeout ────────────────────────────────────
 async function fetchPolygonCandles(pair) {
   try {
     const symbol = pair.replace('-USDT', '');
     const apiKey = Deno.env.get('POLYGON_API_KEY');
     if (!apiKey) return { ok: false, candles: [], reason: 'POLYGON_NO_KEY', resultsCount: 0 };
     
-    // Timeout: 2 seconds
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
     
@@ -463,7 +436,6 @@ async function fetchPolygonCandles(pair) {
 }
 
 // ─── Hybrid scoring: Polygon primary + OKX fallback ────────────────────────
-// Returns: { ok, score, signalSource, polygonStatus, okxStatus, confidence, decisionReason, ... }
 async function scalpScore(pair, ticker, balanceMode = 'NORMAL') {
   if (!ticker) {
     return { ok: false, reason: 'Missing OKX ticker', score: 0, signalSource: 'NONE', polygonStatus: 'UNKNOWN', okxStatus: 'MISSING' };
@@ -479,11 +451,9 @@ async function scalpScore(pair, ticker, balanceMode = 'NORMAL') {
     return { ok: false, reason: 'Missing OKX bid/ask', score: 0, signalSource: 'NONE', okxStatus: 'MISSING_QUOTES' };
   }
   
-  // Spread calculation
   const mid = (bid + ask) / 2;
   const spreadPct = mid > 0 ? ((ask - bid) / mid) * 100 : 99;
 
-  // Hard filters
   if (spreadPct > MAX_SPREAD_PCT) {
     return { ok: false, reason: `spread ${spreadPct.toFixed(4)}% > ${MAX_SPREAD_PCT}%`, score: 0, okxStatus: 'SPREAD_TOO_WIDE' };
   }
@@ -491,7 +461,7 @@ async function scalpScore(pair, ticker, balanceMode = 'NORMAL') {
     return { ok: false, reason: 'OKX 24h volume too low', score: 0, okxStatus: 'LOW_VOLUME' };
   }
 
-  // ── Fetch Polygon candles (primary signal) ──
+  // Fetch Polygon candles (primary signal)
   const polygonData = await fetchPolygonCandles(pair);
   let polygonStatus = polygonData.reason;
   let polygonScore = 0;
@@ -501,26 +471,17 @@ async function scalpScore(pair, ticker, balanceMode = 'NORMAL') {
     polygonStatus = 'OK';
     const candle = polygonData.candles[0];
     polygonTrendConfirmed = candle.close > candle.open;
-    // Polygon trend: 40pts if uptrend, 20pts if downtrend
     polygonScore = polygonTrendConfirmed ? 40 : 20;
   }
 
-  // ── OKX execution quality score ──
-  // 24h trend: 20-40pts
+  // OKX execution quality score
   const trendScore = last > open24h ? 40 : 20;
-  
-  // Spread: tighter = higher (0-25pts)
   const spreadScore = Math.max(0, 25 - (spreadPct / MAX_SPREAD_PCT) * 25);
-  
-  // Volume: higher = higher (0-20pts)
   const volumeScore = Math.min(20, Math.max(0, (vol24h - 10000) / 4500));
-  
-  // Liquidity: bid/ask present (10pts)
   const liquidityScore = bid > 0 && ask > 0 ? 10 : 0;
-  
   const okxExecutionScore = trendScore + spreadScore + volumeScore + liquidityScore;
 
-  // ── Determine final score and signal source ──
+  // Determine final score and signal source
   let finalScore = 0;
   let signalSource = 'NONE';
   let confidence = 0;
@@ -533,7 +494,7 @@ async function scalpScore(pair, ticker, balanceMode = 'NORMAL') {
     confidence = 100;
     decisionReason = `Polygon ${polygonTrendConfirmed ? 'uptrend' : 'downtrend'} confirmed, OKX exec=${okxExecutionScore.toFixed(0)}/95`;
   } else {
-    // Polygon unavailable: OKX fallback only (reduced confidence)
+    // Polygon unavailable: OKX fallback (reduced confidence but DO NOT BLOCK)
     finalScore = okxExecutionScore;
     signalSource = 'OKX_FALLBACK';
     confidence = 80;
@@ -577,12 +538,30 @@ async function scalpScore(pair, ticker, balanceMode = 'NORMAL') {
   };
 }
 
+// ─── Log execution to Robot1ExecutionLog ───────────────────────────────────────
+async function logExecution(base44, decision, reason, selectedPair, score, tradeAllowed, rejectionReason, okxStatus, polygonStatus) {
+  try {
+    await base44.asServiceRole.entities.Robot1ExecutionLog.create({
+      execution_time: new Date().toISOString(),
+      decision,
+      reason,
+      selectedPair: selectedPair || null,
+      score: score !== undefined ? parseFloat(score.toFixed(2)) : null,
+      tradeAllowed: tradeAllowed ?? false,
+      rejectionReason: rejectionReason || null,
+      okx_status: okxStatus || 'UNKNOWN',
+      polygon_status: polygonStatus || 'UNKNOWN'
+    });
+  } catch (e) {
+    console.error(`[SCALP] Execution log failed: ${e.message}`);
+  }
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   let base44;
   try {
     base44 = createClientFromRequest(req);
-    // Allow: logged-in Suzana/admin, OR service-role call from dispatcher (no user context)
     let user = null;
     try { user = await base44.auth.me(); } catch { /* scheduler / service-role call */ }
     if (user && user.email !== SUZANA_EMAIL && user.role !== 'admin') {
@@ -591,7 +570,7 @@ Deno.serve(async (req) => {
 
     console.log('[SCALP] === SCALP EXECUTION START ===');
 
-    // 1. OKX credentials (must fetch first)
+    // 1. OKX credentials
     const [c1, c2] = await Promise.all([
       base44.asServiceRole.entities.ExchangeConnection.filter({ created_by: SUZANA_EMAIL, exchange: 'okx' }),
       base44.asServiceRole.entities.ExchangeConnection.filter({ user_email: SUZANA_EMAIL, exchange: 'okx' })
@@ -617,7 +596,7 @@ Deno.serve(async (req) => {
     const details  = balRes.data?.[0]?.details || [];
     const freeUsdt = parseFloat(details.find(d => d.ccy === 'USDT')?.availBal || 0);
 
-    // ── Determine mode based on total equity ──
+    // Determine mode
     let balanceMode = 'NORMAL';
     let effectiveMaxPos = MAX_SIMULTANEOUS_POS;
     let effectiveMinFreePct = MIN_FREE_CAPITAL_PCT;
@@ -625,11 +604,9 @@ Deno.serve(async (req) => {
     let effectiveTakeProfitPct = TAKE_PROFIT_PCT;
     let effectiveStopLossPct = STOP_LOSS_PCT;
 
-    // ── Capital Reserve Analysis ──
     const capitalReserve = analyzeCapitalReserve(freeUsdt, activePositions, tickerMap);
     const { totalCapital, capitalRecoveryMode } = capitalReserve;
 
-    // Small Balance Mode activation
     if (totalCapital < SMALL_BALANCE_THRESHOLD) {
       balanceMode = 'SMALL';
       effectiveMaxPos = SMALL_MODE_MAX_POSITIONS;
@@ -642,12 +619,10 @@ Deno.serve(async (req) => {
 
     console.log(`[SCALP] freeUSDT=${freeUsdt.toFixed(2)} total=${totalCapital.toFixed(2)} freeCapPct=${capitalReserve.freeCapitalPct}% recovery=${capitalRecoveryMode} positions=${activePositions.length}/${MAX_POSITIONS}`);
 
-    // In CAPITAL_RECOVERY mode, log it clearly
     if (capitalRecoveryMode) {
       console.log(`[SCALP] ⚠️ CAPITAL_RECOVERY MODE — freeCapital ${capitalReserve.freeCapitalPct}% < ${(CAPITAL_RECOVERY_PCT*100)}% threshold. Prioritizing exits.`);
     }
 
-    // ── Pre-compute sizing preview for all pairs (always shown in dashboard) ──
     const sizingPreview = {};
     const tradeAmountForPreview = balanceMode === 'SMALL' ? Math.min(25, freeUsdt * 0.70) : DEFAULT_TRADE_USDT;
     for (const pair of ALLOWED_PAIRS) {
@@ -657,7 +632,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. SELL pass — always before BUY
+    // 3. SELL pass
     const sellDetails = [];
     const sellResults = [];
 
@@ -673,7 +648,6 @@ Deno.serve(async (req) => {
       const estimatedFees  = buyFee + sellFee;
       const netProfit      = grossProfit - estimatedFees;
 
-      // Persist bestPnlPct high-water mark
       const prevBest = pos.bestPnlPct ?? 0;
       const newBest  = Math.max(prevBest, pnlPct);
       if (newBest > prevBest && pos.ledgerId) {
@@ -691,9 +665,7 @@ Deno.serve(async (req) => {
       const hitSL         = pnlPct <= effectiveStopLossPct;
       const hitTrail      = pnlPct >= (effectiveTakeProfitPct - TRAILING_STOP_PCT) && pnlPct < effectiveTakeProfitPct && netProfit >= effectiveMinNetProfit;
       const hitMicroTrail = microTrailingActive && newBest >= MICRO_TRAIL_PEAK_PCT && trailingDistance >= MICRO_TRAIL_DROP_PCT && netProfit >= effectiveMinNetProfit;
-      // In CAPITAL_RECOVERY mode: also exit at break-even or better to free capital
       const hitBreakEven  = capitalRecoveryMode && netProfit >= 0 && pnlPct > 0;
-      // Dead position: stuck too long with no meaningful move — recycle capital
       const hitDeadPos    = isDeadPosition(pos, pnlPct);
       const shouldSell    = hitTP || hitSL || hitTrail || hitMicroTrail || hitBreakEven || hitDeadPos;
 
@@ -737,8 +709,15 @@ Deno.serve(async (req) => {
     const posNow = await getActivePositions(base44);
     const activePairNow = new Set(posNow.map(p => p.instId));
     let buyResult = null;
+    let logDecision = 'WAIT_NO_CANDIDATES';
+    let logReason = 'No eligible candidates';
+    let logSelectedPair = null;
+    let logScore = null;
+    let logTradeAllowed = false;
+    let logRejectionReason = null;
+    let logOkxStatus = 'UNKNOWN';
+    let logPolygonStatus = 'UNKNOWN';
 
-    // Re-run capital reserve with updated positions after sells
     const capitalReserveNow = analyzeCapitalReserve(freeUsdt, posNow, tickerMap);
 
     if (posNow.length >= effectiveMaxPos) {
@@ -750,17 +729,23 @@ Deno.serve(async (req) => {
       }).join(' | ');
       console.log(`[SCALP] WAIT — max positions reached: ${holdingStr}`);
       buyResult = { decision: 'WAIT_ACTIVE_POSITION', reason: `Max positions (${effectiveMaxPos}): ${holdingStr}` };
+      logDecision = 'WAIT_ACTIVE_POSITION';
+      logReason = `Max positions (${effectiveMaxPos})`;
 
     } else if (capitalReserveNow.capitalRecoveryMode) {
       console.log(`[SCALP] WAIT — CAPITAL_RECOVERY: freeCapital=${capitalReserveNow.freeCapitalPct}% < ${(CAPITAL_RECOVERY_PCT*100)}%. No new positions.`);
       buyResult = { decision: 'WAIT_CAPITAL_RECOVERY', freeUsdt, freeCapitalPct: capitalReserveNow.freeCapitalPct, balanceMode };
+      logDecision = 'WAIT_CAPITAL_RECOVERY';
+      logReason = 'Capital recovery mode';
 
     } else if (freeUsdt < MIN_FREE_USDT && balanceMode === 'NORMAL') {
       console.log(`[SCALP] WAIT: freeUSDT=${freeUsdt.toFixed(2)} < min=${MIN_FREE_USDT}`);
       buyResult = { decision: 'WAIT_LOW_BALANCE', freeUsdt, balanceMode };
+      logDecision = 'WAIT_LOW_BALANCE';
+      logReason = `freeUSDT=${freeUsdt.toFixed(2)} < min=${MIN_FREE_USDT}`;
 
     } else {
-      // ── Aggression scaling based on recent losses ──
+      // Aggression scaling
       const recentTrades = (await base44.asServiceRole.entities.VerifiedTrade.filter({ robotId: 'robot1' }))
         .filter(t => t.sellTime)
         .sort((a, b) => new Date(b.sellTime) - new Date(a.sellTime))
@@ -775,21 +760,22 @@ Deno.serve(async (req) => {
         console.log(`[SCALP] Aggression reduced: ${recentConsecLosses} consec losses → mult=${aggMult}x`);
       }
 
-      // ── Fee-aware candidate scoring (Polygon primary + OKX fallback) ──
-       const candidates = [];
-       for (const pair of ALLOWED_PAIRS) {
-         if (activePairNow.has(pair)) continue;
+      // Candidate scoring (OKX_FALLBACK now allowed)
+      const candidates = [];
+      for (const pair of ALLOWED_PAIRS) {
+        if (activePairNow.has(pair)) continue;
 
-         const score = await scalpScore(pair, tickerMap[pair], balanceMode);
-         if (!score.ok) { console.log(`[SCALP] SKIP ${pair}: ${score.reason} (score=${score.score}, signal=${score.signalSource})`); continue; }
+        const score = await scalpScore(pair, tickerMap[pair], balanceMode);
+        if (!score.ok) { 
+          console.log(`[SCALP] SKIP ${pair}: ${score.reason} (score=${score.score}, signal=${score.signalSource})`); 
+          continue; 
+        }
 
         const cooled = await isInCooldown(base44, pair);
         if (cooled) { console.log(`[SCALP] SKIP ${pair}: cooldown`); continue; }
 
-        // Capital-reserve-aware sizing with aggression scaling
         let sizing = computeTradeAmount(freeUsdt, capitalReserveNow.totalCapital, capitalReserveNow.capitalRecoveryMode);
         
-        // Small Balance Mode: use reduced amount if viable
         if (balanceMode === 'SMALL' && sizing.amount > 0) {
           const smallModeAmount = Math.min(25, freeUsdt * 0.70);
           const smallModeSizing = analyzeTradeSizing(smallModeAmount, effectiveTakeProfitPct, effectiveMinNetProfit);
@@ -817,19 +803,20 @@ Deno.serve(async (req) => {
         }
 
         if (!sizing.analysis.viable) {
-          console.log(`[SCALP] SKIP ${pair}: not viable — netAtTP=${sizing.analysis.netProfitAtTP} requiredMove=${sizing.analysis.requiredPriceMovePercent}% > TP=${TAKE_PROFIT_PCT}%`);
+          console.log(`[SCALP] SKIP ${pair}: not viable — netAtTP=${sizing.analysis.netProfitAtTP} requiredMove=${sizing.analysis.requiredPriceMovePercent}% > TP=${effectiveTakeProfitPct}%`);
           continue;
         }
 
         console.log(`[SCALP] CANDIDATE ${pair}: score=${score.score} (${score.signalSource}) amount=${sizing.amount} USDT spread=${score.spreadPct.toFixed(4)}% confidence=${score.confidence}%`);
-         candidates.push({ pair, ...score, sizing });
+        candidates.push({ pair, ...score, sizing });
       }
 
       if (candidates.length === 0) {
         console.log('[SCALP] WAIT: no eligible candidates');
         buyResult = { decision: 'WAIT_NO_CANDIDATES' };
+        logDecision = 'WAIT_NO_CANDIDATES';
+        logReason = 'No eligible candidates after scoring';
       } else {
-        // Sort by quality score (highest first), then by spread (tightest first)
         const best = candidates.sort((a, b) => (b.score - a.score) || (a.spreadPct - b.spreadPct))[0];
         const buyUsdtAmount = parseFloat(best.sizing.amount.toFixed(2));
 
@@ -845,6 +832,13 @@ Deno.serve(async (req) => {
           const errMsg = `BUY rejected (${best.pair}): ${buyRes.msg}`;
           console.error(`[SCALP] ${errMsg}`);
           buyResult = { decision: 'BUY_FAILED', reason: errMsg };
+          logDecision = 'BUY_FAILED';
+          logReason = errMsg;
+          logSelectedPair = best.pair;
+          logScore = best.score;
+          logTradeAllowed = false;
+          logRejectionReason = buyRes.msg;
+          logOkxStatus = 'ERROR';
         } else {
           const buyOrdId = buyRes.data?.[0]?.ordId;
           await new Promise(r => setTimeout(r, 600));
@@ -852,6 +846,12 @@ Deno.serve(async (req) => {
           const bf = verify.data?.[0];
           if (!bf || bf.state !== 'filled') {
             buyResult = { decision: 'BUY_UNVERIFIED', ordId: buyOrdId, state: bf?.state };
+            logDecision = 'BUY_UNVERIFIED';
+            logReason = `Order ${buyOrdId} state=${bf?.state}`;
+            logSelectedPair = best.pair;
+            logScore = best.score;
+            logTradeAllowed = false;
+            logRejectionReason = `Unverified state: ${bf?.state}`;
           } else {
             const buyFill = {
               ordId: buyOrdId, instId: best.pair, side: 'buy',
@@ -866,7 +866,6 @@ Deno.serve(async (req) => {
               pair: best.pair, ordId: buyOrdId,
               usedUSDT: buyUsdtAmount, avgPx: buyFill.avgPx, qty: buyFill.accFillSz,
               tradeSizeScaled: best.sizing.scaled,
-              // Sizing diagnostics
               sizing: {
                 requiredPriceMovePercent: best.sizing.analysis.requiredPriceMovePercent,
                 minTradeAmountForProfit:  best.sizing.analysis.minTradeAmountForProfit,
@@ -874,44 +873,51 @@ Deno.serve(async (req) => {
                 expectedNetProfitAtTP:    best.sizing.analysis.netProfitAtTP,
               }
             };
+            logDecision = 'BUY_EXECUTED';
+            logReason = `Executed ${best.pair} at ${buyFill.avgPx}`;
+            logSelectedPair = best.pair;
+            logScore = best.score;
+            logTradeAllowed = true;
           }
         }
       }
     }
 
+    // ── Log execution (ALWAYS, even on WAIT) ──
+    await logExecution(base44, logDecision, logReason, logSelectedPair, logScore, logTradeAllowed, logRejectionReason, logOkxStatus, logPolygonStatus);
+
     const finalPositions = await getActivePositions(base44);
-     const finalCapital = analyzeCapitalReserve(freeUsdt, finalPositions, tickerMap);
+    const finalCapital = analyzeCapitalReserve(freeUsdt, finalPositions, tickerMap);
 
-     // Extract signal diagnostics from best candidate
-     const signalDiagnostics = buyResult?.signalSource ? {
-       signalSource: buyResult.signalSource,
-       polygonStatus: buyResult.polygonStatus,
-       polygonResultsCount: buyResult.polygonResultsCount,
-       okxStatus: buyResult.okxStatus,
-       confidence: buyResult.confidence,
-       decisionReason: buyResult.decisionReason
-     } : null;
+    const signalDiagnostics = buyResult?.signalSource ? {
+      signalSource: buyResult.signalSource,
+      polygonStatus: buyResult.polygonStatus,
+      polygonResultsCount: buyResult.polygonResultsCount,
+      okxStatus: buyResult.okxStatus,
+      confidence: buyResult.confidence,
+      decisionReason: buyResult.decisionReason
+    } : null;
 
-     return Response.json({
-       mode: 'scalp',
-       balanceMode,
-       freeUsdt,
-       freeCapitalPercent: finalCapital.freeCapitalPct,
-       positionCount: finalPositions.length,
-       maxPositions: effectiveMaxPos,
-       capitalReserve: finalCapital,
-       optimizerMetrics,
-       signalDiagnostics,
-       positionDiagnostics: sellDetails,
-       sizingPreview,
-       smallBalanceModeConfig: balanceMode === 'SMALL' ? {
-         minNetProfit: effectiveMinNetProfit,
-         takeProfitPercent: effectiveTakeProfitPct,
-         stopLossPercent: effectiveStopLossPct,
-         maxTradeAmount: Math.min(25, freeUsdt * 0.70),
-         minFreeCapitalPct: effectiveMinFreePct,
-         maxSimultaneousPositions: effectiveMaxPos
-       } : null,
+    return Response.json({
+      mode: 'scalp',
+      balanceMode,
+      freeUsdt,
+      freeCapitalPercent: finalCapital.freeCapitalPct,
+      positionCount: finalPositions.length,
+      maxPositions: effectiveMaxPos,
+      capitalReserve: finalCapital,
+      optimizerMetrics,
+      signalDiagnostics,
+      positionDiagnostics: sellDetails,
+      sizingPreview,
+      smallBalanceModeConfig: balanceMode === 'SMALL' ? {
+        minNetProfit: effectiveMinNetProfit,
+        takeProfitPercent: effectiveTakeProfitPct,
+        stopLossPercent: effectiveStopLossPct,
+        maxTradeAmount: Math.min(25, freeUsdt * 0.70),
+        minFreeCapitalPct: effectiveMinFreePct,
+        maxSimultaneousPositions: effectiveMaxPos
+      } : null,
       activePositions: finalPositions.map(p => ({
         instId: p.instId, qty: p.qty, entryPrice: p.entryPrice,
         currentPrice: parseFloat(tickerMap[p.instId]?.last || 0),
@@ -920,10 +926,11 @@ Deno.serve(async (req) => {
       sells: sellResults,
       buy: buyResult,
       config: {
+        TAKE_PROFIT_PCT: `${(effectiveTakeProfitPct).toFixed(2)}%`,
+        STOP_LOSS_PCT: `${(effectiveStopLossPct).toFixed(2)}%`,
         DEFAULT_TRADE_USDT, MAX_TRADE_USDT, MAX_POSITION_PCT,
         MIN_FREE_CAPITAL_PCT, PREFERRED_FREE_PCT, CAPITAL_RECOVERY_PCT,
-        TAKE_PROFIT_PCT, STOP_LOSS_PCT, TRAILING_STOP_PCT,
-        MICRO_TRAIL_ENTER_PCT, MICRO_TRAIL_PEAK_PCT, MICRO_TRAIL_DROP_PCT,
+        TRAILING_STOP_PCT, MICRO_TRAIL_ENTER_PCT, MICRO_TRAIL_PEAK_PCT, MICRO_TRAIL_DROP_PCT,
         MIN_NET_PROFIT_USDT, MAX_SPREAD_PCT, OKX_FEE_RATE, COOLDOWN_SECONDS
       }
     });
