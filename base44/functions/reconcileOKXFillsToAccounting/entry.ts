@@ -9,28 +9,33 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Read existing OXXOrderLedger records (already synced from OKX or audit)
+    // Read existing OXXOrderLedger records (both robot1 and alphaScalper, all verified fills)
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayStartMs = todayStart.getTime();
     
-    const existingLedger = await base44.asServiceRole.entities.OXXOrderLedger.filter({ robotId: 'alphaScalper' });
+    // Get ALL verified fills (robot1, alphaScalper, or both)
+    const allLedger = await base44.asServiceRole.entities.OXXOrderLedger.list();
     const fills = [];
     
-    for (const rec of existingLedger) {
-      const recTime = new Date(rec.timestamp).getTime();
-      if (recTime >= todayStartMs) {
-        fills.push({
-          ordId: rec.ordId,
-          instId: rec.instId,
-          side: rec.side,
-          fillPx: rec.avgPx,
-          fillSz: rec.accFillSz,
-          fee: rec.fee,
-          feeCcy: rec.feeCcy,
-          fillTime: rec.timestamp,
-          state: rec.state
-        });
+    for (const rec of allLedger) {
+      // Include if: verified, has robotId, and today's timestamp
+      if (rec.verified === true) {
+        const recTime = new Date(rec.timestamp).getTime();
+        if (recTime >= todayStartMs) {
+          fills.push({
+            ordId: rec.ordId,
+            instId: rec.instId,
+            side: rec.side,
+            fillPx: rec.avgPx,
+            fillSz: rec.accFillSz,
+            fee: rec.fee,
+            feeCcy: rec.feeCcy,
+            fillTime: rec.timestamp,
+            state: rec.state,
+            robotId: rec.robotId // preserve original robot
+          });
+        }
       }
     }
 
@@ -65,7 +70,7 @@ Deno.serve(async (req) => {
         const netPnLPct = (netPnL / buyValue) * 100;
         
         const trade = {
-          robotId: 'alphaScalper',
+          robotId: buyRec.robotId || 'robot1', // Use robot from buy order
           instId: buyRec.instId,
           buyOrdId: buyRec.ordId,
           sellOrdId: sellRec.ordId,
