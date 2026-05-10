@@ -140,6 +140,19 @@ function analyzeTradeSizing(tradeUSDT, tpPct) {
   };
 }
 
+// ─── Dead position detection ─────────────────────────────────────────────────
+// A position is "dead" if it's been held too long with no progress toward TP
+const DEAD_POSITION_MINUTES = 15;    // max hold time before forced exit
+const DEAD_POSITION_MIN_PNL = -0.05; // exit only if pnl% > this (avoid cutting at bad SL)
+
+function isDeadPosition(pos, pnlPct) {
+  if (!pos.buyTimestamp) return false;
+  const holdMs = Date.now() - new Date(pos.buyTimestamp).getTime();
+  const holdMin = holdMs / 60000;
+  // Dead: held > 15 min AND stuck between SL and +0% (no progress)
+  return holdMin >= DEAD_POSITION_MINUTES && pnlPct > DEAD_POSITION_MIN_PNL && pnlPct < 0.05;
+}
+
 // ─── Capital Reserve Analysis ─────────────────────────────────────────────────
 function analyzeCapitalReserve(freeUsdt, activePositions, tickerMap) {
   // Estimate locked capital = sum of position values at current price
@@ -327,6 +340,81 @@ async function isInCooldown(base44, pair) {
   return secondsSince < COOLDOWN_SECONDS;
 }
 
+// ─── Optimizer Metrics ────────────────────────────────────────────────────────
+// Computes all 9 optimizer KPIs from VerifiedTrade history
+async function computeOptimizerMetrics(base44) {
+  const allTrades = await base44.asServiceRole.entities.VerifiedTrade.filter({ robotId: 'robot1' });
+  const now = Date.now();
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+
+  const todayTrades = allTrades.filter(t => t.sellTime && new Date(t.sellTime) >= todayStart);
+  const week7Trades = allTrades.filter(t => t.sellTime && new Date(t.sellTime).getTime() >= sevenDaysAgo);
+
+  // realizedPnLToday
+  const realizedPnLToday = todayTrades.reduce((s, t) => s + (t.realizedPnL || 0), 0);
+
+  // realizedPnL7D
+  const realizedPnL7D = week7Trades.reduce((s, t) => s + (t.realizedPnL || 0), 0);
+
+  // rollingWinRate (last 50 trades)
+  const last50 = allTrades
+    .filter(t => t.sellTime)
+    .sort((a, b) => new Date(b.sellTime) - new Date(a.sellTime))
+    .slice(0, 50);
+  const wins = last50.filter(t => t.realizedPnL > 0).length;
+  const rollingWinRate = last50.length > 0 ? parseFloat((wins / last50.length * 100).toFixed(1)) : 0;
+
+  // rollingDrawdown: max consecutive losses in last 50
+  let maxDD = 0, curDD = 0;
+  for (const t of last50) {
+    if ((t.realizedPnL || 0) < 0) { curDD++; maxDD = Math.max(maxDD, curDD); }
+    else curDD = 0;
+  }
+  const rollingDrawdown = maxDD;
+
+  // avgCycleDuration (ms → seconds, last 50 closed trades)
+  const durations = last50.filter(t => t.holdingMs > 0).map(t => t.holdingMs);
+  const avgCycleDuration = durations.length > 0
+    ? parseFloat((durations.reduce((s, d) => s + d, 0) / durations.length / 1000).toFixed(1))
+    : 0;
+
+  // feeEfficiencyRatio: totalPnL / totalFeesPaid (last 50)
+  const totalGross = last50.reduce((s, t) => s + ((t.sellValue || 0) - (t.buyValue || 0)), 0);
+  const totalFees = last50.reduce((s, t) => s + (t.buyFee || 0) + (t.sellFee || 0), 0);
+  const feeEfficiencyRatio = totalFees > 0 ? parseFloat((totalGross / totalFees).toFixed(2)) : 0;
+
+  // scalpQualityScore: composite 0-100
+  // Weights: winRate (40) + feeEfficiency (30) + drawdown penalty (20) + cycleDuration bonus (10)
+  const winScore = Math.min(rollingWinRate, 100) * 0.40;
+  const feeScore = Math.min(Math.max(feeEfficiencyRatio * 20, 0), 30); // 1.5x = 30pts
+  const ddPenalty = Math.min(rollingDrawdown * 5, 20);
+  const cycleBonus = avgCycleDuration > 0 && avgCycleDuration < 120 ? 10 : 5; // fast cycles = bonus
+  const scalpQualityScore = parseFloat(Math.max(0, Math.min(100, winScore + feeScore - ddPenalty + cycleBonus)).toFixed(1));
+
+  return {
+    realizedPnLToday: parseFloat(realizedPnLToday.toFixed(4)),
+    realizedPnL7D:    parseFloat(realizedPnL7D.toFixed(4)),
+    rollingWinRate,
+    rollingDrawdown,
+    avgCycleDuration,
+    feeEfficiencyRatio,
+    scalpQualityScore,
+    tradesCountToday: todayTrades.length,
+    tradesCount7D:    week7Trades.length,
+    last50Count:      last50.length,
+  };
+}
+
+// ─── Aggression scaling: reduce trade size after losses ───────────────────────
+function aggressionMultiplier(recentLosses) {
+  // 0 losses → 1.0x, 1 loss → 0.85x, 2 → 0.70x, 3+ → 0.55x (minimum)
+  if (recentLosses <= 0) return 1.0;
+  if (recentLosses === 1) return 0.85;
+  if (recentLosses === 2) return 0.70;
+  return 0.55;
+}
+
 // ─── Score pair for scalping ──────────────────────────────────────────────────
 function scalpScore(pair, ticker) {
   if (!ticker) return { ok: false, reason: 'no ticker' };
@@ -378,11 +466,12 @@ Deno.serve(async (req) => {
       decryptOkx(conn.encryption_iv)
     ]);
 
-    // 2. Fetch tickers + balance + active positions
-    const [tickerMap, balRes, activePositions] = await Promise.all([
+    // 2. Fetch tickers + balance + active positions + optimizer metrics
+    const [tickerMap, balRes, activePositions, optimizerMetrics] = await Promise.all([
       fetchAllTickers(apiKey, apiSecret, passphrase),
       okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance'),
-      getActivePositions(base44)
+      getActivePositions(base44),
+      computeOptimizerMetrics(base44)
     ]);
 
     const details  = balRes.data?.[0]?.details || [];
@@ -444,7 +533,9 @@ Deno.serve(async (req) => {
       const hitMicroTrail = microTrailingActive && newBest >= MICRO_TRAIL_PEAK_PCT && trailingDistance >= MICRO_TRAIL_DROP_PCT && netProfit >= MIN_NET_PROFIT_USDT;
       // In CAPITAL_RECOVERY mode: also exit at break-even or better to free capital
       const hitBreakEven  = capitalRecoveryMode && netProfit >= 0 && pnlPct > 0;
-      const shouldSell    = hitTP || hitSL || hitTrail || hitMicroTrail || hitBreakEven;
+      // Dead position: stuck too long with no meaningful move — recycle capital
+      const hitDeadPos    = isDeadPosition(pos, pnlPct);
+      const shouldSell    = hitTP || hitSL || hitTrail || hitMicroTrail || hitBreakEven || hitDeadPos;
 
       let exitMode = 'WAIT';
       if (hitTP)              exitMode = 'TP';
@@ -452,6 +543,7 @@ Deno.serve(async (req) => {
       else if (hitTrail)      exitMode = 'TRAIL';
       else if (hitMicroTrail) exitMode = 'MICRO_TRAIL';
       else if (hitBreakEven)  exitMode = 'BREAK_EVEN_EXIT';
+      else if (hitDeadPos)    exitMode = 'DEAD_EXIT';
       else if (netProfit < MIN_NET_PROFIT_USDT && pnlPct > 0) exitMode = 'WAIT_NET_TOO_LOW';
 
       console.log(`[SCALP] ${pos.instId}: exitMode=${exitMode}`);
@@ -474,6 +566,7 @@ Deno.serve(async (req) => {
                      : hitSL         ? `SL: pnl=${pnlPct.toFixed(4)}%`
                      : hitTrail      ? `TRAIL: pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}`
                      : hitBreakEven  ? `BREAK_EVEN_EXIT: capital recovery mode, pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}`
+                     : hitDeadPos    ? `DEAD_EXIT: stuck ${((Date.now()-new Date(pos.buyTimestamp).getTime())/60000).toFixed(1)}min pnl=${pnlPct.toFixed(4)}%`
                      : `MICRO_TRAIL: bestPnl=${newBest.toFixed(4)}% drop=${trailingDistance}% net=${netProfit.toFixed(4)}`;
         const sr = await executeSell(base44, apiKey, apiSecret, passphrase, pos, reason);
         sellResults.push({ ...diag, ...sr });
@@ -507,6 +600,21 @@ Deno.serve(async (req) => {
       buyResult = { decision: 'WAIT_LOW_BALANCE', freeUsdt };
 
     } else {
+      // ── Aggression scaling based on recent losses ──
+      const recentTrades = (await base44.asServiceRole.entities.VerifiedTrade.filter({ robotId: 'robot1' }))
+        .filter(t => t.sellTime)
+        .sort((a, b) => new Date(b.sellTime) - new Date(a.sellTime))
+        .slice(0, 5);
+      let recentConsecLosses = 0;
+      for (const t of recentTrades) {
+        if ((t.realizedPnL || 0) < 0) recentConsecLosses++;
+        else break;
+      }
+      const aggMult = aggressionMultiplier(recentConsecLosses);
+      if (recentConsecLosses > 0) {
+        console.log(`[SCALP] Aggression reduced: ${recentConsecLosses} consec losses → mult=${aggMult}x`);
+      }
+
       // ── Fee-aware candidate scoring ──
       const candidates = [];
       for (const pair of ALLOWED_PAIRS) {
@@ -518,8 +626,9 @@ Deno.serve(async (req) => {
         const cooled = await isInCooldown(base44, pair);
         if (cooled) { console.log(`[SCALP] SKIP ${pair}: cooldown`); continue; }
 
-        // Capital-reserve-aware sizing
+        // Capital-reserve-aware sizing with aggression scaling
         const sizing = computeTradeAmount(freeUsdt, capitalReserveNow.totalCapital, capitalReserveNow.capitalRecoveryMode);
+        if (sizing.amount > 0) sizing.amount = parseFloat((sizing.amount * aggMult).toFixed(2));
 
         if (sizing.analysis?.tpBelowFees) {
           console.log(`[SCALP] SKIP ${pair}: TP below round-trip fees — trading disabled`);
@@ -598,9 +707,11 @@ Deno.serve(async (req) => {
     return Response.json({
       mode: 'scalp',
       freeUsdt,
+      freeCapitalPercent: finalCapital.freeCapitalPct,
       positionCount: finalPositions.length,
       maxPositions: MAX_POSITIONS,
       capitalReserve: finalCapital,
+      optimizerMetrics,
       positionDiagnostics: sellDetails,
       sizingPreview,
       activePositions: finalPositions.map(p => ({
