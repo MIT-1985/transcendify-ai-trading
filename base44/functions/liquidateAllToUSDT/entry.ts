@@ -61,10 +61,18 @@ async function fetchOkxBalance(apiKey, secret, passphrase) {
     const bal = parseFloat(d.availBal || 0);
     if (bal > 0) {
       balances[d.ccy] = bal;
-      if (d.ccy === 'USDT') totalEquity += bal;
+      totalEquity += parseFloat(d.usdtEq || 0);
     }
   }
   return { balances, totalEquity, raw: res.data?.[0] };
+}
+
+async function fetchTickerPrice(apiKey, secret, passphrase, instId) {
+  const res = await okxRequest(apiKey, secret, passphrase, 'GET', `/api/v5/market/ticker?instId=${instId}`);
+  if (res.code === '0' && res.data?.[0]) {
+    return parseFloat(res.data[0].last || 0);
+  }
+  return 0;
 }
 
 Deno.serve(async (req) => {
