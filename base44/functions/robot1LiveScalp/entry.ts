@@ -74,6 +74,104 @@ async function getPolygonSignal(asset) {
   return null;
 }
 
+// ==================== RECOVERY & EXIT LOGIC ====================
+async function checkAndRecoverUnmatchedPositions(apiKey, apiSecret, passphrase, base44, robotId) {
+  const ALLOWED_ASSETS = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'BNB', 'ADA'];
+  const DUST_THRESHOLD = 0.00001;
+  
+  // Fetch live balance
+  const balRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance');
+  if (balRes.code !== '0') return { status: 'FAILED', reason: 'Balance fetch failed' };
+
+  const holdings = {};
+  for (const d of (balRes.data?.[0]?.details || [])) {
+    const avail = parseFloat(d.availBal || 0);
+    if (ALLOWED_ASSETS.includes(d.ccy) && avail > DUST_THRESHOLD) {
+      holdings[d.ccy] = avail;
+    }
+  }
+
+  if (Object.keys(holdings).length === 0) {
+    return { status: 'CLEAR', reason: 'No unmatched holdings' };
+  }
+
+  // Check for unmatched BUYs
+  for (const asset of Object.keys(holdings)) {
+    const pair = `${asset}-USDT`;
+    const buyRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET',
+      `/api/v5/trade/orders-history?instId=${pair}&instType=SPOT&side=buy&limit=5`);
+    
+    if (buyRes.code !== '0' || !buyRes.data) continue;
+
+    const buys = buyRes.data.filter(o => parseFloat(o.accFillSz || 0) > 0);
+    if (buys.length === 0) continue;
+
+    const lastBuy = buys[0];
+    const sellRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET',
+      `/api/v5/trade/orders-history?instId=${pair}&instType=SPOT&side=sell&limit=5`);
+    
+    const sells = (sellRes.code === '0' && sellRes.data) ? sellRes.data.filter(o => parseFloat(o.accFillSz || 0) > 0) : [];
+    const matchingSell = sells.find(s => parseInt(s.fillTime) > parseInt(lastBuy.fillTime));
+    
+    if (!matchingSell) {
+      // Unmatched BUY found, execute recovery SELL
+      const sellQty = holdings[asset].toFixed(8);
+      const sellOrderBody = JSON.stringify({
+        instId: pair,
+        side: 'sell',
+        ordType: 'market',
+        tdMode: 'cash',
+        sz: sellQty
+      });
+
+      const sellRes = await okxRequest(apiKey, apiSecret, passphrase, 'POST', '/api/v5/trade/order', sellOrderBody);
+      if (sellRes.code !== '0') {
+        return { status: 'RECOVERY_FAILED', reason: `SELL rejected: ${sellRes.data?.[0]?.sMsg}` };
+      }
+
+      const sellOrdId = sellRes.data?.[0]?.ordId;
+      if (!sellOrdId) return { status: 'RECOVERY_FAILED', reason: 'No ordId returned' };
+
+      // Wait for fill
+      await new Promise(r => setTimeout(r, 500));
+      let sellFilled = null;
+      for (let i = 0; i < 20; i++) {
+        const histRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET',
+          `/api/v5/trade/orders-history?instId=${pair}&instType=SPOT&ordId=${sellOrdId}`);
+        if (histRes.code === '0' && histRes.data && histRes.data.length > 0) {
+          sellFilled = histRes.data[0];
+          if (parseFloat(sellFilled.accFillSz || 0) > 0) break;
+        }
+        await new Promise(r => setTimeout(r, 250));
+      }
+
+      if (!sellFilled || !sellFilled.accFillSz) {
+        return { status: 'RECOVERY_TIMEOUT', reason: `SELL didn't fill for ${asset}` };
+      }
+
+      // Save recovery SELL
+      await base44.asServiceRole.entities.OXXOrderLedger.create({
+        ordId: sellFilled.ordId,
+        instId: pair,
+        side: 'sell',
+        avgPx: parseFloat(sellFilled.avgPx),
+        accFillSz: parseFloat(sellFilled.accFillSz),
+        quoteUSDT: parseFloat(sellFilled.avgPx) * parseFloat(sellFilled.accFillSz),
+        fee: parseFloat(sellFilled.fee),
+        feeCcy: sellFilled.feeCcy,
+        timestamp: new Date(parseInt(sellFilled.fillTime)).toISOString(),
+        robotId: 'robot1_recovery',
+        verified: true,
+        state: 'filled'
+      });
+
+      return { status: 'RECOVERED', reason: `${asset} recovered to USDT` };
+    }
+  }
+
+  return { status: 'OK', reason: 'All positions matched' };
+}
+
 // ==================== MAIN HANDLER ====================
 Deno.serve(async (req) => {
   try {

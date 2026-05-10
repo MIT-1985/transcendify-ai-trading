@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import ManualScalpTriggerV2 from '@/components/dashboard/ManualScalpTriggerV2';
 import LastRobotActionPanel from '@/components/dashboard/LastRobotActionPanel';
 import Robot1LivePnLClock from '@/components/dashboard/Robot1LivePnLClock';
+import AlphaScalperRuntime from '@/components/dashboard/AlphaScalperRuntime';
 
 const ALLOWED_PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT'];
 
@@ -214,10 +215,13 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* 2. Live P&L Clock */}
+        {/* 2. Alpha Scalper Runtime (1s/2s/10s intervals) */}
+        <AlphaScalperRuntime enabled={true} />
+
+        {/* 3. Live P&L Clock */}
         <Robot1LivePnLClock />
 
-        {/* 2b. Quick Stats */}
+        {/* 4. Quick Stats */}
         <section className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
             <div className="text-xs text-slate-400 mb-2">Total Realized P&L</div>
@@ -243,7 +247,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* 3. All Execution History */}
+        {/* 6. All Execution History */}
         <section className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-5 h-5 text-cyan-400" />
@@ -305,7 +309,7 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* 4. Verified Trades (Closed Cycles) */}
+        {/* 7. Verified Trades (Closed Cycles) */}
         <section className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-5 h-5 text-emerald-400" />
@@ -361,7 +365,7 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* 5. All OKX Orders */}
+        {/* 8. All OKX Orders */}
         <section className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-5 h-5 text-cyan-400" />
