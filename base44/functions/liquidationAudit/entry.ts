@@ -1,11 +1,12 @@
 /**
  * Complete OKX Liquidation Audit
- * Captures exact before/after balances, liquidation P&L, and dust analysis
+ * Pulls real OKX order history directly - NOT relying on OXXOrderLedger
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
+const LIQUIDATION_START = '2026-05-09T00:00:00Z'; // When liquidation likely started
 
 async function deriveOkxKey() {
   const enc = new TextEncoder();
@@ -58,7 +59,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    console.log('[AUDIT] === Complete Liquidation Audit ===');
+    console.log('[AUDIT] === OKX Real Order History Audit ===');
 
     // Get OKX connection
     const [c1, c2] = await Promise.all([
@@ -76,105 +77,174 @@ Deno.serve(async (req) => {
       decryptOkx(conn.encryption_iv)
     ]);
 
-    // 1. Fetch all liquidation SELL orders (manual_liquidation)
-    const allOrders = await base44.asServiceRole.entities.OXXOrderLedger.filter({ robotId: 'manual_liquidation', side: 'sell' });
-    console.log(`[AUDIT] Found ${allOrders.length} manual liquidation SELL orders`);
-
-    const liquidationSells = allOrders.map(o => ({
-      asset: o.instId.split('-')[0],
-      instId: o.instId,
-      ordId: o.ordId,
-      avgPx: o.avgPx,
-      accFillSz: o.accFillSz,
-      filledUSDT: o.quoteUSDT,
-      fee: o.fee,
-      feeCcy: o.feeCcy,
-      timestamp: o.timestamp,
-      verified: o.verified
-    }));
-
-    // 2. Calculate liquidation totals
-    const totalUsdt = liquidationSells.reduce((sum, s) => sum + (s.filledUSDT || 0), 0);
-    const totalFees = liquidationSells.reduce((sum, s) => sum + Math.abs(s.fee || 0), 0);
-
-    // 3. Get current OKX balance
+    // 1. Get current OKX balance (AFTER state)
     const balRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance');
     const details = balRes.data?.[0]?.details || [];
 
     const afterBalance = {};
     let afterTotalEquity = 0;
-    let dustValue = 0;
+    let afterUSDT = 0;
 
     for (const d of details) {
       const bal = parseFloat(d.availBal || 0);
       if (bal > 0) {
         afterBalance[d.ccy] = bal;
         afterTotalEquity += parseFloat(d.usdtEq || 0);
-        if (d.ccy !== 'USDT' && bal > 0) {
-          dustValue += parseFloat(d.usdtEq || 0);
-        }
+        if (d.ccy === 'USDT') afterUSDT = bal;
       }
     }
 
-    const afterUSDT = afterBalance['USDT'] || 0;
+    console.log(`[AUDIT] Current OKX balance - USDT: ${afterUSDT}, Total Equity: ${afterTotalEquity}`);
+
+    // 2. Query OKX order history for all orders (no filter)
+    // then filter for SELL orders on -USDT pairs from liquidation window
+    const liquidationStart = new Date(LIQUIDATION_START).getTime();
+    const now = Date.now();
     
-    console.log(`[AUDIT] After balance - USDT: ${afterUSDT}, Total Equity: ${afterTotalEquity}, Dust: ${dustValue}`);
+    let allOkxSells = [];
+    const instIds = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'AVAX-USDT', 'LINK-USDT', 'ARB-USDT', 
+                     'BCH-USDT', 'LTC-USDT', 'ADA-USDT', 'SUI-USDT', 'OP-USDT', 'ATOM-USDT', 'TRX-USDT', 'TON-USDT', 'BNB-USDT', 'XRP-USDT', 'NEAR-USDT', 'DOT-USDT'];
 
-    // 4. Calculate before liquidation balance (reverse from sells)
-    let beforeTotalUSDT = afterUSDT - totalUsdt + totalFees;
-    const beforeEquity = beforeTotalUSDT + liquidationSells.reduce((sum, s) => sum + (s.filledUSDT || 0), 0);
-
-    // 5. Build before balance asset breakdown
-    const beforeBalance = { USDT: beforeTotalUSDT };
-    for (const sell of liquidationSells) {
-      beforeBalance[sell.asset] = (beforeBalance[sell.asset] || 0) + sell.accFillSz;
+    for (const instId of instIds) {
+      try {
+        const orderRes = await okxRequest(apiKey, apiSecret, passphrase, 'GET', 
+          `/api/v5/trade/orders?instId=${instId}&state=2&after=&before=${now}&limit=100`);
+        
+        if (orderRes.code === '0' && orderRes.data) {
+          const sells = orderRes.data.filter(o => {
+            const ts = parseInt(o.uTime || o.ts || 0);
+            return o.side === 'sell' && ts >= liquidationStart && ts <= now;
+          });
+          allOkxSells.push(...sells);
+          console.log(`[AUDIT] ${instId}: found ${sells.length} sells`);
+        }
+      } catch (e) {
+        console.warn(`[AUDIT] Error fetching ${instId}: ${e.message}`);
+      }
     }
 
-    // 6. Calculate P&L
-    const realizedPnL = totalUsdt - totalFees;
-    const slippageEst = liquidationSells.length > 0 ? totalFees : 0;
-    const preservedAmount = (afterTotalEquity / beforeEquity * 100).toFixed(2);
+    console.log(`[AUDIT] Total OKX SELL orders in liquidation window: ${allOkxSells.length}`);
+
+    // 3. Format OKX sells with calculated values
+    const okxSellsFormatted = allOkxSells.map(o => {
+      const fillSz = parseFloat(o.fillSz || 0);
+      const fillPx = parseFloat(o.fillPx || 0);
+      const fillUSDT = fillSz * fillPx;
+      const fee = parseFloat(o.fee || 0);
+      const avgPx = fillSz > 0 ? fillUSDT / fillSz : 0;
+      
+      return {
+        ordId: o.ordId,
+        instId: o.instId,
+        side: o.side,
+        avgPx: avgPx,
+        accFillSz: fillSz,
+        fillSz: fillSz,
+        fillPx: fillPx,
+        fillTime: new Date(parseInt(o.uTime || o.ts || 0)).toISOString(),
+        fee: Math.abs(fee),
+        feeCcy: o.feeCcy || 'USDT',
+        fillUSDT: fillUSDT,
+        state: o.state,
+        ordType: o.ordType
+      };
+    }).sort((a, b) => new Date(a.fillTime).getTime() - new Date(b.fillTime).getTime());
+
+    // 4. Compare with OXXOrderLedger
+    const ledgerSells = await base44.asServiceRole.entities.OXXOrderLedger.filter({ 
+      robotId: 'manual_liquidation', 
+      side: 'sell' 
+    });
+
+    console.log(`[AUDIT] OXXOrderLedger SELL records: ${ledgerSells.length}`);
+
+    const ledgerOrdIds = new Set(ledgerSells.map(s => s.ordId));
+    const missingFromLedger = okxSellsFormatted.filter(s => !ledgerOrdIds.has(s.ordId));
+
+    // 5. Calculate liquidation P&L
+    const totalFillUSDT = okxSellsFormatted.reduce((sum, s) => sum + s.fillUSDT, 0);
+    const totalFees = okxSellsFormatted.reduce((sum, s) => sum + s.fee, 0);
+    const netUSDTReceived = totalFillUSDT - totalFees;
+
+    // 6. Reconstruct before balance
+    const beforeAssets = {};
+    let beforeEstimatedEquity = null;
+
+    for (const sell of okxSellsFormatted) {
+      const asset = sell.instId.split('-')[0];
+      beforeAssets[asset] = (beforeAssets[asset] || 0) + sell.accFillSz;
+    }
+    
+    // If any sells occurred, estimate before equity
+    if (okxSellsFormatted.length > 0) {
+      beforeEstimatedEquity = afterUSDT - netUSDTReceived;
+      beforeAssets['USDT'] = beforeEstimatedEquity;
+    }
+
+    // 7. Dust analysis
+    const dustAssets = Object.entries(afterBalance)
+      .filter(([k]) => k !== 'USDT')
+      .reduce((obj, [k, v]) => { obj[k] = v; return obj; }, {});
 
     return Response.json({
       status: 'audit_complete',
       timestamp: new Date().toISOString(),
+      auditMethod: 'OKX API Order History + Ledger Reconciliation',
       
-      before: {
-        totalEquityUSDT: beforeEquity,
-        assets: beforeBalance,
-        assetCount: Object.keys(beforeBalance).length
+      okxOrderHistory: {
+        totalSellsFound: okxSellsFormatted.length,
+        liquidationWindow: {
+          start: LIQUIDATION_START,
+          end: new Date(now).toISOString()
+        },
+        sells: okxSellsFormatted
       },
 
-      liquidationSells: liquidationSells.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
+      ledgerReconciliation: {
+        totalLedgerRecords: ledgerSells.length,
+        missingFromLedger: missingFromLedger.length,
+        missingRecords: missingFromLedger.map(s => ({
+          ordId: s.ordId,
+          instId: s.instId,
+          fillUSDT: s.fillUSDT,
+          fee: s.fee,
+          fillTime: s.fillTime
+        }))
+      },
 
-      after: {
+      beforeLiquidation: {
+        estimated: beforeEstimatedEquity !== null,
+        estimatedTotalEquityUSDT: beforeEstimatedEquity,
+        estimatedAssets: beforeAssets,
+        note: beforeEstimatedEquity === null ? 'No sells found - before balance not captured' : 'Reconstructed from OKX SELL orders'
+      },
+
+      afterLiquidation: {
         totalEquityUSDT: afterTotalEquity,
         USDT: afterUSDT,
-        dustAssets: Object.entries(afterBalance)
-          .filter(([k]) => k !== 'USDT')
-          .reduce((obj, [k, v]) => { obj[k] = v; return obj; }, {}),
-        dustValueUSDT: dustValue
+        dustAssets: dustAssets,
+        dustCount: Object.keys(dustAssets).length
       },
 
       pnl: {
-        totalUSDTReceived: totalUsdt,
+        realOkxOrdersCount: okxSellsFormatted.length,
+        totalFillUSDT: totalFillUSDT,
         totalFeesPaid: totalFees,
-        realizedPnL: realizedPnL,
-        slippageEstimate: slippageEst,
-        preservedPercent: preservedAmount,
-        comparison: {
-          beforeEquity: beforeEquity,
-          afterEquity: afterTotalEquity,
-          loss: (beforeEquity - afterTotalEquity).toFixed(4),
-          lossPercent: ((beforeEquity - afterTotalEquity) / beforeEquity * 100).toFixed(2)
-        }
+        netUSDTReceived: netUSDTReceived,
+        realizedPnL: beforeEstimatedEquity !== null ? (afterTotalEquity - beforeEstimatedEquity) : null,
+        realizedPnLPercent: beforeEstimatedEquity !== null && beforeEstimatedEquity > 0 
+          ? ((afterTotalEquity - beforeEstimatedEquity) / beforeEstimatedEquity * 100).toFixed(2) 
+          : null,
+        preserved: beforeEstimatedEquity !== null && beforeEstimatedEquity > 0
+          ? (afterTotalEquity / beforeEstimatedEquity * 100).toFixed(2)
+          : null
       },
 
       summary: {
-        liquidationOrderCount: liquidationSells.length,
-        dustAssetsRemaining: Object.keys(afterBalance).length - 1,
-        tradingStatus: 'PAUSED',
-        auditStatus: 'COMPLETE'
+        auditStatus: 'COMPLETE',
+        dataQuality: missingFromLedger.length > 0 ? 'WARNING: Ledger incomplete' : 'VERIFIED: Ledger matches OKX',
+        realizedPnLStatus: beforeEstimatedEquity !== null ? 'KNOWN' : 'UNKNOWN - before balance not captured',
+        tradingStatus: 'PAUSED'
       }
     });
 
