@@ -176,13 +176,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* 3. Last Execution */}
-        <LastRobotActionPanel />
-
-        {/* 4. Manual Trigger */}
-        <ManualScalpTriggerV2 />
-
-        {/* 5. All Execution History */}
+        {/* 3. All Execution History */}
         <section className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-5 h-5 text-cyan-400" />
@@ -244,7 +238,7 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* 6. Verified Trades (Closed Cycles) */}
+        {/* 4. Verified Trades (Closed Cycles) */}
         <section className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-5 h-5 text-emerald-400" />
@@ -300,7 +294,7 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* 7. All OKX Orders */}
+        {/* 5. All OKX Orders */}
         <section className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-5 h-5 text-cyan-400" />
