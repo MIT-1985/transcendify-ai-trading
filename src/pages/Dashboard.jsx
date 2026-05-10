@@ -48,13 +48,13 @@ export default function Dashboard() {
     refetchInterval: 30000
   });
 
-  // Verified Trades (closed BUY→SELL pairs)
+  // Verified Trades (closed BUY→SELL pairs) - exclude recovery reconciliation
   const { data: verifiedTrades = [], isLoading: loadVerified, refetch: refetchVerified } = useQuery({
     queryKey: ['robot1-verified', user?.email],
     queryFn: async () => {
       const all = await base44.asServiceRole.entities.VerifiedTrade.list();
       return all
-        .filter(t => t.robotId === 'robot1' && ALLOWED_PAIRS.includes(t.instId))
+        .filter(t => t.robotId === 'robot1' && ALLOWED_PAIRS.includes(t.instId) && t.status === 'closed')
         .sort((a, b) => new Date(b.sellTime).getTime() - new Date(a.sellTime).getTime());
     },
     enabled: !!user,
@@ -86,10 +86,16 @@ export default function Dashboard() {
     refetchInterval: 10000
   });
 
+  // Calculate stats excluding reconciled positions
   const totalPnL = verifiedTrades.reduce((s, t) => s + (t.realizedPnL || 0), 0);
   const totalFees = ledger.reduce((s, o) => s + (o.fee || 0), 0);
   const winCount = verifiedTrades.filter(t => t.realizedPnL > 0).length;
   const winRate = verifiedTrades.length > 0 ? Math.round(winCount / verifiedTrades.length * 100) : 0;
+
+  // Detect active positions: BUY orders not in any closed VerifiedTrade
+  const closedBuyIds = new Set(verifiedTrades.flatMap(t => [t.buyOrdId, t.sellOrdId]));
+  const unmatched = ledger.filter(o => o.side === 'buy' && !closedBuyIds.has(o.ordId));
+  const activePositionExists = unmatched.length > 0 && (balance.SOL > 0.0001 || balance.ETH > 0.0001 || balance.BTC > 0.000001);
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
@@ -99,9 +105,10 @@ export default function Dashboard() {
         <div className="bg-emerald-900/30 border border-emerald-700 rounded-xl p-4 mb-6 flex items-start gap-3">
           <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm">
-            <div className="font-bold text-emerald-300">Recovery Complete ✓</div>
+            <div className="font-bold text-emerald-300">Recovery Complete ✓ | Legacy Position Closed</div>
             <div className="text-emerald-200 text-xs mt-1">
-              Sold 0.774 SOL @ $96.36 → $74.60 USDT recovered. Account: $75.02 free | Equity $125.44 | Ready for controlled cycle.
+              Legacy 0.945 SOL reconciled: bought @ $95.21, sold 0.774 SOL @ $96.36 → -$15.33 P&L (17% loss, fee bleed). 
+              Account state: $75.02 USDT free | $125.44 equity | 0 SOL active | Ready for new controlled cycle.
             </div>
           </div>
         </div>
@@ -183,6 +190,27 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+        </section>
+
+        {/* 1.5 Active Position State */}
+        <section className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-slate-400 mb-1">Active Position</div>
+              <div className={`text-lg font-bold ${activePositionExists ? 'text-yellow-400' : 'text-emerald-400'}`}>
+                {activePositionExists ? '⚠ HOLDING' : '✓ CLEAR'}
+              </div>
+              <div className="text-xs text-slate-500 mt-1">
+                {activePositionExists 
+                  ? `${unmatched.length} unmatched BUY(s), live holdings exist`
+                  : 'No stale positions. Ready for new cycle.'}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-slate-400 mb-1">Reconciled Trades</div>
+              <div className="text-lg font-bold text-cyan-400">{verifiedTrades.length}</div>
+            </div>
+          </div>
         </section>
 
         {/* 2. Quick Stats */}
