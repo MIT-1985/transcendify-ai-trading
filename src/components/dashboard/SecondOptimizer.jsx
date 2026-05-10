@@ -8,7 +8,7 @@ import { base44 } from '@/api/base44Client';
 
 const OKX_FEE_RATE = 0.001;
 const PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT'];
-const REFRESH_MS = 3000;
+const REFRESH_MS = 15000;
 
 function getStatus(pos, lastLog) {
   if (!pos) {
@@ -85,10 +85,15 @@ export default function SecondOptimizer() {
   useEffect(() => {
     refresh();
     intervalRef.current = setInterval(refresh, REFRESH_MS);
+    // stagger start by 5s to avoid colliding with Robot1LivePnL
+    const staggerTimer = setTimeout(() => {
+      refresh();
+    }, 5000);
     tickRef.current = setInterval(() => setTick(t => t + 1), 1000);
     return () => {
       clearInterval(intervalRef.current);
       clearInterval(tickRef.current);
+      clearTimeout(staggerTimer);
     };
   }, []);
 

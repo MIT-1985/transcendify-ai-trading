@@ -174,7 +174,7 @@ export default function Robot1LivePnL() {
 
   useEffect(() => {
     refresh();
-    intervalRef.current = setInterval(refresh, 3000); // refresh every 3s
+    intervalRef.current = setInterval(refresh, 10000); // refresh every 10s
     return () => clearInterval(intervalRef.current);
   }, []);
 
