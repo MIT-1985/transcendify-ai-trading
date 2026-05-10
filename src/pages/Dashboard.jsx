@@ -138,7 +138,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-purple-400" />
               <h2 className="font-bold text-sm">Robot 1 — Scalping Mode</h2>
-              <span className="text-xs text-slate-500 ml-1">TP=0.25% · SL=-0.18% · Trail=0.12% · Cooldown=30s</span>
+              <span className="text-xs text-slate-500 ml-1">TP=0.18% · SL=-0.18% · Trail=0.06% · minNet=0.02 USDT · Cooldown=30s</span>
             </div>
             <Button
               size="sm"

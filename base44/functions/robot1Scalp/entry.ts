@@ -10,13 +10,13 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
 const ALLOWED_PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT'];
 
-const TRADE_AMOUNT_USDT    = 15;      // USDT per scalp trade (within 10-20 range)
+const TRADE_AMOUNT_USDT    = 15;      // USDT per scalp trade
 const MAX_POSITION_PCT     = 0.25;    // max 25% of freeUSDT in one trade
-const MIN_FREE_USDT        = 12;      // minimum to enter
-const TAKE_PROFIT_PCT      = 0.25;    // 0.25% TP
+const MIN_FREE_USDT        = 12;      // minimum to enter new position
+const TAKE_PROFIT_PCT      = 0.18;    // 0.18% TP
 const STOP_LOSS_PCT        = -0.18;   // -0.18% SL
-const TRAILING_STOP_PCT    = 0.12;    // trail: sell if price falls 0.12% from peak
-const MIN_NET_PROFIT_USDT  = 0.05;    // minimum net profit after fees required to enter
+const TRAILING_STOP_PCT    = 0.06;    // trail: sell if price falls 0.06% from peak
+const MIN_NET_PROFIT_USDT  = 0.02;    // minimum net profit after fees to trigger SELL
 const MAX_SPREAD_PCT       = 0.08;    // tight spread gate
 const OKX_FEE_RATE         = 0.001;   // 0.1% taker per side
 const MAX_POSITIONS        = 2;
@@ -253,44 +253,56 @@ Deno.serve(async (req) => {
 
     const sellResults = [];
 
-    // 3. SELL pass: check TP / trailing / SL for each active position
-    // Track peak price per position using a simple in-memory object for this run
-    // (trailing stop is approximated: if pnlPct at or above TP, check trailing)
+    // 3. SELL pass — ALWAYS check active positions FIRST before any BUY logic
+    // Rules (in order):
+    //   a) if pnlPct >= TAKE_PROFIT_PCT AND netProfit >= MIN_NET_PROFIT_USDT → SELL (TP)
+    //   b) if pnlPct <= STOP_LOSS_PCT → SELL (SL, no net profit requirement)
+    //   c) if pnlPct >= (TAKE_PROFIT_PCT - TRAILING_STOP_PCT) AND netProfit >= MIN_NET_PROFIT_USDT → SELL (trail)
+    //   d) else → WAIT (active position, do not buy more)
     for (const pos of activePositions) {
       const ticker = tickerMap[pos.instId];
-      if (!ticker) continue;
+      if (!ticker) { console.log(`[SCALP] ${pos.instId}: no ticker, skipping sell check`); continue; }
       const currentPrice = parseFloat(ticker.last || 0);
       const pnlPct = (currentPrice - pos.entryPrice) / pos.entryPrice * 100;
       const grossProfit = (currentPrice - pos.entryPrice) * pos.qty;
       const buyFee = pos.buyFee || pos.entryPrice * pos.qty * OKX_FEE_RATE;
       const sellFee = currentPrice * pos.qty * OKX_FEE_RATE;
-      const netProfit = grossProfit - buyFee - sellFee;
+      const estimatedFees = buyFee + sellFee;
+      const netProfit = grossProfit - estimatedFees;
 
-      const hitTP = pnlPct >= TAKE_PROFIT_PCT;
-      const hitSL = pnlPct <= STOP_LOSS_PCT;
-      // Trailing: if we are near TP but pulled back TRAILING_STOP_PCT from recent high
-      // Since we don't persist highs, approximate: sell if gained TP-TRAILING and currently above entry
-      const hitTrail = pnlPct >= (TAKE_PROFIT_PCT - TRAILING_STOP_PCT) && pnlPct < TAKE_PROFIT_PCT && netProfit > MIN_NET_PROFIT_USDT;
-      const shouldSell = (hitTP || hitTrail) && netProfit >= MIN_NET_PROFIT_USDT || hitSL;
+      console.log(`[SCALP] ${pos.instId}: entry=${pos.entryPrice} cur=${currentPrice} pnlPct=${pnlPct.toFixed(4)}% gross=${grossProfit.toFixed(4)} fees=${estimatedFees.toFixed(4)} net=${netProfit.toFixed(4)} USDT`);
 
-      console.log(`[SCALP] ${pos.instId}: entry=${pos.entryPrice} cur=${currentPrice} pnl=${pnlPct.toFixed(3)}% netPnL=${netProfit.toFixed(4)} USDT — sell=${shouldSell}`);
+      const hitTP    = pnlPct >= TAKE_PROFIT_PCT && netProfit >= MIN_NET_PROFIT_USDT;
+      const hitSL    = pnlPct <= STOP_LOSS_PCT;
+      const hitTrail = pnlPct >= (TAKE_PROFIT_PCT - TRAILING_STOP_PCT) && pnlPct < TAKE_PROFIT_PCT && netProfit >= MIN_NET_PROFIT_USDT;
+      const shouldSell = hitTP || hitSL || hitTrail;
+
+      console.log(`[SCALP] ${pos.instId}: hitTP=${hitTP} hitSL=${hitSL} hitTrail=${hitTrail} → sell=${shouldSell}`);
 
       if (shouldSell) {
-        const reason = hitTP ? `TP hit: pnl=${pnlPct.toFixed(3)}% net=${netProfit.toFixed(4)}USDT`
-                     : hitSL ? `SL hit: pnl=${pnlPct.toFixed(3)}%`
-                     : `Trail hit: pnl=${pnlPct.toFixed(3)}% net=${netProfit.toFixed(4)}USDT`;
+        const reason = hitTP    ? `TP: pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}USDT`
+                     : hitSL    ? `SL: pnl=${pnlPct.toFixed(4)}%`
+                     : `Trail: pnl=${pnlPct.toFixed(4)}% net=${netProfit.toFixed(4)}USDT`;
         const sr = await executeSell(base44, apiKey, apiSecret, passphrase, pos, reason);
-        sellResults.push({ pair: pos.instId, ...sr });
+        sellResults.push({ pair: pos.instId, ...sr, pnlPct: parseFloat(pnlPct.toFixed(4)), netProfit: parseFloat(netProfit.toFixed(4)) });
       }
     }
 
-    // 4. BUY pass: re-fetch positions, then attempt entry on best eligible pair
+    // 4. BUY pass: only attempt if NO active positions remain after sells
     const posNow = await getActivePositions(base44);
     const activePairNow = new Set(posNow.map(p => p.instId));
     let buyResult = null;
 
-    if (posNow.length >= MAX_POSITIONS) {
-      console.log(`[SCALP] WAIT: max positions (${posNow.length}/${MAX_POSITIONS})`);
+    // If there are still active positions → do not BUY, wait for next cycle to sell
+    if (posNow.length > 0) {
+      const holdingStr = posNow.map(p => {
+        const t = tickerMap[p.instId];
+        const cur = t ? parseFloat(t.last || 0) : 0;
+        const pct = cur ? ((cur - p.entryPrice) / p.entryPrice * 100).toFixed(4) : '?';
+        return `${p.instId} @${p.entryPrice} cur=${cur} pnl=${pct}%`;
+      }).join(' | ');
+      console.log(`[SCALP] WAIT — active position: ${holdingStr}. Waiting for TP/SL.`);
+      buyResult = { decision: 'WAIT_ACTIVE_POSITION', reason: `Holding: ${holdingStr}` };
     } else if (freeUsdt < MIN_FREE_USDT) {
       console.log(`[SCALP] WAIT: freeUSDT=${freeUsdt.toFixed(2)} < min=${MIN_FREE_USDT}`);
     } else {
@@ -374,7 +386,8 @@ Deno.serve(async (req) => {
       })),
       sells: sellResults,
       buy: buyResult,
-      config: { TAKE_PROFIT_PCT, STOP_LOSS_PCT, TRAILING_STOP_PCT, MIN_NET_PROFIT_USDT, MAX_SPREAD_PCT, COOLDOWN_SECONDS, TRADE_AMOUNT_USDT }
+      config: { TAKE_PROFIT_PCT, STOP_LOSS_PCT, TRAILING_STOP_PCT, MIN_NET_PROFIT_USDT, MAX_SPREAD_PCT, COOLDOWN_SECONDS, TRADE_AMOUNT_USDT },
+      note: 'SELL always checked before BUY. BUY blocked while any position active.'
     });
 
   } catch (err) {
