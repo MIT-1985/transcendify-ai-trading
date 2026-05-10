@@ -2,17 +2,20 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
-import { Wallet, TrendingUp, Activity } from 'lucide-react';
+import { Wallet, TrendingUp, Activity, Zap } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Robot1Panel from '@/components/dashboard/Robot1Panel';
 import PairScoringTable from '@/components/dashboard/PairScoringTable';
+import Robot1LivePnL from '@/components/dashboard/Robot1LivePnL';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [syncStatus, setSyncStatus] = useState('idle');
   const [pairScores, setPairScores] = useState([]);
   const [scoresLoading, setScoresLoading] = useState(false);
+  const [scalpRunning, setScalpRunning] = useState(false);
+  const [scalpResult, setScalpResult] = useState(null);
 
   const handleSync = async () => {
     setSyncStatus('syncing');
@@ -122,7 +125,54 @@ export default function Dashboard() {
             )}
         </section>
 
-        {/* 2. Robot 1 Live Status */}
+        {/* 2. Robot 1 Live P&L */}
+        <Robot1LivePnL />
+
+        {/* 2b. Robot 1 Scalping Mode */}
+        <section className="bg-slate-900/50 border border-purple-700/40 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-purple-400" />
+              <h2 className="font-bold text-sm">Robot 1 — Scalping Mode</h2>
+              <span className="text-xs text-slate-500 ml-1">TP=0.25% · SL=-0.18% · Trail=0.12% · Cooldown=30s</span>
+            </div>
+            <Button
+              size="sm"
+              disabled={scalpRunning}
+              onClick={async () => {
+                setScalpRunning(true);
+                setScalpResult(null);
+                try {
+                  const res = await base44.functions.invoke('robot1Scalp', {});
+                  setScalpResult(res.data);
+                } catch (e) {
+                  setScalpResult({ error: e.message });
+                } finally {
+                  setScalpRunning(false);
+                }
+              }}
+              className="bg-purple-700 hover:bg-purple-600 text-white text-xs h-8 px-3 gap-1.5"
+            >
+              <Zap className="w-3 h-3" />
+              {scalpRunning ? 'Running…' : 'Run Scalp'}
+            </Button>
+          </div>
+          {scalpResult && (
+            <div className={`rounded-lg px-3 py-2 border text-xs mt-2 ${
+              scalpResult.error ? 'bg-red-900/30 border-red-700 text-red-300' :
+              scalpResult.buy?.decision === 'BUY_EXECUTED' ? 'bg-emerald-900/30 border-emerald-700 text-emerald-300' :
+              scalpResult.sells?.length > 0 ? 'bg-blue-900/30 border-blue-700 text-blue-300' :
+              'bg-slate-800/50 border-slate-600 text-slate-300'
+            }`}>
+              {scalpResult.error ? `Error: ${scalpResult.error}` :
+               scalpResult.buy?.decision === 'BUY_EXECUTED' ? `✓ BUY ${scalpResult.buy.pair} @ $${scalpResult.buy.avgPx} · ${scalpResult.buy.usedUSDT} USDT · expected net: +${scalpResult.buy.expectedNetProfit?.toFixed(4)} USDT` :
+               scalpResult.sells?.length > 0 ? `✓ SOLD ${scalpResult.sells.map(s => s.pair).join(', ')} → back to USDT` :
+               `WAIT · ${scalpResult.positionCount}/${scalpResult.maxPositions} positions · $${scalpResult.freeUsdt?.toFixed(2)} free`}
+            </div>
+          )}
+        </section>
+
+        {/* 3. Robot 1 Live Status (scheduler) */}
         <Robot1Panel onRunResult={(data) => { if (data?.pairScores) setPairScores(data.pairScores); }} />
 
         {/* 2b. Pair Scoring */}
