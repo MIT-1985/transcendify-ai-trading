@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
-import { Wallet, TrendingUp, Activity, AlertCircle } from 'lucide-react';
+import { Wallet, TrendingUp, Activity, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import ManualScalpTriggerV2 from '@/components/dashboard/ManualScalpTriggerV2';
@@ -94,6 +94,17 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
       <div className="max-w-6xl mx-auto space-y-6">
+
+        {/* Recovery Status Banner */}
+        <div className="bg-emerald-900/30 border border-emerald-700 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <div className="font-bold text-emerald-300">Recovery Complete ✓</div>
+            <div className="text-emerald-200 text-xs mt-1">
+              Sold 0.774 SOL @ $96.36 → $74.60 USDT recovered. Account: $75.02 free | Equity $125.44 | Ready for controlled cycle.
+            </div>
+          </div>
+        </div>
 
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
