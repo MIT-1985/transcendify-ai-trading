@@ -6,6 +6,7 @@ import { Wallet, TrendingUp, Activity } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Robot1Panel from '@/components/dashboard/Robot1Panel';
+import PairScoringTable from '@/components/dashboard/PairScoringTable';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -111,6 +112,9 @@ export default function Dashboard() {
 
         {/* 2. Robot 1 Live Status */}
         <Robot1Panel />
+
+        {/* 2b. Pair Scoring Table */}
+        <PairScoringTable />
 
         {/* 3. Robot 1 Verified Trades */}
         <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">

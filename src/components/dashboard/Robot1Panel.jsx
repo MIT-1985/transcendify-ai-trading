@@ -27,7 +27,7 @@ const StatusDot = ({ status }) => {
   return <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${colors[status] || 'bg-slate-500'}`} />;
 };
 
-export default function Robot1Panel() {
+export default function Robot1Panel({ onRunResult } = {}) {
   const [running, setRunning] = useState(false);
   const [runResult, setRunResult] = useState(null);
   const [runError, setRunError] = useState(null);
@@ -51,6 +51,7 @@ export default function Robot1Panel() {
     try {
       const res = await base44.functions.invoke('robot1Execute', {});
       setRunResult(res.data);
+      if (onRunResult) onRunResult(res.data);
       refetch();
     } catch (err) {
       setRunError(err.message || 'Execution failed');
@@ -68,7 +69,7 @@ export default function Robot1Panel() {
             <Zap className="w-4 h-4 text-blue-400" />
           </div>
           <div>
-            <div className="font-bold text-white text-sm">Robot 1 — ETH/SOL</div>
+            <div className="font-bold text-white text-sm">Robot 1 — BTC/ETH/SOL/DOGE/XRP</div>
             <div className="text-xs text-slate-500">Scheduler: active · every 15 min</div>
           </div>
         </div>
@@ -97,12 +98,18 @@ export default function Robot1Panel() {
       {/* Run result banner */}
       {runResult && (
         <div className={`rounded-lg px-3 py-2 border text-xs ${
-          runResult.decision?.includes('BUY') ? 'bg-emerald-900/30 border-emerald-700 text-emerald-300' :
-          runResult.decision?.includes('SELL') ? 'bg-red-900/30 border-red-700 text-red-300' :
+          runResult.buy?.decision?.includes('BUY_EXECUTED') ? 'bg-emerald-900/30 border-emerald-700 text-emerald-300' :
+          runResult.sells?.length > 0 ? 'bg-red-900/30 border-red-700 text-red-300' :
           'bg-slate-800/50 border-slate-600 text-slate-300'
         }`}>
-          <span className="font-bold">{runResult.decision || runResult.status}</span>
-          {runResult.reason && <span className="ml-2 opacity-75">— {runResult.reason}</span>}
+          {runResult.buy ? (
+            <span className="font-bold">{runResult.buy.decision}</span>
+          ) : (
+            <span className="font-bold">WAIT</span>
+          )}
+          {runResult.positionCount !== undefined && (
+            <span className="ml-2 opacity-75">· Positions: {runResult.positionCount}/{runResult.maxPositions} · USDT: ${runResult.freeUsdt?.toFixed(2)}</span>
+          )}
         </div>
       )}
       {runError && (
