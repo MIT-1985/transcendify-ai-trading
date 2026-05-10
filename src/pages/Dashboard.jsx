@@ -13,6 +13,10 @@ import Robot1ModePanel from '@/components/dashboard/Robot1ModePanel';
 import CapitalReservePanel from '@/components/dashboard/CapitalReservePanel';
 import ScalpOptimizerPanel from '@/components/dashboard/ScalpOptimizerPanel';
 import OptimizationEngine from '@/components/dashboard/OptimizationEngine';
+import RobotLiveClockProfit from '@/components/dashboard/RobotLiveClockProfit';
+import LastRobotActionPanel from '@/components/dashboard/LastRobotActionPanel';
+import WhyNoTradePanel from '@/components/dashboard/WhyNoTradePanel';
+import ManualScalpTrigger from '@/components/dashboard/ManualScalpTrigger';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -129,6 +133,18 @@ export default function Dashboard() {
               </div>
             )}
         </section>
+
+        {/* LIVE PROOF: Robot Live Clock Profit */}
+        <RobotLiveClockProfit />
+
+        {/* LIVE PROOF: Last Robot Action */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <LastRobotActionPanel />
+          <ManualScalpTrigger />
+        </div>
+
+        {/* LIVE PROOF: Why No Trade */}
+        <WhyNoTradePanel />
 
         {/* Mode & Scheduler Panel */}
         <Robot1ModePanel />
