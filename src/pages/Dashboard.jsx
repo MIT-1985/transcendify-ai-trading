@@ -2,31 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
-import { AlertCircle, TrendingUp, Activity, DollarSign, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [killSwitchStatus, setKillSwitchStatus] = useState('CHECKING');
-  const sessionStartRef = useRef(new Date());
 
-  // Fetch OKX Live Balance (live from exchange) - every 5 seconds
+  // OKX Live Balance — refresh every 5s
   const { data: okxBalance = {}, isLoading: loadBalance } = useQuery({
     queryKey: ['okx-live-balance-final', user?.email],
     queryFn: async () => {
       try {
         const res = await base44.functions.invoke('okxLiveBalance', {});
         const d = res.data || {};
-        if (!d.success) {
-          return { 
-            success: false, 
-            error: 'OKX API unreachable',
-            totalEquityUSDT: 'ERROR',
-            availableUSDT: 'ERROR',
-            frozenUSDT: 'ERROR'
-          };
-        }
+        if (!d.success) return { success: false, error: 'OKX API unreachable' };
         const raw = d.raw_usdt_balance || {};
         return {
           success: true,
@@ -40,14 +30,7 @@ export default function Dashboard() {
           timestamp: d.fetchedAt
         };
       } catch (e) {
-        console.error('[Dashboard] OKX Balance error:', e);
-        return { 
-          success: false, 
-          error: e.message,
-          totalEquityUSDT: 'ERROR',
-          availableUSDT: 'ERROR',
-          frozenUSDT: 'ERROR'
-        };
+        return { success: false, error: e.message };
       }
     },
     enabled: !!user,
@@ -56,28 +39,13 @@ export default function Dashboard() {
     gcTime: 0
   });
 
-  // Fetch Clean Accounting Metrics with Dedup
+  // Clean Metrics — refresh every 10s
   const { data: cleanMetrics = {}, isLoading: loadMetrics } = useQuery({
     queryKey: ['final-clean-metrics-dedup', user?.email],
     queryFn: async () => {
-      try {
-        const res = await base44.functions.invoke('finalCleanMetricsWithDedup', {});
-        if (!res.data.success) {
-          throw new Error('Failed to get clean metrics');
-        }
-        return res.data;
-      } catch (e) {
-        console.error('[Dashboard] Final clean metrics error:', e);
-        return {
-          success: false,
-          error: e.message,
-          okx_balance: { mapped: { totalEquityUSDT: '0', freeUSDT: '0', frozenUSDT: '0' } },
-          unique_counts: { unique_orders: 0, duplicate_orders: 0, unique_trades: 0, duplicate_trades: 0 },
-          clean_metrics: { orders_count: 0, closed_trades_count: 0, net_pnl: 0, fees: 0, win_rate: 0, wins: 0, losses: 0, latest_orders: [], latest_trades: [] },
-          total_counts: {},
-          trading_status: { kill_switch_active: true, trading_paused: true }
-        };
-      }
+      const res = await base44.functions.invoke('finalCleanMetricsWithDedup', {});
+      if (!res.data.success) throw new Error('Failed to get clean metrics');
+      return res.data;
     },
     enabled: !!user,
     staleTime: 0,
@@ -85,331 +53,318 @@ export default function Dashboard() {
     gcTime: 0
   });
 
-  // Check Kill Switch
+  // Kill Switch check — every 15s
   useEffect(() => {
-    const checkKillSwitch = async () => {
+    const check = async () => {
       try {
         const res = await base44.functions.invoke('checkKillSwitch', {});
         setKillSwitchStatus(res.data?.kill_switch_active ? 'ACTIVE' : 'INACTIVE');
-      } catch (e) {
-        setKillSwitchStatus('ERROR');
-      }
+      } catch { setKillSwitchStatus('ERROR'); }
     };
-    checkKillSwitch();
-    const interval = setInterval(checkKillSwitch, 15000);
-    return () => clearInterval(interval);
+    check();
+    const t = setInterval(check, 15000);
+    return () => clearInterval(t);
   }, []);
 
   const metrics = cleanMetrics?.clean_metrics || {};
-  const uniqueCounts = cleanMetrics?.unique_counts || {};
+  const counts = cleanMetrics?.unique_counts || {};
   const totals = cleanMetrics?.total_counts || {};
-  const excluded = {}; // Legacy/suspect excluded from dedup function
+  const latestOrders = metrics.latest_orders || [];
+  const latestTrades = metrics.latest_trades || [];
 
-  const getBalanceColor = (success) => success ? 'border-emerald-600 bg-emerald-950/30' : 'border-red-600 bg-red-950/30';
+  const fmt2 = (v) => parseFloat(v || 0).toFixed(2);
+  const fmt4 = (v) => parseFloat(v || 0).toFixed(4);
+  const fmt6 = (v) => parseFloat(v || 0).toFixed(6);
+  const shortId = (id) => id ? `...${String(id).slice(-8)}` : '—';
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
-      {/* KILL SWITCH WARNING */}
+    <div className="min-h-screen bg-[#0A0A0F] text-white p-4 lg:p-6">
+
+      {/* ── KILL SWITCH BANNER ── */}
       {killSwitchStatus === 'ACTIVE' && (
-        <div className="max-w-7xl mx-auto mb-6 space-y-3">
-          <div className="bg-red-950/90 border-2 border-red-600 rounded-2xl p-6 text-center">
-            <div className="text-2xl font-black text-red-400 mb-2">🛑 TRADING HARD PAUSED</div>
-            <div className="text-sm text-red-300">KILL SWITCH ACTIVE — All trading disabled</div>
-            <div className="text-xs text-red-400 mt-2">Status: PAUSED_KILL_SWITCH</div>
+        <div className="max-w-7xl mx-auto mb-4">
+          <div className="bg-red-950/90 border-2 border-red-600 rounded-2xl p-5 text-center">
+            <div className="text-2xl font-black text-red-400">🛑 TRADING HARD PAUSED</div>
+            <div className="text-sm text-red-300 mt-1">KILL SWITCH ACTIVE — All trading disabled · Status: PAUSED_KILL_SWITCH</div>
           </div>
         </div>
       )}
 
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* SECTION 1: OKX LIVE BALANCE */}
-        <div className={`rounded-2xl p-8 border-2 ${getBalanceColor(okxBalance?.success)} shadow-2xl`}>
-          <div className="text-center space-y-4">
-            <div className="text-sm font-semibold text-emerald-400 uppercase">OKX DATA: LIVE | Read Mode: ACTIVE</div>
-            
-            <div className="text-5xl font-black text-emerald-400">
-              {loadBalance ? '...' : `$${parseFloat(okxBalance?.totalEquityUSDT || 0).toFixed(2)}`}
-            </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-emerald-600">
-                <div className="text-xs text-slate-500 mb-1">Available USDT</div>
-                <div className="font-mono font-bold text-emerald-400 text-lg">
-                  ${loadBalance ? '...' : (parseFloat(okxBalance?.availableUSDT || 0).toFixed(2))}
-                </div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-yellow-600">
-                <div className="text-xs text-slate-500 mb-1">Frozen USDT</div>
-                <div className="font-mono font-bold text-yellow-400">
-                  ${loadBalance ? '...' : (parseFloat(okxBalance?.frozenUSDT || 0).toFixed(2))}
-                </div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">In Positions</div>
-                <div className="font-mono font-bold text-slate-400">
-                  ${loadBalance ? '...' : (parseFloat(okxBalance?.nonFreeBal || 0).toFixed(2))}
-                </div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-xs text-slate-500 mb-1">Assets</div>
-                <div className="font-mono font-bold text-slate-400">{okxBalance?.assetCount || 0} types</div>
-              </div>
-            </div>
-
-            {/* Raw USDT Balance Details */}
-            {okxBalance?.rawUsdt?.eq && (
-              <div className="mt-6 p-4 bg-slate-800/30 rounded-lg border border-slate-700 text-left text-xs">
-                <div className="font-bold text-slate-400 mb-3">Raw USDT Object from OKX API:</div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-slate-500 font-mono text-xs">
-                  <div><span className="text-slate-400">ccy:</span> <span className="text-emerald-400">{okxBalance.rawUsdt?.ccy || 'USDT'}</span></div>
-                  <div><span className="text-slate-400">eq:</span> <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.eq || 0).toFixed(2)}</span></div>
-                  <div><span className="text-slate-400">cashBal:</span> <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.cashBal || 0).toFixed(2)}</span></div>
-                  <div><span className="text-slate-400">availBal:</span> <span className="text-emerald-400">${parseFloat(okxBalance.rawUsdt?.availBal || 0).toFixed(2)}</span></div>
-                  <div><span className="text-slate-400">availEq:</span> <span className="text-slate-300">${parseFloat(okxBalance.rawUsdt?.availEq || 0).toFixed(2)}</span></div>
-                  <div><span className="text-slate-400">frozenBal:</span> <span className="text-yellow-400">${parseFloat(okxBalance.rawUsdt?.frozenBal || 0).toFixed(2)}</span></div>
-                  <div><span className="text-slate-400">ordFrozen:</span> <span className="text-yellow-400">${parseFloat(okxBalance.rawUsdt?.ordFrozen || 0).toFixed(2)}</span></div>
-                  <div><span className="text-slate-400">disEq:</span> <span className="text-slate-300">${parseFloat(okxBalance.rawUsdt?.disEq || 0).toFixed(2)}</span></div>
-                </div>
-                <div className="mt-3 p-2 bg-slate-700/30 rounded border-l-2 border-emerald-500 text-xs text-slate-300">
-                  <strong>Mapping:</strong> totalEquity = eq | Available = availBal | Frozen = frozenBal + ordFrozen | InPositions = cashBal - availBal
-                </div>
-              </div>
-            )}
-
-            {okxBalance?.timestamp && (
-              <div className="text-xs text-slate-500 mt-4">Last fetched: {okxBalance.timestamp}</div>
-            )}
+        {/* ══════════════════════════════════════════════
+            SECTION 1: BALANCE
+        ══════════════════════════════════════════════ */}
+        <div className={`rounded-2xl p-6 border-2 shadow-2xl ${okxBalance?.success ? 'border-emerald-600 bg-emerald-950/20' : 'border-red-600 bg-red-950/20'}`}>
+          <div className="text-xs font-bold text-emerald-400 uppercase mb-4 tracking-widest">
+            OKX DATA: LIVE &nbsp;|&nbsp; READ MODE: ACTIVE &nbsp;|&nbsp; TRADING: OFF
           </div>
-        </div>
 
-        {/* SECTION 2: CLEAN OKX ACCOUNTING */}
-        <div className="rounded-2xl p-8 border-2 border-emerald-600 bg-emerald-950/20">
-          <h2 className="text-2xl font-bold mb-6 text-emerald-400">✅ OKX CLEAN REAL TRADES (DEDUPED + SUSPECT FILTERED)</h2>
-          
-          {loadMetrics ? (
-            <Skeleton className="h-40 bg-slate-800" />
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
-              <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
-                <div className="text-xs text-slate-500 uppercase mb-2">Unique Orders</div>
-                <div className="text-3xl font-bold text-emerald-400">{uniqueCounts.unique_orders || 0}</div>
-                <div className="text-xs text-slate-500 mt-1">Dup: {uniqueCounts.duplicate_orders || 0}</div>
+          {/* Total Equity */}
+          <div className="text-5xl font-black text-emerald-400 mb-6">
+            {loadBalance ? '...' : `$${fmt2(okxBalance?.totalEquityUSDT)}`}
+          </div>
+
+          {/* Balance breakdown */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <Tile label="Total Equity" value={`$${fmt2(okxBalance?.totalEquityUSDT)}`} color="emerald" loading={loadBalance} />
+            <Tile label="Available USDT" value={`$${fmt2(okxBalance?.availableUSDT)}`} color="emerald" loading={loadBalance} />
+            <Tile label="Frozen USDT" value={`$${fmt2(okxBalance?.frozenUSDT)}`} color="yellow" loading={loadBalance} />
+            <Tile label="Open Orders" value={okxBalance?.openOrdersCount ?? 0} color="slate" loading={loadBalance} />
+            <Tile label="Active Positions" value={parseFloat(okxBalance?.nonFreeBal || 0) > 0.01 ? 'YES' : 'NONE'} color={parseFloat(okxBalance?.nonFreeBal || 0) > 0.01 ? 'red' : 'slate'} loading={loadBalance} />
+          </div>
+
+          {/* Raw OKX USDT object */}
+          {okxBalance?.rawUsdt?.eq && (
+            <div className="mt-5 p-4 bg-slate-800/30 rounded-lg border border-slate-700 text-xs font-mono">
+              <div className="text-slate-400 font-bold mb-2">Raw USDT from OKX API:</div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-slate-500">
+                {[
+                  ['ccy', okxBalance.rawUsdt?.ccy || 'USDT', 'emerald'],
+                  ['eq (total)', `$${fmt2(okxBalance.rawUsdt?.eq)}`, 'emerald'],
+                  ['cashBal', `$${fmt2(okxBalance.rawUsdt?.cashBal)}`, 'emerald'],
+                  ['availBal', `$${fmt2(okxBalance.rawUsdt?.availBal)}`, 'emerald'],
+                  ['availEq', `$${fmt2(okxBalance.rawUsdt?.availEq)}`, 'slate'],
+                  ['frozenBal', `$${fmt2(okxBalance.rawUsdt?.frozenBal)}`, 'yellow'],
+                  ['ordFrozen', `$${fmt2(okxBalance.rawUsdt?.ordFrozen)}`, 'yellow'],
+                  ['disEq', `$${fmt2(okxBalance.rawUsdt?.disEq)}`, 'slate'],
+                ].map(([k, v, c]) => (
+                  <div key={k}>
+                    <span className="text-slate-400">{k}:</span>{' '}
+                    <span className={`text-${c}-400`}>{v}</span>
+                  </div>
+                ))}
               </div>
-              <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
-                <div className="text-xs text-slate-500 uppercase mb-2">Clean Trades</div>
-                <div className="text-3xl font-bold text-emerald-400">{uniqueCounts.unique_trades || 0}</div>
-                <div className="text-xs text-slate-500 mt-1">Dup: {uniqueCounts.duplicate_trades || 0}</div>
-              </div>
-              <div className="bg-red-950/50 rounded-xl p-6 border border-red-600">
-                <div className="text-xs text-red-400 uppercase mb-2">Excluded</div>
-                <div className="text-3xl font-bold text-red-400">{(uniqueCounts.suspect_trades || 0) + (uniqueCounts.mismatched_pnl_trades || 0)}</div>
-                <div className="text-xs text-red-300 mt-1">
-                  {uniqueCounts.suspect_trades || 0} suspect · {uniqueCounts.mismatched_pnl_trades || 0} mismatch
-                </div>
-              </div>
-              <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
-                <div className="text-xs text-slate-500 uppercase mb-2">Net P&L</div>
-                <div className={`text-3xl font-bold ${(metrics.net_pnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {(metrics.net_pnl || 0) >= 0 ? '+' : ''}{(metrics.net_pnl || 0).toFixed(4)}
-                </div>
-              </div>
-              <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
-                <div className="text-xs text-slate-500 uppercase mb-2">Fees</div>
-                <div className="text-3xl font-bold text-red-400">{(metrics.fees || 0).toFixed(4)}</div>
-              </div>
-              <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
-                <div className="text-xs text-slate-500 uppercase mb-2">Win Rate</div>
-                <div className="text-3xl font-bold text-cyan-400">{(metrics.win_rate || 0).toFixed(1)}%</div>
-                <div className="text-xs text-slate-400 mt-1">({metrics.wins || 0}W/{metrics.losses || 0}L)</div>
+              <div className="mt-2 pt-2 border-t border-slate-700 text-slate-400">
+                Mapping: totalEquity=eq | Available=availBal | Frozen=frozenBal+ordFrozen | InPositions=cashBal−availBal
               </div>
             </div>
           )}
+          {okxBalance?.timestamp && (
+            <div className="text-xs text-slate-500 mt-3">Last fetched: {okxBalance.timestamp}</div>
+          )}
         </div>
 
-        {/* SECTION 3: DATA CATEGORIZATION */}
-        <Tabs defaultValue="clean" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-900/50 border border-slate-700 rounded-xl p-1">
-            <TabsTrigger value="clean" className="text-sm">Clean OKX</TabsTrigger>
-            <TabsTrigger value="legacy" className="text-sm">Legacy/Suspect</TabsTrigger>
-            <TabsTrigger value="stale" className="text-sm">Stale Records</TabsTrigger>
+        {/* ══════════════════════════════════════════════
+            SECTION 2: CLEAN ACCOUNTING SUMMARY
+        ══════════════════════════════════════════════ */}
+        <div className="rounded-2xl p-6 border-2 border-emerald-600 bg-emerald-950/10">
+          <h2 className="text-xl font-bold text-emerald-400 mb-5">✅ CLEAN ACCOUNTING (DEDUPED · SUSPECT FILTERED)</h2>
+
+          {loadMetrics ? <Skeleton className="h-32 bg-slate-800" /> : (
+            <>
+              {/* Orders row */}
+              <div className="mb-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Orders</div>
+              <div className="grid grid-cols-3 lg:grid-cols-3 gap-3 mb-5">
+                <Tile label="Total Ledger Records" value={totals.all_ledger ?? 0} color="slate" />
+                <Tile label="Unique Clean Orders" value={counts.unique_orders ?? 0} color="emerald" />
+                <Tile label="Duplicates Excluded" value={counts.duplicate_orders ?? 0} color="yellow" />
+              </div>
+
+              {/* Trades row */}
+              <div className="mb-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Trades</div>
+              <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-5">
+                <Tile label="Total VerifiedTrade Records" value={totals.all_trades ?? 0} color="slate" />
+                <Tile label="Unique Clean Trades" value={counts.unique_trades ?? 0} color="emerald" />
+                <Tile label="Duplicates Excluded" value={counts.duplicate_trades ?? 0} color="yellow" />
+                <Tile label="Mismatched PnL Excl." value={counts.mismatched_pnl_trades ?? 0} color="orange" />
+                <Tile label="Suspect Excluded" value={counts.suspect_trades ?? 0} color="red" />
+                <Tile label="Invalid Excluded" value={counts.invalid_trades ?? 0} color="red" />
+              </div>
+
+              {/* P&L row */}
+              <div className="mb-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Performance</div>
+              <div className="grid grid-cols-3 gap-3">
+                <Tile
+                  label="Clean Net P&L"
+                  value={`${(metrics.net_pnl || 0) >= 0 ? '+' : ''}${fmt4(metrics.net_pnl)} USDT`}
+                  color={(metrics.net_pnl || 0) >= 0 ? 'emerald' : 'red'}
+                />
+                <Tile label="Clean Fees" value={`${fmt4(metrics.fees)} USDT`} color="red" />
+                <Tile
+                  label="Clean Win Rate"
+                  value={`${parseFloat(metrics.win_rate || 0).toFixed(1)}%  (${metrics.wins || 0}W/${metrics.losses || 0}L)`}
+                  color="cyan"
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ══════════════════════════════════════════════
+            SECTION 3: CLEAN DATA TABLES
+        ══════════════════════════════════════════════ */}
+        <Tabs defaultValue="orders" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 bg-slate-900/50 border border-slate-700 rounded-xl p-1">
+            <TabsTrigger value="orders" className="text-sm">Latest 10 Clean Orders</TabsTrigger>
+            <TabsTrigger value="trades" className="text-sm">Latest 10 Clean Trades</TabsTrigger>
           </TabsList>
 
-          {/* TAB 1: CLEAN OKX TRADES */}
-          <TabsContent value="clean" className="space-y-4 mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
-              <h3 className="text-lg font-bold mb-4 text-emerald-400">Last Clean Orders</h3>
-              {loadMetrics ? (
-                <Skeleton className="h-32 bg-slate-800" />
-              ) : metrics.latest_orders?.length === 0 ? (
-                <div className="text-center text-slate-400 py-8">No clean orders</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="border-b border-slate-700">
-                      <tr className="text-slate-400">
-                        <th className="text-left px-3 py-2">Pair</th>
-                        <th className="text-left px-3 py-2">Side</th>
-                        <th className="text-right px-3 py-2">Price</th>
-                        <th className="text-right px-3 py-2">Qty</th>
-                        <th className="text-right px-3 py-2">Fee</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {metrics.latest_orders?.slice(0, 5).map((o, i) => (
-                        <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/20">
-                          <td className="px-3 py-2 font-bold">{o.instId}</td>
-                          <td className={`px-3 py-2 font-bold ${o.side === 'buy' ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {o.side.toUpperCase()}
-                          </td>
-                          <td className="px-3 py-2 text-right">${parseFloat(o.avgPx).toFixed(2)}</td>
-                          <td className="px-3 py-2 text-right text-slate-400">{parseFloat(o.accFillSz).toFixed(6)}</td>
-                          <td className="px-3 py-2 text-right text-red-400">{parseFloat(o.fee).toFixed(4)}</td>
+          {/* ORDERS TABLE */}
+          <TabsContent value="orders" className="mt-4">
+            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-emerald-400">Last 10 Clean Orders</h3>
+                <span className="text-xs text-slate-500">Unique by ordId · instId · side</span>
+              </div>
+              {loadMetrics ? <Skeleton className="h-40 bg-slate-800" /> :
+                latestOrders.length === 0 ? (
+                  <div className="text-center text-slate-400 py-8">No clean orders</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="border-b border-slate-700">
+                        <tr className="text-slate-400">
+                          <th className="text-left px-2 py-2">#</th>
+                          <th className="text-left px-2 py-2">ordId (last 8)</th>
+                          <th className="text-left px-2 py-2">Pair</th>
+                          <th className="text-left px-2 py-2">Side</th>
+                          <th className="text-right px-2 py-2">Price</th>
+                          <th className="text-right px-2 py-2">Qty</th>
+                          <th className="text-right px-2 py-2">Fee</th>
+                          <th className="text-left px-2 py-2">Time</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
-              <h3 className="text-lg font-bold mb-4 text-emerald-400">Last Clean Closed Trades</h3>
-              {loadMetrics ? (
-                <Skeleton className="h-32 bg-slate-800" />
-              ) : metrics.latest_trades?.length === 0 ? (
-                <div className="text-center text-slate-400 py-8">No clean trades</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="border-b border-slate-700">
-                      <tr className="text-slate-400">
-                        <th className="text-left px-3 py-2">Pair</th>
-                        <th className="text-right px-3 py-2">Entry</th>
-                        <th className="text-right px-3 py-2">Exit</th>
-                        <th className="text-right px-3 py-2">P&L</th>
-                        <th className="text-right px-3 py-2">P&L %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {metrics.latest_trades?.slice(0, 10).map((t, i) => (
-                        <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/20">
-                          <td className="px-3 py-2 font-bold">{t.instId}</td>
-                          <td className="px-3 py-2 text-right">${parseFloat(t.buyPrice).toFixed(2)}</td>
-                          <td className="px-3 py-2 text-right">${parseFloat(t.sellPrice).toFixed(2)}</td>
-                          <td className={`px-3 py-2 text-right font-bold ${t.realizedPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {t.realizedPnL >= 0 ? '+' : ''}{parseFloat(t.realizedPnL).toFixed(4)}
-                          </td>
-                          <td className={`px-3 py-2 text-right font-bold ${t.realizedPnLPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {t.realizedPnLPct >= 0 ? '+' : ''}{parseFloat(t.realizedPnLPct).toFixed(2)}%
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody>
+                        {latestOrders.map((o, i) => (
+                          <tr key={o.ordId || i} className="border-b border-slate-800/50 hover:bg-slate-800/20">
+                            <td className="px-2 py-2 text-slate-500">{i + 1}</td>
+                            <td className="px-2 py-2 font-mono text-slate-300 text-xs" title={o.ordId}>
+                              {shortId(o.ordId)}
+                            </td>
+                            <td className="px-2 py-2 font-bold text-white">{o.instId}</td>
+                            <td className={`px-2 py-2 font-bold ${o.side === 'buy' ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {o.side?.toUpperCase()}
+                            </td>
+                            <td className="px-2 py-2 text-right">${fmt2(o.avgPx)}</td>
+                            <td className="px-2 py-2 text-right text-slate-400">{fmt6(o.accFillSz)}</td>
+                            <td className="px-2 py-2 text-right text-red-400">{fmt4(o.fee)}</td>
+                            <td className="px-2 py-2 text-slate-500 text-xs">
+                              {o.timestamp ? new Date(o.timestamp).toLocaleTimeString() : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
             </div>
           </TabsContent>
 
-          {/* TAB 2: LEGACY / SUSPECT TRADES */}
-          <TabsContent value="legacy" className="space-y-4 mt-4">
-            <div className="bg-yellow-950/30 border border-yellow-600 rounded-xl p-6">
-              <h3 className="text-lg font-bold mb-4 text-yellow-400">⚠️ EXCLUDED DATA</h3>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                  <div className="text-xs text-slate-500 mb-1">Legacy Trades</div>
-                  <div className="text-2xl font-bold text-yellow-400">{excluded.legacy_trades_count || 0}</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                  <div className="text-xs text-slate-500 mb-1">Suspect Trades</div>
-                  <div className="text-2xl font-bold text-yellow-400">{excluded.suspect_trades_count || 0}</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                  <div className="text-xs text-slate-500 mb-1">Invalid Trades</div>
-                  <div className="text-2xl font-bold text-red-400">{excluded.invalid_trades_count || 0}</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                  <div className="text-xs text-slate-500 mb-1">Negative Duration</div>
-                  <div className="text-2xl font-bold text-red-400">{excluded.negative_duration_count || 0}</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                  <div className="text-xs text-slate-500 mb-1">Missing Order IDs</div>
-                  <div className="text-2xl font-bold text-red-400">{excluded.missing_order_id_count || 0}</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                  <div className="text-xs text-slate-500 mb-1">SIM Trades</div>
-                  <div className="text-2xl font-bold text-slate-400">{excluded.sim_trades_count || 0}</div>
-                </div>
+          {/* TRADES TABLE */}
+          <TabsContent value="trades" className="mt-4">
+            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-emerald-400">Last 10 Clean Closed Trades</h3>
+                <span className="text-xs text-slate-500">Unique by buyOrdId+sellOrdId · verified · no suspect/mismatch</span>
               </div>
-              <div className="text-xs text-yellow-300 mt-4 p-3 bg-yellow-900/20 rounded border border-yellow-600">
-                ⚠️ These records are EXCLUDED from all main accounting metrics. They are shown here for audit purposes only.
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* TAB 3: STALE LEDGER */}
-          <TabsContent value="stale" className="space-y-4 mt-4">
-            <div className="bg-orange-950/30 border border-orange-600 rounded-xl p-6">
-              <h3 className="text-lg font-bold mb-4 text-orange-400">🗑️ STALE LEDGER RECORDS</h3>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                  <div className="text-xs text-slate-500 mb-1">Stale Unmatched Buy</div>
-                  <div className="text-2xl font-bold text-orange-400">{excluded.stale_ledger_records_count || 0}</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                  <div className="text-xs text-slate-500 mb-1">Duplicate Records</div>
-                  <div className="text-2xl font-bold text-orange-400">{excluded.duplicate_ledger_records_count || 0}</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                  <div className="text-xs text-slate-500 mb-1">Excluded from Positions</div>
-                  <div className="text-2xl font-bold text-orange-400">{excluded.excluded_ledger_records_count || 0}</div>
-                </div>
-              </div>
-              <div className="text-xs text-orange-300 mt-4 p-3 bg-orange-900/20 rounded border border-orange-600">
-                🗑️ These ledger records have been marked as stale, duplicated, or excluded from active position tracking. OKX confirms they no longer represent open positions.
-              </div>
+              {loadMetrics ? <Skeleton className="h-40 bg-slate-800" /> :
+                latestTrades.length === 0 ? (
+                  <div className="text-center text-slate-400 py-8">No clean trades</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="border-b border-slate-700">
+                        <tr className="text-slate-400">
+                          <th className="text-left px-2 py-2">#</th>
+                          <th className="text-left px-2 py-2">Pair</th>
+                          <th className="text-left px-2 py-2">buyOrdId</th>
+                          <th className="text-left px-2 py-2">sellOrdId</th>
+                          <th className="text-right px-2 py-2">Entry</th>
+                          <th className="text-right px-2 py-2">Exit</th>
+                          <th className="text-right px-2 py-2">Qty</th>
+                          <th className="text-right px-2 py-2">P&L</th>
+                          <th className="text-right px-2 py-2">P&L%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {latestTrades.map((t, i) => {
+                          const pnl = parseFloat(t.realizedPnL || 0);
+                          const pnlPct = parseFloat(t.realizedPnLPct || 0);
+                          const pnlClass = pnl >= 0 ? 'text-emerald-400' : 'text-red-400';
+                          return (
+                            <tr key={`${t.buyOrdId}-${t.sellOrdId}`} className="border-b border-slate-800/50 hover:bg-slate-800/20">
+                              <td className="px-2 py-2 text-slate-500">{i + 1}</td>
+                              <td className="px-2 py-2 font-bold text-white">{t.instId}</td>
+                              <td className="px-2 py-2 font-mono text-emerald-300 text-xs" title={t.buyOrdId}>
+                                {shortId(t.buyOrdId)}
+                              </td>
+                              <td className="px-2 py-2 font-mono text-red-300 text-xs" title={t.sellOrdId}>
+                                {shortId(t.sellOrdId)}
+                              </td>
+                              <td className="px-2 py-2 text-right">${fmt2(t.buyPrice)}</td>
+                              <td className="px-2 py-2 text-right">${fmt2(t.sellPrice)}</td>
+                              <td className="px-2 py-2 text-right text-slate-400">{fmt6(t.buyQty || t.sellQty)}</td>
+                              <td className={`px-2 py-2 text-right font-bold ${pnlClass}`}>
+                                {pnl >= 0 ? '+' : ''}{fmt4(pnl)}
+                              </td>
+                              <td className={`px-2 py-2 text-right font-bold ${pnlClass}`}>
+                                {pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(3)}%
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
             </div>
           </TabsContent>
         </Tabs>
 
-        {/* SECTION 4: SUMMARY STATS */}
-        <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-6">
-          <h3 className="text-lg font-bold mb-4">📊 Full Dataset Summary (with Dedup)</h3>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-              <div className="text-xs text-slate-500 mb-1">Total Ledger</div>
-              <div className="text-2xl font-bold text-slate-300">{totals.all_ledger || 0}</div>
-              <div className="text-xs text-slate-600 mt-1">Unique: {totals.unique_ledger || 0}</div>
-            </div>
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-              <div className="text-xs text-slate-500 mb-1">Total Verified Trades</div>
-              <div className="text-2xl font-bold text-slate-300">{totals.all_trades || 0}</div>
-              <div className="text-xs text-slate-600 mt-1">Unique: {totals.unique_trades || 0}</div>
-            </div>
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-              <div className="text-xs text-slate-500 mb-1">Duplicate Ledger</div>
-              <div className="text-2xl font-bold text-yellow-400">{totals.duplicate_ledger || 0}</div>
-            </div>
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-              <div className="text-xs text-slate-500 mb-1">Duplicate Trades</div>
-              <div className="text-2xl font-bold text-yellow-400">{totals.duplicate_trades || 0}</div>
-            </div>
+        {/* ══════════════════════════════════════════════
+            SECTION 4: SYSTEM STATUS
+        ══════════════════════════════════════════════ */}
+        <div className="rounded-2xl p-5 border-2 border-red-700 bg-red-950/20">
+          <h3 className="text-base font-bold text-red-400 mb-4">🔒 SYSTEM STATUS</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatusBadge label="Kill Switch Active" value={true} trueColor="red" />
+            <StatusBadge label="Trading Paused" value={true} trueColor="red" />
+            <StatusBadge label="Read Mode Active" value={true} trueColor="emerald" />
+            <StatusBadge label="Trading Mode OFF" value={true} trueColor="emerald" />
+          </div>
+          <div className="mt-4 text-xs text-red-300 font-mono">
+            PAUSED_KILL_SWITCH · OKX DATA: LIVE · No BUY/SELL orders will be placed
           </div>
         </div>
 
-        {/* SECTION 5: TRADING SYSTEM STATUS */}
-        <div className="bg-red-950/30 border-2 border-red-600 rounded-2xl p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-red-400">Trading System Status</h3>
-              <div className="text-xs text-red-300 mt-1">PAUSED_KILL_SWITCH</div>
-            </div>
-            <div className="text-right">
-              <div className="text-red-400 font-bold text-lg">● PAUSED</div>
-              <div className="text-xs text-red-300 mt-1">No trading allowed</div>
-            </div>
-          </div>
-        </div>
       </div>
+    </div>
+  );
+}
+
+// ── Small reusable tile ──
+function Tile({ label, value, color = 'slate', loading = false }) {
+  const colorMap = {
+    emerald: 'text-emerald-400',
+    yellow: 'text-yellow-400',
+    red: 'text-red-400',
+    cyan: 'text-cyan-400',
+    orange: 'text-orange-400',
+    slate: 'text-slate-300',
+  };
+  return (
+    <div className="bg-slate-900/70 rounded-xl p-4 border border-slate-700">
+      <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">{label}</div>
+      {loading ? (
+        <div className="h-6 bg-slate-700 rounded animate-pulse w-16" />
+      ) : (
+        <div className={`text-xl font-bold ${colorMap[color] || 'text-white'}`}>{value}</div>
+      )}
+    </div>
+  );
+}
+
+// ── Status badge ──
+function StatusBadge({ label, value, trueColor = 'emerald' }) {
+  const on = value === true;
+  const colorMap = { emerald: 'text-emerald-400', red: 'text-red-400' };
+  return (
+    <div className="bg-slate-900/70 rounded-xl p-4 border border-slate-700 flex items-center justify-between">
+      <span className="text-xs text-slate-400">{label}</span>
+      <span className={`text-xs font-bold ${on ? colorMap[trueColor] : 'text-slate-500'}`}>
+        {on ? '● YES' : '○ NO'}
+      </span>
     </div>
   );
 }
