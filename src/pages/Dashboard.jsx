@@ -200,8 +200,11 @@ export default function Dashboard() {
                 <div className="text-xs text-slate-500 mt-1">Dup: {uniqueCounts.duplicate_trades || 0}</div>
               </div>
               <div className="bg-red-950/50 rounded-xl p-6 border border-red-600">
-                <div className="text-xs text-red-400 uppercase mb-2">Suspect</div>
-                <div className="text-3xl font-bold text-red-400">{uniqueCounts.suspect_trades || 0}</div>
+                <div className="text-xs text-red-400 uppercase mb-2">Excluded</div>
+                <div className="text-3xl font-bold text-red-400">{(uniqueCounts.suspect_trades || 0) + (uniqueCounts.mismatched_pnl_trades || 0)}</div>
+                <div className="text-xs text-red-300 mt-1">
+                  {uniqueCounts.suspect_trades || 0} suspect · {uniqueCounts.mismatched_pnl_trades || 0} mismatch
+                </div>
               </div>
               <div className="bg-slate-900/70 rounded-xl p-6 border border-slate-700">
                 <div className="text-xs text-slate-500 uppercase mb-2">Net P&L</div>
