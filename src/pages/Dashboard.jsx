@@ -75,20 +75,44 @@ export default function Dashboard() {
   const fmt2 = (v) => parseFloat(v || 0).toFixed(2);
   const fmt4 = (v) => parseFloat(v || 0).toFixed(4);
   const fmt6 = (v) => parseFloat(v || 0).toFixed(6);
-  const shortId = (id) => id ? `...${String(id).slice(-8)}` : '—';
+
+  // Compute dust asset value: totalEquity - eq (raw USDT eq)
+  const dustValue = (() => {
+    const total = parseFloat(okxBalance?.totalEquityUSDT || 0);
+    const eq = parseFloat(okxBalance?.rawUsdt?.eq || 0);
+    const diff = total - eq;
+    return diff > 0 ? diff : 0;
+  })();
+
+  const fmtHoldTime = (ms) => {
+    if (!ms || ms <= 0) return '—';
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ${s % 60}s`;
+    return `${Math.floor(m / 60)}h ${m % 60}m`;
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 lg:p-6">
 
-      {/* ── KILL SWITCH BANNER ── */}
-      {killSwitchStatus === 'ACTIVE' && (
-        <div className="max-w-7xl mx-auto mb-4">
-          <div className="bg-red-950/90 border-2 border-red-600 rounded-2xl p-5 text-center">
-            <div className="text-2xl font-black text-red-400">🛑 TRADING HARD PAUSED</div>
-            <div className="text-sm text-red-300 mt-1">KILL SWITCH ACTIVE — All trading disabled · Status: PAUSED_KILL_SWITCH</div>
+      {/* ── STATUS BADGE ── always visible ── */}
+      <div className="max-w-7xl mx-auto mb-4 flex flex-col sm:flex-row gap-3">
+        <div className="flex-1 bg-red-950/80 border-2 border-red-600 rounded-xl px-5 py-3 flex items-center gap-3">
+          <span className="text-xl">🛑</span>
+          <div>
+            <div className="text-sm font-black text-red-400 uppercase tracking-widest">TRADING PAUSED BY KILL SWITCH</div>
+            <div className="text-xs text-red-300 mt-0.5">No BUY/SELL orders will be executed · status: PAUSED_KILL_SWITCH</div>
           </div>
         </div>
-      )}
+        <div className="flex-1 bg-emerald-950/60 border-2 border-emerald-600 rounded-xl px-5 py-3 flex items-center gap-3">
+          <span className="text-xl">👁</span>
+          <div>
+            <div className="text-sm font-black text-emerald-400 uppercase tracking-widest">READ MODE ACTIVE</div>
+            <div className="text-xs text-emerald-300 mt-0.5">READ_ONLY_MONITORING_CONFIRMED · OKX data live</div>
+          </div>
+        </div>
+      </div>
 
       <div className="max-w-7xl mx-auto space-y-6">
 
@@ -106,12 +130,13 @@ export default function Dashboard() {
           </div>
 
           {/* Balance breakdown */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
             <Tile label="Total Equity" value={`$${fmt2(okxBalance?.totalEquityUSDT)}`} color="emerald" loading={loadBalance} />
             <Tile label="Available USDT" value={`$${fmt2(okxBalance?.availableUSDT)}`} color="emerald" loading={loadBalance} />
             <Tile label="Frozen USDT" value={`$${fmt2(okxBalance?.frozenUSDT)}`} color="yellow" loading={loadBalance} />
             <Tile label="Open Orders" value={okxBalance?.openOrdersCount ?? 0} color="slate" loading={loadBalance} />
             <Tile label="Active Positions" value={parseFloat(okxBalance?.nonFreeBal || 0) > 0.01 ? 'YES' : 'NONE'} color={parseFloat(okxBalance?.nonFreeBal || 0) > 0.01 ? 'red' : 'slate'} loading={loadBalance} />
+            <Tile label="Dust Assets Value" value={`$${fmt2(dustValue)}`} color="slate" loading={loadBalance} />
           </div>
 
           {/* Raw OKX USDT object */}
@@ -204,50 +229,50 @@ export default function Dashboard() {
           <TabsContent value="orders" className="mt-4">
             <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold text-emerald-400">Last 10 Clean Orders</h3>
-                <span className="text-xs text-slate-500">Unique by ordId · instId · side</span>
+              <h3 className="text-base font-bold text-emerald-400">Last 10 Clean Orders</h3>
+              <span className="text-xs text-slate-500">Unique by ordId · instId · side</span>
               </div>
               {loadMetrics ? <Skeleton className="h-40 bg-slate-800" /> :
-                latestOrders.length === 0 ? (
-                  <div className="text-center text-slate-400 py-8">No clean orders</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead className="border-b border-slate-700">
-                        <tr className="text-slate-400">
-                          <th className="text-left px-2 py-2">#</th>
-                          <th className="text-left px-2 py-2">ordId (last 8)</th>
-                          <th className="text-left px-2 py-2">Pair</th>
-                          <th className="text-left px-2 py-2">Side</th>
-                          <th className="text-right px-2 py-2">Price</th>
-                          <th className="text-right px-2 py-2">Qty</th>
-                          <th className="text-right px-2 py-2">Fee</th>
-                          <th className="text-left px-2 py-2">Time</th>
+              latestOrders.length === 0 ? (
+                <div className="text-center text-slate-400 py-8">No clean orders</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="border-b border-slate-700">
+                      <tr className="text-slate-400">
+                        <th className="text-left px-2 py-2">#</th>
+                        <th className="text-left px-2 py-2">ordId (full)</th>
+                        <th className="text-left px-2 py-2">Pair</th>
+                        <th className="text-left px-2 py-2">Side</th>
+                        <th className="text-right px-2 py-2">Price</th>
+                        <th className="text-right px-2 py-2">Qty</th>
+                        <th className="text-right px-2 py-2">Fee</th>
+                        <th className="text-left px-2 py-2">fillTime</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {latestOrders.map((o, i) => (
+                        <tr key={o.ordId || i} className="border-b border-slate-800/50 hover:bg-slate-800/20">
+                          <td className="px-2 py-2 text-slate-500">{i + 1}</td>
+                          <td className="px-2 py-2 font-mono text-slate-200 text-xs select-all">
+                            {o.ordId || '—'}
+                          </td>
+                          <td className="px-2 py-2 font-bold text-white">{o.instId}</td>
+                          <td className={`px-2 py-2 font-bold ${o.side === 'buy' ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {o.side?.toUpperCase()}
+                          </td>
+                          <td className="px-2 py-2 text-right">${fmt2(o.avgPx)}</td>
+                          <td className="px-2 py-2 text-right text-slate-400">{fmt6(o.accFillSz)}</td>
+                          <td className="px-2 py-2 text-right text-red-400">{fmt4(o.fee)}</td>
+                          <td className="px-2 py-2 text-slate-400 text-xs whitespace-nowrap">
+                            {o.timestamp ? new Date(o.timestamp).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' }) : '—'}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {latestOrders.map((o, i) => (
-                          <tr key={o.ordId || i} className="border-b border-slate-800/50 hover:bg-slate-800/20">
-                            <td className="px-2 py-2 text-slate-500">{i + 1}</td>
-                            <td className="px-2 py-2 font-mono text-slate-300 text-xs" title={o.ordId}>
-                              {shortId(o.ordId)}
-                            </td>
-                            <td className="px-2 py-2 font-bold text-white">{o.instId}</td>
-                            <td className={`px-2 py-2 font-bold ${o.side === 'buy' ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {o.side?.toUpperCase()}
-                            </td>
-                            <td className="px-2 py-2 text-right">${fmt2(o.avgPx)}</td>
-                            <td className="px-2 py-2 text-right text-slate-400">{fmt6(o.accFillSz)}</td>
-                            <td className="px-2 py-2 text-right text-red-400">{fmt4(o.fee)}</td>
-                            <td className="px-2 py-2 text-slate-500 text-xs">
-                              {o.timestamp ? new Date(o.timestamp).toLocaleTimeString() : '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </TabsContent>
 
@@ -268,13 +293,13 @@ export default function Dashboard() {
                         <tr className="text-slate-400">
                           <th className="text-left px-2 py-2">#</th>
                           <th className="text-left px-2 py-2">Pair</th>
-                          <th className="text-left px-2 py-2">buyOrdId</th>
-                          <th className="text-left px-2 py-2">sellOrdId</th>
+                          <th className="text-left px-2 py-2">buyOrdId (full)</th>
+                          <th className="text-left px-2 py-2">sellOrdId (full)</th>
                           <th className="text-right px-2 py-2">Entry</th>
                           <th className="text-right px-2 py-2">Exit</th>
-                          <th className="text-right px-2 py-2">Qty</th>
-                          <th className="text-right px-2 py-2">P&L</th>
-                          <th className="text-right px-2 py-2">P&L%</th>
+                          <th className="text-right px-2 py-2">netPnL</th>
+                          <th className="text-right px-2 py-2">pnl%</th>
+                          <th className="text-right px-2 py-2">holdTime</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -286,20 +311,22 @@ export default function Dashboard() {
                             <tr key={`${t.buyOrdId}-${t.sellOrdId}`} className="border-b border-slate-800/50 hover:bg-slate-800/20">
                               <td className="px-2 py-2 text-slate-500">{i + 1}</td>
                               <td className="px-2 py-2 font-bold text-white">{t.instId}</td>
-                              <td className="px-2 py-2 font-mono text-emerald-300 text-xs" title={t.buyOrdId}>
-                                {shortId(t.buyOrdId)}
+                              <td className="px-2 py-2 font-mono text-emerald-300 text-xs select-all">
+                                {t.buyOrdId || '—'}
                               </td>
-                              <td className="px-2 py-2 font-mono text-red-300 text-xs" title={t.sellOrdId}>
-                                {shortId(t.sellOrdId)}
+                              <td className="px-2 py-2 font-mono text-red-300 text-xs select-all">
+                                {t.sellOrdId || '—'}
                               </td>
                               <td className="px-2 py-2 text-right">${fmt2(t.buyPrice)}</td>
                               <td className="px-2 py-2 text-right">${fmt2(t.sellPrice)}</td>
-                              <td className="px-2 py-2 text-right text-slate-400">{fmt6(t.buyQty || t.sellQty)}</td>
                               <td className={`px-2 py-2 text-right font-bold ${pnlClass}`}>
                                 {pnl >= 0 ? '+' : ''}{fmt4(pnl)}
                               </td>
                               <td className={`px-2 py-2 text-right font-bold ${pnlClass}`}>
                                 {pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(3)}%
+                              </td>
+                              <td className="px-2 py-2 text-right text-slate-400">
+                                {fmtHoldTime(t.holdingMs)}
                               </td>
                             </tr>
                           );
@@ -313,7 +340,28 @@ export default function Dashboard() {
         </Tabs>
 
         {/* ══════════════════════════════════════════════
-            SECTION 4: SYSTEM STATUS
+            SECTION 4: ACTION PANEL
+        ══════════════════════════════════════════════ */}
+        <div className="rounded-2xl p-5 border border-slate-700 bg-slate-900/50">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Actions</div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            {/* ENABLED safe actions */}
+            <ActionBtn label="🔄 Refresh OKX Balance" enabled onClick={() => base44.functions.invoke('okxLiveBalance', {})} />
+            <ActionBtn label="📥 Sync OKX Fills" enabled onClick={() => base44.functions.invoke('syncOKXOrderLedger', {})} />
+            <ActionBtn label="🔧 Rebuild Accounting" enabled onClick={() => base44.functions.invoke('finalCleanMetricsWithDedup', {})} />
+            <ActionBtn label="📋 View Audit" enabled onClick={() => window.open('/OKXDataSync', '_blank')} />
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* DISABLED — trading buttons */}
+            <ActionBtn label="🚫 Start Alpha Scalper" enabled={false} disabledReason="Kill switch active" />
+            <ActionBtn label="🚫 Run One Cycle" enabled={false} disabledReason="Kill switch active" />
+            <ActionBtn label="🚫 Execute Trade" enabled={false} disabledReason="Kill switch active" />
+            <ActionBtn label="🚫 Run Bot Trades" enabled={false} disabledReason="Kill switch active" />
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════
+            SECTION 5: SYSTEM STATUS
         ══════════════════════════════════════════════ */}
         <div className="rounded-2xl p-5 border-2 border-red-700 bg-red-950/20">
           <h3 className="text-base font-bold text-red-400 mb-4">🔒 SYSTEM STATUS</h3>
@@ -352,6 +400,25 @@ function Tile({ label, value, color = 'slate', loading = false }) {
         <div className={`text-xl font-bold ${colorMap[color] || 'text-white'}`}>{value}</div>
       )}
     </div>
+  );
+}
+
+// ── Action button ──
+function ActionBtn({ label, enabled, onClick, disabledReason }) {
+  return (
+    <button
+      onClick={enabled ? onClick : undefined}
+      disabled={!enabled}
+      title={!enabled ? disabledReason : undefined}
+      className={`rounded-xl px-4 py-3 text-xs font-bold border transition-all text-left ${
+        enabled
+          ? 'bg-slate-800 border-emerald-700 text-emerald-300 hover:bg-emerald-900/40 cursor-pointer'
+          : 'bg-slate-900/30 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'
+      }`}
+    >
+      {label}
+      {!enabled && <div className="text-slate-700 font-normal mt-0.5">{disabledReason}</div>}
+    </button>
   );
 }
 
