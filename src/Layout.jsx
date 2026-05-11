@@ -56,6 +56,7 @@ export default function Layout({ children, currentPageName }) {
     { nameKey: 'connectBinance', page: 'ConnectBinance', icon: Link2, fallback: 'Connect Binance' },
     { nameKey: 'connectOKX', page: 'ConnectOKX', icon: Link2, fallback: 'Connect OKX' },
     { nameKey: 'okxDashboard', page: 'OKXDashboard', icon: Link2, fallback: 'OKX Dashboard' },
+    { nameKey: 'signalDashboard', page: 'SignalDashboard', icon: Activity, fallback: '📡 Signal Dashboard' },
     { nameKey: 'wallet', page: 'Wallet', icon: Users },
     { nameKey: 'deposit', page: 'Deposit', icon: TrendingUp },
     { nameKey: 'vipUpgrade', page: 'VIPUpgrade', icon: Crown },
