@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
+import SystemArchitectureDiagram from '@/components/dashboard/SystemArchitectureDiagram';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -361,7 +362,12 @@ export default function Dashboard() {
         </div>
 
         {/* ══════════════════════════════════════════════
-            SECTION 5: SYSTEM STATUS
+            SECTION 5: ARCHITECTURE DIAGRAM
+        ══════════════════════════════════════════════ */}
+        <SystemArchitectureDiagram />
+
+        {/* ══════════════════════════════════════════════
+            SECTION 6: SYSTEM STATUS
         ══════════════════════════════════════════════ */}
         <div className="rounded-2xl p-5 border-2 border-red-700 bg-red-950/20">
           <h3 className="text-base font-bold text-red-400 mb-4">🔒 SYSTEM STATUS</h3>
