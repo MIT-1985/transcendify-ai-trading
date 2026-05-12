@@ -156,41 +156,60 @@ async function testOKXTickOrSecond(instId) {
   };
 }
 
-// ── Determine recommended data mode ──────────────────────────────────────────
-// NOTE: Polygon 1s is NOT_AUTHORIZED on current plan (403).
-//       Polygon 1m is NOT_AUTHORIZED on current plan (403).
-//       Confirmed engine mode: POLYGON_DAILY_MACRO + OKX_1M_INTRADAY + OKX_TRADES_CONFIRMATION
+// ── Determine recommended data mode per pair ──────────────────────────────────
 function recommendDataMode(poly1s, poly1m, polyDaily, okx1m, okxTick) {
   let recommendedIntradaySource;
   let recommendedMacroSource;
   let engineRule;
+  let dataMode;
+  let tradeAllowed = false;
+  let recommendedAction;
+  let reason;
 
   if (poly1s.available) {
-    // Would need paid Polygon plan upgrade
     recommendedIntradaySource = 'POLYGON_1S';
     engineRule = 'POLYGON_1S_MICRO_SIGNAL';
+    dataMode = 'POLYGON_1S_MICRO_SIGNAL';
   } else if (poly1m.available) {
-    // Would need paid Polygon plan upgrade
     recommendedIntradaySource = 'POLYGON_1M';
     engineRule = 'POLYGON_1M_INTRADAY_SIGNAL';
+    dataMode = 'POLYGON_1M_INTRADAY_SIGNAL';
   } else if (polyDaily.available && okx1m.available && okxTick.available) {
-    // Current confirmed working mode
+    // Full confirmed engine mode
     recommendedIntradaySource = 'OKX_1M';
     engineRule = 'POLYGON_DAILY_MACRO_PLUS_OKX_1M_INTRADAY_PLUS_OKX_TRADES_CONFIRMATION';
+    dataMode = 'POLYGON_DAILY_MACRO_PLUS_OKX_1M_INTRADAY_PLUS_OKX_TRADES_CONFIRMATION';
+    recommendedAction = 'TRADE_READY';
   } else if (polyDaily.available && okx1m.available) {
     recommendedIntradaySource = 'OKX_1M';
     engineRule = 'POLYGON_DAILY_MACRO_PLUS_OKX_1M_INTRADAY';
+    dataMode = 'POLYGON_DAILY_MACRO_PLUS_OKX_1M_INTRADAY';
+    recommendedAction = 'WATCH_ONLY';
+    reason = 'OKX trades/tick unavailable';
+  } else if (okx1m.available && okxTick.available) {
+    // Polygon macro unavailable — limited mode
+    recommendedIntradaySource = 'OKX_1M';
+    engineRule = 'OKX_INTRADAY_ONLY_LIMITED';
+    dataMode = 'OKX_INTRADAY_ONLY_LIMITED';
+    recommendedAction = 'WATCH_ONLY';
+    reason = 'Polygon macro unavailable for this pair';
   } else if (okxTick.available) {
     recommendedIntradaySource = 'OKX_TICK';
     engineRule = 'OKX_TICK_ONLY_LIMITED';
+    dataMode = 'OKX_TICK_ONLY_LIMITED';
+    recommendedAction = 'WATCH_ONLY';
+    reason = 'Polygon macro unavailable and OKX 1m unavailable';
   } else {
     recommendedIntradaySource = 'NONE';
     engineRule = 'WAIT_DATA_UNAVAILABLE';
+    dataMode = 'WAIT_DATA_UNAVAILABLE';
+    recommendedAction = 'SKIP';
+    reason = 'No usable data source';
   }
 
   recommendedMacroSource = polyDaily.available ? 'POLYGON_DAILY' : 'NONE';
 
-  return { recommendedIntradaySource, recommendedMacroSource, engineRule };
+  return { recommendedIntradaySource, recommendedMacroSource, engineRule, dataMode, tradeAllowed, recommendedAction, reason };
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -230,7 +249,11 @@ Deno.serve(async (req) => {
       const okx1m   = await testOKX1m(pair.okx);
       const okxTick = await testOKXTickOrSecond(pair.okx);
 
-      const { recommendedIntradaySource, recommendedMacroSource, engineRule } = recommendDataMode(poly1s, poly1m, polyDaily, okx1m, okxTick);
+      const { recommendedIntradaySource, recommendedMacroSource, engineRule, dataMode, tradeAllowed: pairTradeAllowed, recommendedAction, reason } = recommendDataMode(poly1s, poly1m, polyDaily, okx1m, okxTick);
+
+      // Is this pair "full data"?
+      const isFullData = polyDaily.available && okx1m.available && okxTick.available;
+      const isLimited  = !polyDaily.available && (okx1m.available || okxTick.available);
 
       console.log(`[DATA_ACCESS_TEST] ${pair.okx}: poly1s=${poly1s.available}(${poly1s.candlesCount}) poly1m=${poly1m.available}(${poly1m.candlesCount}) polyDaily=${polyDaily.available}(${polyDaily.candlesCount}) okx1m=${okx1m.available} → ${engineRule}`);
 
@@ -238,23 +261,32 @@ Deno.serve(async (req) => {
         pair:       pair.okx,
         polyTicker: pair.poly,
 
+        // Coverage classification
+        isFullData,
+        isLimited,
+        isUnavailable: !okx1m.available && !okxTick.available,
+
         // Summary flags
-        polygonSecondAvailable:  poly1s.available,
-        polygonMinuteAvailable:  poly1m.available,
-        polygonDailyAvailable:   polyDaily.available,
-        okx1mAvailable:          okx1m.available,
+        polygonSecondAvailable:   poly1s.available,
+        polygonMinuteAvailable:   poly1m.available,
+        polygonDailyAvailable:    polyDaily.available,
+        okx1mAvailable:           okx1m.available,
         okxTickOrSecondAvailable: okxTick.available,
 
         // Recommended sources
         recommendedIntradaySource,
         recommendedMacroSource,
         engineRule,
+        dataMode,
+        tradeAllowed: false, // always false — kill switch
+        recommendedAction: recommendedAction || (isFullData ? 'TRADE_READY' : 'WATCH_ONLY'),
+        reason: reason || null,
 
         // Raw test results
         tests: {
-          polygon1s:    poly1s,
-          polygon1m:    poly1m,
-          polygonDaily: polyDaily,
+          polygon1s:       poly1s,
+          polygon1m:       poly1m,
+          polygonDaily:    polyDaily,
           okx1m,
           okxTickOrSecond: okxTick,
         },
@@ -271,6 +303,23 @@ Deno.serve(async (req) => {
     const anyOKX1m     = pairResults.some(r => r.okx1mAvailable);
     const anyOKXTick   = pairResults.some(r => r.okxTickOrSecondAvailable);
 
+    // Per-pair coverage counts
+    const fullDataPairs      = pairResults.filter(r => r.isFullData).map(r => r.pair);
+    const limitedDataPairs   = pairResults.filter(r => r.isLimited).map(r => r.pair);
+    const unavailablePairs   = pairResults.filter(r => r.isUnavailable).map(r => r.pair);
+    const requestedPairs     = PRIMARY_PAIRS.map(p => p.okx);
+    const returnedPairs      = pairResults.map(r => r.pair);
+    const missingPairs       = requestedPairs.filter(p => !returnedPairs.includes(p));
+
+    const pairCoverage = {
+      totalPairsRequested: requestedPairs.length,
+      fullDataPairs,
+      limitedDataPairs,
+      unavailablePairs,
+      missingPairs,
+    };
+
+    // Global engine rule — based on full pair set (any == true for poly is fine since it's per-pair)
     let globalEngineRule;
     if (anyPoly1s) {
       globalEngineRule = 'POLYGON_1S_MICRO_SIGNAL';
@@ -284,9 +333,27 @@ Deno.serve(async (req) => {
       globalEngineRule = 'WAIT_DATA_UNAVAILABLE';
     }
 
+    // Final phase 3 readiness verdict — requires BTC-USDT AND ETH-USDT to be fullData
+    const btcFull = pairResults.find(r => r.pair === 'BTC-USDT')?.isFullData ?? false;
+    const ethFull = pairResults.find(r => r.pair === 'ETH-USDT')?.isFullData ?? false;
+    const primaryCoreReady = btcFull && ethFull;
+
+    let finalVerdict;
+    let finalVerdictReason;
+    if (!primaryCoreReady) {
+      finalVerdict = 'ENGINE_NOT_READY';
+      finalVerdictReason = `BTC full=${btcFull}, ETH full=${ethFull} — primary core pairs must both have full data`;
+    } else if (fullDataPairs.length === requestedPairs.length) {
+      finalVerdict = 'ENGINE_FULLY_READY_FOR_PHASE_3';
+      finalVerdictReason = 'All requested pairs have full data (Polygon daily + OKX 1m + OKX trades)';
+    } else {
+      finalVerdict = 'ENGINE_PARTIALLY_READY_FOR_PHASE_3';
+      finalVerdictReason = `BTC/ETH full. Limited pairs: [${limitedDataPairs.join(', ')}]. Missing macro: check Polygon rate limits for alt pairs.`;
+    }
+
     const bestIntradayModes = [...new Set(pairResults.map(r => r.recommendedIntradaySource))].filter(Boolean);
 
-    console.log(`[DATA_ACCESS_TEST] Complete. globalEngineRule=${globalEngineRule} poly1s=${anyPoly1s} poly1m=${anyPoly1m} polyDaily=${anyPolyDaily} okx1m=${anyOKX1m}`);
+    console.log(`[DATA_ACCESS_TEST] Complete. verdict=${finalVerdict} globalEngineRule=${globalEngineRule} btcFull=${btcFull} ethFull=${ethFull} fullPairs=${fullDataPairs.length}/${requestedPairs.length}`);
 
     return Response.json({
       diagnostic:               'DATA_ACCESS_TEST',
@@ -294,23 +361,22 @@ Deno.serve(async (req) => {
       noOKXOrderEndpointCalled: true,
       killSwitchActive:         true,
       testTime:                 new Date().toISOString(),
+      finalVerdict,
+      finalVerdictReason,
       globalSummary: {
-        polygonSecondAvailable:  anyPoly1s,
-        polygonMinuteAvailable:  anyPoly1m,
-        polygonDailyAvailable:   anyPolyDaily,
-        okx1mAvailable:          anyOKX1m,
+        polygonSecondAvailable:   anyPoly1s,
+        polygonMinuteAvailable:   anyPoly1m,
+        polygonDailyAvailable:    anyPolyDaily,
+        okx1mAvailable:           anyOKX1m,
         okxTickOrSecondAvailable: anyOKXTick,
         globalEngineRule,
         bestIntradayModes,
-        recommendation: anyPoly1s
-          ? '✅ Polygon 1s available — upgrade engine to MICRO_SIGNAL mode'
-          : anyPoly1m
-          ? '✅ Polygon 1m available — upgrade engine to 1M_INTRADAY mode'
-          : anyPolyDaily && anyOKX1m && anyOKXTick
-          ? '✅ Confirmed engine mode: POLYGON_DAILY_MACRO + OKX_1M_INTRADAY + OKX_TRADES_CONFIRMATION'
-          : anyPolyDaily && anyOKX1m
-          ? '⚠️ Polygon daily + OKX 1m only (trades unavailable) — partial engine mode'
-          : '❌ Insufficient data — keep WAIT_DATA_UNAVAILABLE, do not trade',
+        pairCoverage,
+        recommendation: finalVerdict === 'ENGINE_FULLY_READY_FOR_PHASE_3'
+          ? '✅ All pairs confirmed. Engine fully ready for Phase 3.'
+          : finalVerdict === 'ENGINE_PARTIALLY_READY_FOR_PHASE_3'
+          ? '⚠️ BTC/ETH confirmed full. Some alt pairs limited (likely Polygon rate limit on alts). Partial Phase 3 ready.'
+          : '❌ Engine NOT ready. Primary core (BTC/ETH) missing full data.',
         okxLimitsNote: `OKX: no 1s candle bars. /market/candles max=${OKX_CANDLE_LIMIT}/req. /market/history-candles max=${OKX_HISTORY_LIMIT}/req (paginate). /market/trades max=${OKX_TRADES_LIMIT} (tick confirmation).`,
       },
       pairs: pairResults,
