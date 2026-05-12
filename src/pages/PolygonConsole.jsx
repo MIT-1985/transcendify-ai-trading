@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -13,15 +13,23 @@ import AdvancedIndicators from '@/components/market/AdvancedIndicators';
 import ComplexAlerts from '@/components/market/ComplexAlerts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { startMarketDataStore, stopMarketDataStore, subscribeMarketData } from '@/lib/marketDataStore';
 
+// OKX instId format — single source of truth
 const CRYPTO_PAIRS = [
-  'X:BTCUSD',
-  'X:ETHUSD',
-  'X:SOLUSD',
-  'X:XRPUSD',
-  'X:ADAUSD',
-  'X:DOGEUSD'
+  'BTC-USDT', 'ETH-USDT', 'SOL-USDT',
+  'XRP-USDT', 'ADA-USDT', 'DOGE-USDT',
 ];
+
+// Convert OKX instId → TradingView symbol
+function toTVSymbol(instId) {
+  return instId.replace('-USDT', 'USD');   // BTC-USDT → BTCUSD
+}
+
+// Display label
+function toLabel(instId) {
+  return instId.replace('-USDT', '/USDT'); // BTC-USDT → BTC/USDT
+}
 
 const TIMEFRAMES = [
   { value: 'minute', label: '1m', multiplier: 1, limit: 60 },
@@ -34,38 +42,24 @@ const TIMEFRAMES = [
 ];
 
 export default function PolygonConsole() {
-  const [selectedPair, setSelectedPair] = useState('X:BTCUSD');
+  // selectedPair is in OKX format (BTC-USDT), displayed as Polygon format (X:BTCUSD)
+  const [selectedPair, setSelectedPair] = useState('BTC-USDT');
   const [timeframe, setTimeframe] = useState(TIMEFRAMES[4]); // 1h default
-  const [currentPrice, setCurrentPrice] = useState(0);
-  const [priceChange, setPriceChange] = useState(0);
+  const [prices, setPrices] = useState({});
   const [isChartLoading, setIsChartLoading] = useState(true);
-  const [error, setError] = useState(null);
 
+  // Start shared market data store — one timer for all components
   useEffect(() => {
-    // Use OKX public ticker — no auth, no rate limits
-    const okxInstId = selectedPair.replace('X:', '').replace('USD', '-USDT');
-    const fetchPrice = async () => {
-      try {
-        const res  = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${okxInstId}`);
-        const json = await res.json();
-        const d    = json?.data?.[0];
-        if (d) {
-          setCurrentPrice(parseFloat(d.last) || 0);
-          const open = parseFloat(d.open24h) || 0;
-          const last = parseFloat(d.last)    || 0;
-          setPriceChange(open > 0 ? ((last - open) / open) * 100 : 0);
-        }
-      } catch (err) {
-        // silent — don't break UI
-      }
-    };
+    startMarketDataStore(12000);
+    const unsub = subscribeMarketData(({ prices }) => setPrices(prices));
+    return () => { unsub(); stopMarketDataStore(); };
+  }, []);
 
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 5000);
-    return () => clearInterval(interval);
-  }, [selectedPair]);
+  const ticker      = prices[selectedPair];
+  const currentPrice = ticker?.last       || 0;
+  const priceChange  = ticker?.change24hPct || 0;
 
-  const tvSymbol = selectedPair.replace('X:', '').replace('USD', 'USD');
+  const tvSymbol   = toTVSymbol(selectedPair);
   const tvInterval = timeframe.label === '1m' ? '1' : timeframe.label === '5m' ? '5' : timeframe.label === '15m' ? '15' : timeframe.label === '30m' ? '30' : timeframe.label === '1h' ? '60' : timeframe.label === '6h' ? '360' : 'D';
 
   return (
@@ -82,9 +76,7 @@ export default function PolygonConsole() {
               </SelectTrigger>
               <SelectContent className="bg-slate-900 border-slate-700">
                 {CRYPTO_PAIRS.map(pair => (
-                  <SelectItem key={pair} value={pair}>
-                    {pair.replace('X:', '').replace('USD', '/USD')}
-                  </SelectItem>
+                  <SelectItem key={pair} value={pair}>{toLabel(pair)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -115,7 +107,7 @@ export default function PolygonConsole() {
 
           <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-2" />
-            Live
+            OKX Live · 12s
           </Badge>
         </div>
 
@@ -197,11 +189,11 @@ export default function PolygonConsole() {
           </div>
         </div>
 
-        {/* Market Watchlist */}
+        {/* Market Watchlist — reads from shared store, no individual polling */}
         <div className="mt-4">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {CRYPTO_PAIRS.map(pair => (
-              <QuickPriceCard key={pair} symbol={pair} onSelect={setSelectedPair} isActive={pair === selectedPair} />
+              <QuickPriceCard key={pair} symbol={pair} ticker={prices[pair]} onSelect={setSelectedPair} isActive={pair === selectedPair} />
             ))}
           </div>
         </div>
@@ -210,46 +202,21 @@ export default function PolygonConsole() {
   );
 }
 
-function QuickPriceCard({ symbol, onSelect, isActive }) {
-  const [price, setPrice] = useState(0);
-  const [change, setChange] = useState(0);
-
-  useEffect(() => {
-    // OKX public ticker — no auth, no rate limits
-    const okxInstId = symbol.replace('X:', '').replace('USD', '-USDT');
-    const fetchPrice = async () => {
-      try {
-        const res  = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${okxInstId}`);
-        const json = await res.json();
-        const d    = json?.data?.[0];
-        if (d) {
-          setPrice(parseFloat(d.last) || 0);
-          const open = parseFloat(d.open24h) || 0;
-          const last = parseFloat(d.last)    || 0;
-          setChange(open > 0 ? ((last - open) / open) * 100 : 0);
-        }
-      } catch (err) {
-        // silent
-      }
-    };
-
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 10000);
-    return () => clearInterval(interval);
-  }, [symbol]);
+// QuickPriceCard reads from shared store (passed as prop) — no individual polling
+function QuickPriceCard({ symbol, ticker, onSelect, isActive }) {
+  const price  = ticker?.last          || 0;
+  const change = ticker?.change24hPct  || 0;
 
   return (
-    <div 
+    <div
       className={`bg-slate-900/50 border rounded-lg p-3 hover:border-blue-500/50 transition-all cursor-pointer ${
         isActive ? 'border-blue-500' : 'border-slate-800'
       }`}
       onClick={() => onSelect(symbol)}
     >
-      <div className="text-xs text-slate-500 mb-1">
-        {symbol.replace('X:', '').replace('USD', '/USD')}
-      </div>
+      <div className="text-xs text-slate-500 mb-1">{toLabel(symbol)}</div>
       <div className="text-base font-bold text-white mb-1">
-        ${price.toFixed(2)}
+        ${price < 1 ? price.toFixed(5) : price.toFixed(2)}
       </div>
       <div className={`text-xs flex items-center gap-1 ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
         {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}

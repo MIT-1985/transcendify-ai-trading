@@ -85,9 +85,20 @@ async function testPolygonAgg(ticker, multiplier, timespan, fromMs, toMs, apiKey
   }
 }
 
+// ── OKX candle constants (correct values) ────────────────────────────────────
+// OKX does NOT have 1s candle bars. Smallest bar = 1m.
+// /market/candles max limit = 300 per request
+// /market/history-candles max limit = 100 per request
+// /market/trades max = 500 (tick confirmation, not candles)
+const OKX_CANDLE_LIMIT  = 300;
+const OKX_HISTORY_LIMIT = 100;
+const OKX_TRADES_LIMIT  = 500;
+
 // ── OKX 1m candle tester ──────────────────────────────────────────────────────
 async function testOKX1m(instId) {
-  const endpoint = `https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1m&limit=120`;
+  // Use 120 candles (well within 300 limit) — covers 2 hours of 1m data
+  const limit   = Math.min(120, OKX_CANDLE_LIMIT);
+  const endpoint = `https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1m&limit=${limit}`;
   try {
     const res  = await fetch(endpoint);
     const json = await res.json();
@@ -97,6 +108,7 @@ async function testOKX1m(instId) {
       candlesCount: data.length,
       httpStatus:   res.status,
       endpoint,
+      note:         `OKX /market/candles max=${OKX_CANDLE_LIMIT}. No 1s bars on OKX — 1m is smallest.`,
       errorMessage: data.length === 0 ? (json?.msg || `HTTP ${res.status} no data`) : null,
     };
   } catch (err) {
@@ -104,14 +116,17 @@ async function testOKX1m(instId) {
   }
 }
 
-// ── OKX tick / index candle tester ───────────────────────────────────────────
+// ── OKX tick / trades tester (NOT candles — trade confirmation) ───────────────
+// OKX has NO 1s candle endpoint. For near-realtime confirmation use /market/trades.
+// Also test /market/history-candles (paginatable, 100/req) for extended history.
 async function testOKXTickOrSecond(instId) {
-  // OKX doesn't have true 1-second candles, but offers index candles and trades
-  // Try: index candles (1m), then index tickers, then recent trades as tick proxy
   const endpoints = [
-    { label: 'OKX_INDEX_1M',    url: `https://www.okx.com/api/v5/market/index-candles?instId=${instId.replace('-USDT', '-USDT')}&bar=1m&limit=10` },
-    { label: 'OKX_MARK_1M',     url: `https://www.okx.com/api/v5/market/mark-price-candles?instId=${instId}&bar=1m&limit=10` },
-    { label: 'OKX_TRADES_TICK', url: `https://www.okx.com/api/v5/market/trades?instId=${instId}&limit=50` },
+    // Recent trades — tick confirmation (max 500)
+    { label: 'OKX_TRADES_TICK',    url: `https://www.okx.com/api/v5/market/trades?instId=${instId}&limit=100` },
+    // History candles — paginated 1m history (max 100/req)
+    { label: 'OKX_HISTORY_1M',     url: `https://www.okx.com/api/v5/market/history-candles?instId=${instId}&bar=1m&limit=${OKX_HISTORY_LIMIT}` },
+    // Mark price 1m candles
+    { label: 'OKX_MARK_PRICE_1M',  url: `https://www.okx.com/api/v5/market/mark-price-candles?instId=${instId}&bar=1m&limit=10` },
   ];
 
   const results = [];
@@ -142,17 +157,26 @@ async function testOKXTickOrSecond(instId) {
 }
 
 // ── Determine recommended data mode ──────────────────────────────────────────
+// NOTE: Polygon 1s is NOT_AUTHORIZED on current plan (403).
+//       Polygon 1m is NOT_AUTHORIZED on current plan (403).
+//       Confirmed engine mode: POLYGON_DAILY_MACRO + OKX_1M_INTRADAY + OKX_TRADES_CONFIRMATION
 function recommendDataMode(poly1s, poly1m, polyDaily, okx1m, okxTick) {
   let recommendedIntradaySource;
   let recommendedMacroSource;
   let engineRule;
 
   if (poly1s.available) {
+    // Would need paid Polygon plan upgrade
     recommendedIntradaySource = 'POLYGON_1S';
     engineRule = 'POLYGON_1S_MICRO_SIGNAL';
   } else if (poly1m.available) {
+    // Would need paid Polygon plan upgrade
     recommendedIntradaySource = 'POLYGON_1M';
     engineRule = 'POLYGON_1M_INTRADAY_SIGNAL';
+  } else if (polyDaily.available && okx1m.available && okxTick.available) {
+    // Current confirmed working mode
+    recommendedIntradaySource = 'OKX_1M';
+    engineRule = 'POLYGON_DAILY_MACRO_PLUS_OKX_1M_INTRADAY_PLUS_OKX_TRADES_CONFIRMATION';
   } else if (polyDaily.available && okx1m.available) {
     recommendedIntradaySource = 'OKX_1M';
     engineRule = 'POLYGON_DAILY_MACRO_PLUS_OKX_1M_INTRADAY';
@@ -252,6 +276,8 @@ Deno.serve(async (req) => {
       globalEngineRule = 'POLYGON_1S_MICRO_SIGNAL';
     } else if (anyPoly1m) {
       globalEngineRule = 'POLYGON_1M_INTRADAY_SIGNAL';
+    } else if (anyPolyDaily && anyOKX1m && anyOKXTick) {
+      globalEngineRule = 'POLYGON_DAILY_MACRO_PLUS_OKX_1M_INTRADAY_PLUS_OKX_TRADES_CONFIRMATION';
     } else if (anyPolyDaily && anyOKX1m) {
       globalEngineRule = 'POLYGON_DAILY_MACRO_PLUS_OKX_1M_INTRADAY';
     } else {
@@ -280,9 +306,12 @@ Deno.serve(async (req) => {
           ? '✅ Polygon 1s available — upgrade engine to MICRO_SIGNAL mode'
           : anyPoly1m
           ? '✅ Polygon 1m available — upgrade engine to 1M_INTRADAY mode'
+          : anyPolyDaily && anyOKX1m && anyOKXTick
+          ? '✅ Confirmed engine mode: POLYGON_DAILY_MACRO + OKX_1M_INTRADAY + OKX_TRADES_CONFIRMATION'
           : anyPolyDaily && anyOKX1m
-          ? '⚠️ Only daily+OKX1m — current engine mode is correct (DAILY_MACRO + OKX_INTRADAY)'
+          ? '⚠️ Polygon daily + OKX 1m only (trades unavailable) — partial engine mode'
           : '❌ Insufficient data — keep WAIT_DATA_UNAVAILABLE, do not trade',
+        okxLimitsNote: `OKX: no 1s candle bars. /market/candles max=${OKX_CANDLE_LIMIT}/req. /market/history-candles max=${OKX_HISTORY_LIMIT}/req (paginate). /market/trades max=${OKX_TRADES_LIMIT} (tick confirmation).`,
       },
       pairs: pairResults,
       note: 'Read-only data access test. No orders placed. Kill switch active.',
