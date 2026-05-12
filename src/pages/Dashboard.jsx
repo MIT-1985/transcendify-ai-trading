@@ -150,11 +150,11 @@ export default function Dashboard() {
     enabled: !!user, staleTime: 60000, refetchInterval: 60000
   });
 
-  // Polygon Phase 1 signal (latest)
-  const { data: polygonSignal = null, isLoading: loadPolygon, refetch: refetchPolygon } = useQuery({
-    queryKey: ['dashboard-polygon-signal', user?.email],
-    queryFn: async () => { const r = await base44.functions.invoke('testPolygonFeeAwareSignal', {}); return r.data; },
-    enabled: !!user, staleTime: 300000, refetchInterval: false, gcTime: 0
+  // Paper trades summary
+  const { data: paperTrades = [] } = useQuery({
+    queryKey: ['dashboard-paper-trades', user?.email],
+    queryFn: () => base44.entities.PaperTrade.list('-created_date', 100),
+    enabled: !!user, staleTime: 30000, refetchInterval: 30000
   });
 
   // AI Trading analysis — on demand
@@ -181,8 +181,6 @@ export default function Dashboard() {
   const metrics    = cleanMetrics?.clean_metrics || {};
   const fmt2       = v => parseFloat(v||0).toFixed(2);
   const fmt4       = v => parseFloat(v||0).toFixed(4);
-  const polyBest   = polygonSignal?.bestPair;
-  const sqColor    = { FULL_SCAN:'text-emerald-400', PRIMARY_OK:'text-blue-400', PARTIAL_PRIMARY:'text-yellow-400', DEGRADED_SCAN:'text-orange-400', BLOCKED:'text-red-400' };
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 lg:p-6">
@@ -197,6 +195,7 @@ export default function Dashboard() {
           <div className="flex flex-wrap gap-2">
             <Link to="/OKXDashboard" className="px-4 py-2 text-xs font-bold rounded-xl bg-yellow-700/30 border border-yellow-700 hover:bg-yellow-700/50 text-yellow-300 transition-all">🔗 OKX Dashboard</Link>
             <Link to="/SignalDashboard" className="px-4 py-2 text-xs font-bold rounded-xl bg-blue-700/30 border border-blue-700 hover:bg-blue-700/50 text-blue-300 transition-all">📡 Signal Dashboard</Link>
+            <Link to="/PaperTradingDashboard" className="px-4 py-2 text-xs font-bold rounded-xl bg-yellow-700/30 border border-yellow-600 hover:bg-yellow-700/50 text-yellow-300 transition-all">📄 Phase 4 Paper Trading</Link>
           </div>
         </div>
 
@@ -213,7 +212,7 @@ export default function Dashboard() {
             <span className="text-xl">👁</span>
             <div>
               <div className="text-sm font-black text-emerald-400 uppercase tracking-widest">READ MODE ACTIVE</div>
-              <div className="text-xs text-emerald-300 mt-0.5">FEE_AWARE_POLYGON_ENGINE · Phase 1+2 monitoring</div>
+              <div className="text-xs text-emerald-300 mt-0.5">OKX_ONLY_ENGINE · Phase 4 Paper Trading active</div>
             </div>
           </div>
         </div>
@@ -239,7 +238,7 @@ export default function Dashboard() {
         <Tabs defaultValue="bots" className="w-full">
           <TabsList className="grid w-full grid-cols-5 bg-slate-900/50 border border-slate-700 rounded-xl p-1">
             <TabsTrigger value="bots"     className="text-xs">🤖 All Bots</TabsTrigger>
-            <TabsTrigger value="polygon"  className="text-xs">📡 Polygon</TabsTrigger>
+            <TabsTrigger value="polygon"  className="text-xs">📄 Paper P&L</TabsTrigger>
             <TabsTrigger value="ai"       className="text-xs">🧠 AI Trading</TabsTrigger>
             <TabsTrigger value="accounting" className="text-xs">✅ Accounting</TabsTrigger>
             <TabsTrigger value="system"   className="text-xs">🔒 System</TabsTrigger>
@@ -262,98 +261,9 @@ export default function Dashboard() {
             )}
           </TabsContent>
 
-          {/* POLYGON */}
+          {/* PAPER P&L */}
           <TabsContent value="polygon" className="mt-4">
-            <div className="space-y-4">
-              <div className="bg-slate-900/60 border border-blue-800 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-1">FEE_AWARE_POLYGON_TRADING_ENGINE · Phase 1</div>
-                    {polygonSignal && (
-                      <div className="flex flex-wrap gap-3 text-xs">
-                        <span className={`font-bold ${sqColor[polygonSignal.scanQuality] || 'text-slate-400'}`}>scanQuality: {polygonSignal.scanQuality}</span>
-                        <span className="text-slate-500">·</span>
-                        <span className="text-emerald-400">polyOK: {polygonSignal.pairsPolygonOK}/{polygonSignal.pairsRequested}</span>
-                        <span className="text-slate-500">·</span>
-                        <span className="text-red-400">tradeAllowed: false</span>
-                      </div>
-                    )}
-                  </div>
-                  <button onClick={() => refetchPolygon()} disabled={loadPolygon} className="px-4 py-2 text-xs font-bold rounded-xl bg-blue-700/30 border border-blue-700 hover:bg-blue-700/50 disabled:opacity-50 transition-all">
-                    {loadPolygon ? '⏳ Scanning…' : '🔄 Run Scan'}
-                  </button>
-                </div>
-
-                {loadPolygon && <Skeleton className="h-24 bg-slate-800" />}
-
-                {!loadPolygon && !polygonSignal && (
-                  <div className="text-slate-400 text-sm text-center py-8">Click "Run Scan" to fetch Polygon signals.</div>
-                )}
-
-                {polygonSignal && polyBest && (
-                  <div className="space-y-4">
-                    {/* Best pair */}
-                    <div className="bg-blue-950/30 border border-blue-700 rounded-xl p-4 text-xs">
-                      <div className="text-blue-400 font-bold mb-2">📡 Best Pair: {polyBest.pair}</div>
-                      <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
-                        {[
-                          ['Decision',    polyBest.decision,             polyBest.decision==='BUY_READY'?'emerald':polyBest.decision==='AVOID'?'red':'yellow'],
-                          ['Final Score', polyBest.finalScore?.toFixed(1), polyBest.finalScore>=70?'emerald':'yellow'],
-                          ['Trend',       polyBest.trend,                polyBest.trend==='BULLISH'?'emerald':'slate'],
-                          ['Momentum',    `${(polyBest.momentum||0).toFixed(3)}%`, polyBest.momentum>0?'emerald':'red'],
-                          ['Polygon',     polyBest.polygonStatus,        polyBest.polygonStatus==='OK'?'emerald':'red'],
-                          ['OKX',         polyBest.okxStatus,            polyBest.okxStatus==='OK'?'emerald':'red'],
-                        ].map(([l,v,c]) => (
-                          <div key={l} className="bg-slate-800/50 rounded-lg p-2 border border-slate-700">
-                            <div className="text-slate-400 mb-0.5">{l}</div>
-                            <div className={`font-bold text-${c}-400`}>{v}</div>
-                          </div>
-                        ))}
-                      </div>
-                      {polyBest.blockers?.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {polyBest.blockers.map((b,i) => <span key={i} className="px-1.5 py-0.5 rounded bg-red-950/50 border border-red-800 text-red-300 text-xs">{b}</span>)}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Top 3 */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead className="border-b border-slate-700 text-slate-400">
-                          <tr>
-                            <th className="text-left px-2 py-2">Pair</th>
-                            <th className="text-left px-2 py-2">Poly</th>
-                            <th className="text-left px-2 py-2">Trend</th>
-                            <th className="text-right px-2 py-2">Mom%</th>
-                            <th className="text-right px-2 py-2">PolyScore</th>
-                            <th className="text-right px-2 py-2">OKXScore</th>
-                            <th className="text-right px-2 py-2">Final</th>
-                            <th className="text-left px-2 py-2">Decision</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(polygonSignal.results||[]).sort((a,b)=>b.finalScore-a.finalScore).slice(0,10).map(p => (
-                            <tr key={p.pair} className="border-b border-slate-800/50 hover:bg-slate-800/20">
-                              <td className="px-2 py-2 font-bold">{p.pair}</td>
-                              <td className={`px-2 py-2 font-bold ${p.polygonStatus==='OK'?'text-emerald-400':'text-red-400'}`}>{p.polygonStatus==='OK'?'✓':'✗'}</td>
-                              <td className={`px-2 py-2 ${p.trend==='BULLISH'?'text-emerald-400':p.trend==='MILD_BULL'?'text-yellow-400':'text-slate-400'}`}>{p.trend||'—'}</td>
-                              <td className={`px-2 py-2 text-right ${(p.momentum||0)>0?'text-emerald-400':'text-red-400'}`}>{(p.momentum||0).toFixed(2)}%</td>
-                              <td className="px-2 py-2 text-right text-blue-400">{p.PolygonSignalScore?.toFixed(0)}</td>
-                              <td className="px-2 py-2 text-right text-cyan-400">{p.OKXExecutionScore?.toFixed(0)}</td>
-                              <td className={`px-2 py-2 text-right font-black ${p.finalScore>=70?'text-emerald-400':p.finalScore>=50?'text-yellow-400':'text-red-400'}`}>{p.finalScore?.toFixed(1)}</td>
-                              <td className="px-2 py-2">
-                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${p.decision==='BUY_READY'?'text-emerald-300':p.decision==='AVOID'?'text-red-300':'text-yellow-300'}`}>{p.decision}</span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <PaperPnLSummary user={user} />
           </TabsContent>
 
           {/* AI TRADING */}
@@ -445,6 +355,46 @@ export default function Dashboard() {
           </TabsContent>
         </Tabs>
 
+      </div>
+    </div>
+  );
+}
+
+// ── Paper P&L Summary for Dashboard tab ────────────────────────────────────────
+function PaperPnLSummary({ user }) {
+  const { data: trades = [], isLoading } = useQuery({
+    queryKey: ['dash-paper-pnl', user?.email],
+    queryFn:  () => base44.entities.PaperTrade.list('-created_date', 200),
+    enabled: !!user, staleTime: 30000,
+  });
+
+  const since24h  = Date.now() - 24*60*60*1000;
+  const closed    = trades.filter(t => t.status !== 'open');
+  const last24h   = closed.filter(t => t.closedAt && new Date(t.closedAt).getTime() >= since24h);
+  const open      = trades.filter(t => t.status === 'open');
+  const netPnL    = last24h.reduce((s, t) => s+(t.netPnLUSDT||0), 0);
+  const wins      = last24h.filter(t => (t.netPnLUSDT||0) > 0).length;
+  const wr        = last24h.length > 0 ? (wins/last24h.length*100).toFixed(1) : '0.0';
+
+  if (isLoading) return <Skeleton className="h-40 bg-slate-800 rounded-xl" />;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-slate-900/60 border border-yellow-800 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-xs font-bold text-yellow-400 uppercase tracking-widest">📄 Phase 4 Paper Trading — 24h Virtual P&L</div>
+          <Link to="/PaperTradingDashboard" className="px-3 py-1.5 text-xs font-bold rounded-lg bg-yellow-700/30 border border-yellow-700 hover:bg-yellow-700/50 text-yellow-300 transition-all">→ Full Dashboard</Link>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+          <StatTile label="24h Net PnL"  value={`${netPnL>=0?'+':''}${netPnL.toFixed(4)} USDT`} color={netPnL>=0?'emerald':'red'} />
+          <StatTile label="24h Trades"   value={last24h.length}    color="white" />
+          <StatTile label="Win Rate"     value={`${wr}%`}          color={parseFloat(wr)>=50?'emerald':'red'} />
+          <StatTile label="Open Now"     value={open.length}       color="yellow" />
+          <StatTile label="Total Closed" value={closed.length}     color="slate" />
+        </div>
+        {last24h.length === 0 && (
+          <div className="mt-4 text-center text-slate-400 text-sm py-4">No paper trades closed in last 24h. Run a cycle from the Paper Trading Dashboard.</div>
+        )}
       </div>
     </div>
   );

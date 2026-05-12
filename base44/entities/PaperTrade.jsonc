@@ -1,0 +1,121 @@
+{
+  "name": "PaperTrade",
+  "type": "object",
+  "properties": {
+    "instId": {
+      "type": "string",
+      "description": "Trading pair (BTC-USDT, ETH-USDT, etc)"
+    },
+    "side": {
+      "type": "string",
+      "enum": [
+        "buy",
+        "sell"
+      ],
+      "description": "Trade direction"
+    },
+    "entryPrice": {
+      "type": "number",
+      "description": "Simulated entry price"
+    },
+    "exitPrice": {
+      "type": "number",
+      "description": "Simulated exit price (null if open)"
+    },
+    "qty": {
+      "type": "number",
+      "description": "Trade quantity (USDT size / entry price)"
+    },
+    "sizeUSDT": {
+      "type": "number",
+      "description": "Position size in USDT"
+    },
+    "tpPrice": {
+      "type": "number",
+      "description": "Take profit price"
+    },
+    "slPrice": {
+      "type": "number",
+      "description": "Stop loss price"
+    },
+    "tpPercent": {
+      "type": "number",
+      "description": "Take profit % used"
+    },
+    "slPercent": {
+      "type": "number",
+      "description": "Stop loss % used"
+    },
+    "entryFeeUSDT": {
+      "type": "number",
+      "description": "Simulated entry fee"
+    },
+    "exitFeeUSDT": {
+      "type": "number",
+      "description": "Simulated exit fee"
+    },
+    "grossPnLUSDT": {
+      "type": "number",
+      "description": "Gross P&L before fees"
+    },
+    "netPnLUSDT": {
+      "type": "number",
+      "description": "Net P&L after fees and spread"
+    },
+    "spreadCostUSDT": {
+      "type": "number",
+      "description": "Estimated spread cost"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "closed_tp",
+        "closed_sl",
+        "closed_manual",
+        "expired"
+      ],
+      "default": "open",
+      "description": "Trade status"
+    },
+    "openedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "closedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "holdingMs": {
+      "type": "number",
+      "description": "Milliseconds held"
+    },
+    "intradaySignal": {
+      "type": "string",
+      "description": "Signal that triggered: BULLISH/NEUTRAL"
+    },
+    "tickDirection": {
+      "type": "string",
+      "description": "Tick confirmation: BUY_PRESSURE/NEUTRAL"
+    },
+    "entryScore": {
+      "type": "number",
+      "description": "Composite score at entry"
+    },
+    "phase": {
+      "type": "string",
+      "default": "PHASE_4_PAPER_TRADING"
+    },
+    "engineMode": {
+      "type": "string",
+      "default": "OKX_ONLY_INTRADAY_PLUS_TRADES_CONFIRMATION"
+    }
+  },
+  "required": [
+    "instId",
+    "side",
+    "entryPrice",
+    "sizeUSDT",
+    "status"
+  ]
+}
