@@ -310,7 +310,136 @@ Deno.serve(async (req) => {
       .filter(r => r.decision !== 'BUY_READY')
       .map(r => ({ pair: r.pair, decision: r.decision, finalScore: r.finalScore, blockers: r.blockers, reason: r.reason }));
 
+    // ── Step 4: "What would make this trade valid?" diagnostic ──
+    const diagnosticTarget = sorted[0]; // always use the highest-scoring pair
+    let tradeValidityDiagnostic = null;
+
+    if (diagnosticTarget && diagnosticTarget.polygonStatus === 'OK' && diagnosticTarget.okxStatus === 'OK') {
+      const p = diagnosticTarget;
+      const currentNet    = p.expectedNetProfitAfterFees;
+      const missingNet    = parseFloat((C.K_FEE_MIN_NET - currentNet).toFixed(6));
+
+      // Calculate required TP% to achieve K_FEE_MIN_NET net profit
+      // netProfit = K_SIZE*(K_TP/100) - K_SIZE*fee - (K_SIZE+K_SIZE*K_TP/100)*fee - K_SIZE*(spread/100)
+      // Solving for K_TP:
+      //   K_SIZE*(K_TP/100) - K_SIZE*fee - K_SIZE*(K_TP/100)*fee - K_SIZE*(spread/100) = K_FEE_MIN_NET
+      //   K_SIZE*(K_TP/100)*(1 - fee) = K_FEE_MIN_NET + K_SIZE*fee + K_SIZE*(spread/100)
+      //   K_TP/100 = (K_FEE_MIN_NET + K_SIZE*fee + K_SIZE*(spread/100)) / (K_SIZE*(1 - fee))
+      const fee           = C.OKX_TAKER_FEE;
+      const spreadCostUnit = p.spreadPct / 100;
+      const requiredTPDecimal = (C.K_FEE_MIN_NET + C.K_SIZE * fee + C.K_SIZE * spreadCostUnit) / (C.K_SIZE * (1 - fee));
+      const requiredTPPct = parseFloat((requiredTPDecimal * 100).toFixed(4));
+
+      // Is the required TP realistic given current volatility and trend?
+      const volPct = p.volatility || 0;
+      const trendLabel = p.trend || 'UNKNOWN';
+      let tpRealistic = false;
+      let tpRealismReason = '';
+      if (volPct >= requiredTPDecimal * 100 * 0.5 && (trendLabel === 'BULLISH' || trendLabel === 'MILD_BULL')) {
+        tpRealistic = true;
+        tpRealismReason = `Volatility ${volPct.toFixed(3)}% provides room; trend is ${trendLabel}`;
+      } else if (volPct < requiredTPDecimal * 100 * 0.3) {
+        tpRealistic = false;
+        tpRealismReason = `Volatility ${volPct.toFixed(3)}% too low to reach TP=${requiredTPPct}% reliably`;
+      } else {
+        tpRealistic = false;
+        tpRealismReason = `Trend=${trendLabel}, volatility=${volPct.toFixed(3)}% — marginal, wait for clearer setup`;
+      }
+
+      const volatilityStatus = volPct > C.K_VOLATILITY_MAX ? 'TOO_HIGH' : volPct < 0.1 ? 'TOO_LOW' : 'ACCEPTABLE';
+      const spreadStatus     = p.spreadPct > C.K_SPREAD ? 'TOO_HIGH' : 'ACCEPTABLE';
+      const scoreStatus      = p.finalScore >= C.K_SCORE ? 'PASS' : 'FAIL';
+      const netProfitStatus  = currentNet >= C.K_FEE_MIN_NET ? 'PASS' : 'FAIL';
+
+      const allClear = volatilityStatus === 'ACCEPTABLE' && spreadStatus === 'ACCEPTABLE' && scoreStatus === 'PASS' && netProfitStatus === 'PASS';
+
+      let recommendation = '';
+      if (allClear) {
+        recommendation = 'All fee-aware conditions met. Blocked only by KILL_SWITCH. Awaiting operator Phase 3 approval.';
+      } else {
+        const issues = [];
+        if (volatilityStatus === 'TOO_HIGH')  issues.push(`reduce volatility (now ${volPct.toFixed(3)}%, max ${C.K_VOLATILITY_MAX}%)`);
+        if (spreadStatus === 'TOO_HIGH')      issues.push(`reduce spread (now ${p.spreadPct.toFixed(4)}%, max ${C.K_SPREAD}%)`);
+        if (netProfitStatus === 'FAIL')       issues.push(`increase net profit by ${missingNet.toFixed(6)} USDT (need TP≥${requiredTPPct}%)`);
+        if (scoreStatus === 'FAIL')           issues.push(`raise finalScore from ${p.finalScore.toFixed(1)} to ≥${C.K_SCORE}`);
+        recommendation = `WAIT — ${issues.join('; ')}`;
+      }
+
+      tradeValidityDiagnostic = {
+        bestPair:                     p.pair,
+        wouldBuy,
+        // Net profit gap
+        currentExpectedNetProfit:     parseFloat(currentNet.toFixed(6)),
+        requiredMinNetProfit:         C.K_FEE_MIN_NET,
+        missingNetProfit:             missingNet > 0 ? parseFloat(missingNet.toFixed(6)) : 0,
+        netProfitStatus,
+        // Required TP calculation
+        currentTPPercent:             C.K_TP,
+        requiredTPPercent:            requiredTPPct,
+        tpGapPercent:                 parseFloat((requiredTPPct - C.K_TP).toFixed(4)),
+        increasingTPRealistic:        tpRealistic,
+        tpRealismReason,
+        // Spread
+        currentSpreadPct:             p.spreadPct,
+        maxAllowedSpreadPct:          C.K_SPREAD,
+        spreadStatus,
+        // Volatility
+        currentVolatilityPct:         parseFloat(volPct.toFixed(4)),
+        maxAllowedVolatilityPct:      C.K_VOLATILITY_MAX,
+        volatilityStatus,
+        // Score
+        currentFinalScore:            p.finalScore,
+        requiredKScore:               C.K_SCORE,
+        scoreStatus,
+        // Trend/Momentum
+        currentTrend:                 trendLabel,
+        currentMomentum:              p.momentum,
+        // Summary
+        allConditionsMet:             allClear,
+        recommendation,
+      };
+    }
+
+    // ── Step 5: Constants review ──
+    const topPair = sorted[0];
+    const netP    = topPair?.expectedNetProfitAfterFees || 0;
+    const feeBarrier         = netP > 0 && netP < C.K_FEE_MIN_NET;
+    const scoreBarrier       = (topPair?.finalScore || 0) < C.K_SCORE;
+    const volatilityBarrier  = (topPair?.volatility || 0) > C.K_VOLATILITY_MAX;
+    const spreadBarrier      = (topPair?.spreadPct || 0) > C.K_SPREAD;
+
+    // Are constants too strict? (i.e. near-miss on multiple criteria simultaneously)
+    const nearMissCount = allResults.filter(r => r.finalScore >= C.K_SCORE * 0.85).length;
+    const constantsTooStrict = feeBarrier && scoreBarrier && nearMissCount >= 3;
+
+    const constantsReview = {
+      constants: {
+        K_SCORE:          C.K_SCORE,
+        K_TP:             C.K_TP,
+        K_SL:             C.K_SL,
+        K_SPREAD:         C.K_SPREAD,
+        K_SIZE:           C.K_SIZE,
+        K_VOLATILITY_MAX: C.K_VOLATILITY_MAX,
+        K_FEE_MIN_NET:    C.K_FEE_MIN_NET,
+        K_RESERVE:        C.K_RESERVE,
+        OKX_TAKER_FEE:    C.OKX_TAKER_FEE,
+      },
+      barriers: {
+        feeBarrier,
+        scoreBarrier,
+        volatilityBarrier,
+        spreadBarrier,
+      },
+      constantsTooStrict,
+      safeToTradeNow:     false,
+      nearMissCount,
+      note: constantsTooStrict
+        ? 'Multiple pairs near threshold — consider slight K_TP increase or K_FEE_MIN_NET review after extended monitoring.'
+        : 'Constants are appropriate. Market conditions are the limiting factor, not the constants.',
+    };
+
     console.log(`[PHASE2_DRY_RUN] Complete. wouldBuy=${wouldBuy} selected=${selectedPair?.pair||'none'} scanQuality=${scanQuality} reason="${noTradeReason}"`);
+    console.log(`[PHASE2_DRY_RUN] Diagnostic: bestPair=${tradeValidityDiagnostic?.bestPair} missingNet=${tradeValidityDiagnostic?.missingNetProfit} volStatus=${tradeValidityDiagnostic?.volatilityStatus} constantsTooStrict=${constantsTooStrict}`);
 
     return Response.json({
       engine:                   'FEE_AWARE_POLYGON_TRADING_ENGINE',
@@ -346,6 +475,8 @@ Deno.serve(async (req) => {
       riskChecks,
       rejectedPairs,
       top3: top3.map(p => ({ pair: p.pair, decision: p.decision, finalScore: p.finalScore, expectedNetProfitAfterFees: p.expectedNetProfitAfterFees, blockers: p.blockers, trend: p.trend, momentum: p.momentum, PolygonSignalScore: p.PolygonSignalScore, OKXExecutionScore: p.OKXExecutionScore })),
+      tradeValidityDiagnostic,
+      constantsReview,
       note: 'Phase 2 dry-run complete. No orders placed. Kill switch remains active. Phase 3 requires explicit kill switch deactivation by operator.',
     });
 
