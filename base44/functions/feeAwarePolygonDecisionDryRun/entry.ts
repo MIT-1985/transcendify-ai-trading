@@ -1,8 +1,12 @@
 /**
- * feeAwarePolygonDecisionDryRun — PHASE 2: DRY RUN, NO ORDER
+ * feeAwarePolygonDecisionDryRun — ⚠️ DEPRECATED — NOT PART OF ACTIVE ENGINE
  *
- * System:   FEE_AWARE_POLYGON_TRADING_ENGINE
- * Phase:    PHASE_2_DRY_RUN_NO_ORDER
+ * STATUS:   DEPRECATED — Polygon removed from active engine
+ * Replaced: phase3ReadOnlySignalValidator (OKX-only, no Polygon dependency)
+ * Kept:     For reference / historical scoring comparison only
+ *
+ * System:   FEE_AWARE_POLYGON_TRADING_ENGINE (archived)
+ * Phase:    PHASE_2_DRY_RUN_NO_ORDER (archived)
  * Trading:  DISABLED — tradeAllowed = false, no OKX order endpoint called
  * Orders:   NONE — noOKXOrderEndpointCalled = true always
  *

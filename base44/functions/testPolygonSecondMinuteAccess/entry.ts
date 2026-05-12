@@ -1,8 +1,12 @@
 /**
- * testPolygonSecondMinuteAccess — READ-ONLY DATA ACCESS TEST
+ * testPolygonSecondMinuteAccess — ⚠️ DEPRECATED — READ-ONLY DIAGNOSTIC ONLY
  *
- * System:   FEE_AWARE_POLYGON_TRADING_ENGINE
- * Phase:    DATA_ACCESS_DIAGNOSTIC
+ * STATUS:   DEPRECATED — NOT PART OF ACTIVE ENGINE
+ * Replaced: testOKXOnlyDataAccess (OKX-only engine, no Polygon dependency)
+ * Kept:     For reference / historical Polygon data comparison only
+ *
+ * System:   FEE_AWARE_POLYGON_TRADING_ENGINE (archived)
+ * Phase:    DATA_ACCESS_DIAGNOSTIC (archived)
  * Trading:  DISABLED — tradeAllowed = false always
  * Orders:   NONE — noOKXOrderEndpointCalled = true always
  *
