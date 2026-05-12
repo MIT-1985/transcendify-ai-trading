@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrendingUp, TrendingDown } from 'lucide-react';
@@ -43,27 +42,21 @@ export default function PolygonConsole() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    // Use OKX public ticker — no auth, no rate limits
+    const okxInstId = selectedPair.replace('X:', '').replace('USD', '-USDT');
     const fetchPrice = async () => {
       try {
-        const response = await base44.functions.invoke('polygonMarketData', {
-          action: 'ticker',
-          symbol: selectedPair
-        });
-
-        console.log('Polygon response:', response.data);
-
-        if (response.data?.success && response.data.data?.results?.[0]) {
-          const result = response.data.data.results[0];
-          setCurrentPrice(result.c);
-          setPriceChange(((result.c - result.o) / result.o) * 100);
-          setError(null);
-        } else if (response.data?.error) {
-          console.error('API error:', response.data.error);
-          setError(null); // Don't show error, use fallback data
+        const res  = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${okxInstId}`);
+        const json = await res.json();
+        const d    = json?.data?.[0];
+        if (d) {
+          setCurrentPrice(parseFloat(d.last) || 0);
+          const open = parseFloat(d.open24h) || 0;
+          const last = parseFloat(d.last)    || 0;
+          setPriceChange(open > 0 ? ((last - open) / open) * 100 : 0);
         }
-      } catch (error) {
-        console.error('Error fetching price:', error);
-        setError(null); // Don't block the UI
+      } catch (err) {
+        // silent — don't break UI
       }
     };
 
@@ -222,20 +215,21 @@ function QuickPriceCard({ symbol, onSelect, isActive }) {
   const [change, setChange] = useState(0);
 
   useEffect(() => {
+    // OKX public ticker — no auth, no rate limits
+    const okxInstId = symbol.replace('X:', '').replace('USD', '-USDT');
     const fetchPrice = async () => {
       try {
-        const response = await base44.functions.invoke('polygonMarketData', {
-          action: 'ticker',
-          symbol: symbol
-        });
-        
-        if (response.data?.success && response.data.data?.results?.[0]) {
-          const result = response.data.data.results[0];
-          setPrice(result.c);
-          setChange(((result.c - result.o) / result.o) * 100);
+        const res  = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${okxInstId}`);
+        const json = await res.json();
+        const d    = json?.data?.[0];
+        if (d) {
+          setPrice(parseFloat(d.last) || 0);
+          const open = parseFloat(d.open24h) || 0;
+          const last = parseFloat(d.last)    || 0;
+          setChange(open > 0 ? ((last - open) / open) * 100 : 0);
         }
-      } catch (error) {
-        console.error('Error:', error);
+      } catch (err) {
+        // silent
       }
     };
 
