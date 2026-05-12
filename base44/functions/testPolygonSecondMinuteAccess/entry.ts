@@ -29,7 +29,69 @@ const PRIMARY_PAIRS = [
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-// ── Polygon aggregate tester ──────────────────────────────────────────────────
+// ── Polygon daily macro cache (15-minute TTL, stale fallback) ─────────────────
+const _polyDailyCache = {};
+const CACHE_TTL_MS = 15 * 60 * 1000;
+
+async function getCachedPolygonDaily(okxPair, polyTicker, polygonApiKey) {
+  const now      = Date.now();
+  const cached   = _polyDailyCache[okxPair];
+  const cacheAge = cached ? Math.floor((now - cached.fetchedAt) / 1000) : null;
+  const isFresh  = cached && (now - cached.fetchedAt) < CACHE_TTL_MS;
+
+  if (isFresh) {
+    return { available: true, candlesCount: cached.candlesCount, bars: cached.bars,
+      source: 'CACHE', cacheAgeSeconds: cacheAge, degraded: false, httpStatus: 200, errorBody: null };
+  }
+
+  const from30d  = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const toToday  = new Date(now).toISOString().split('T')[0];
+  const endpoint = `https://api.polygon.io/v2/aggs/ticker/${polyTicker}/range/1/day/${from30d}/${toToday}?adjusted=true&sort=asc&limit=50&apiKey=${polygonApiKey}`;
+
+  try {
+    const res    = await fetch(endpoint, { signal: AbortSignal.timeout(8000) });
+    const body   = await res.text();
+    let json;
+    try { json = JSON.parse(body); } catch { json = null; }
+
+    const httpStatus   = res.status;
+    const bars         = json?.results || [];
+    const candlesCount = bars.length;
+    const success      = httpStatus === 200 && candlesCount > 0;
+
+    if (success) {
+      _polyDailyCache[okxPair] = { bars, candlesCount, fetchedAt: now };
+      return { available: true, candlesCount, bars, source: 'POLYGON_API',
+        cacheAgeSeconds: 0, degraded: false, httpStatus, errorBody: null };
+    }
+
+    const errorBody = json
+      ? { status: json.status, message: json.message, resultsCount: candlesCount }
+      : body.slice(0, 300);
+
+    if (cached) {
+      return { available: true, candlesCount: cached.candlesCount, bars: cached.bars,
+        source: 'STALE_CACHE', cacheAgeSeconds: cacheAge, degraded: true, httpStatus, errorBody,
+        reason: 'Polygon unavailable, using stale daily macro cache' };
+    }
+
+    return { available: false, candlesCount: 0, bars: [], source: 'NONE',
+      cacheAgeSeconds: null, degraded: false, httpStatus, errorBody,
+      reason: json?.message || `Polygon HTTP ${httpStatus}` };
+
+  } catch (err) {
+    if (cached) {
+      return { available: true, candlesCount: cached.candlesCount, bars: cached.bars,
+        source: 'STALE_CACHE', cacheAgeSeconds: cacheAge, degraded: true, httpStatus: 0,
+        errorBody: { message: err.message }, reason: 'Polygon unavailable, using stale daily macro cache' };
+    }
+    return { available: false, candlesCount: 0, bars: [], source: 'NONE',
+      cacheAgeSeconds: null, degraded: false, httpStatus: 0,
+      errorBody: { message: err.message }, reason: err.message };
+  }
+}
+
+// ── Polygon aggregate tester (1s / 1m only — daily uses cache above) ──────────
 async function testPolygonAgg(ticker, multiplier, timespan, fromMs, toMs, apiKey) {
   const from = new Date(fromMs).toISOString().replace('T', ' ').slice(0, 19);
   const to   = new Date(toMs).toISOString().replace('T', ' ').slice(0, 19);
@@ -230,20 +292,20 @@ Deno.serve(async (req) => {
     const now      = Date.now();
     const from10m  = now - 10  * 60 * 1000;   // last 10 minutes
     const from120m = now - 120 * 60 * 1000;   // last 120 minutes
-    const from30d  = now - 30  * 24 * 60 * 60 * 1000; // last 30 days
 
     const pairResults = [];
 
     for (const pair of PRIMARY_PAIRS) {
       console.log(`[DATA_ACCESS_TEST] Testing ${pair.okx} / ${pair.poly} ...`);
 
-      // Run Polygon tests sequentially with delay (avoid rate limit)
-      const poly1s    = await testPolygonAgg(pair.poly, 1, 'second', from10m,  now,    polygonApiKey);
+      // Run Polygon 1s / 1m tests sequentially with delay
+      const poly1s    = await testPolygonAgg(pair.poly, 1, 'second', from10m,  now, polygonApiKey);
       await sleep(600);
-      const poly1m    = await testPolygonAgg(pair.poly, 1, 'minute', from120m, now,    polygonApiKey);
+      const poly1m    = await testPolygonAgg(pair.poly, 1, 'minute', from120m, now, polygonApiKey);
       await sleep(600);
-      const polyDaily = await testPolygonAgg(pair.poly, 1, 'day',    from30d,  now,    polygonApiKey);
-      await sleep(400);
+      // Daily uses cache layer — no extra sleep needed if cache hit
+      const polyDaily = await getCachedPolygonDaily(pair.okx, pair.poly, polygonApiKey);
+      if (polyDaily.source === 'POLYGON_API') await sleep(700); // only delay if we actually hit Polygon
 
       // OKX tests (no rate limit concerns)
       const okx1m   = await testOKX1m(pair.okx);
@@ -251,9 +313,10 @@ Deno.serve(async (req) => {
 
       const { recommendedIntradaySource, recommendedMacroSource, engineRule, dataMode, tradeAllowed: pairTradeAllowed, recommendedAction, reason } = recommendDataMode(poly1s, poly1m, polyDaily, okx1m, okxTick);
 
-      // Is this pair "full data"?
-      const isFullData = polyDaily.available && okx1m.available && okxTick.available;
-      const isLimited  = !polyDaily.available && (okx1m.available || okxTick.available);
+      // Classify pair coverage
+      const isStaleData = polyDaily.available && polyDaily.source === 'STALE_CACHE' && okx1m.available && okxTick.available;
+      const isFullData  = polyDaily.available && !isStaleData && okx1m.available && okxTick.available;
+      const isLimited   = !polyDaily.available && (okx1m.available || okxTick.available);
 
       console.log(`[DATA_ACCESS_TEST] ${pair.okx}: poly1s=${poly1s.available}(${poly1s.candlesCount}) poly1m=${poly1m.available}(${poly1m.candlesCount}) polyDaily=${polyDaily.available}(${polyDaily.candlesCount}) okx1m=${okx1m.available} → ${engineRule}`);
 
@@ -263,6 +326,7 @@ Deno.serve(async (req) => {
 
         // Coverage classification
         isFullData,
+        isStaleData,
         isLimited,
         isUnavailable: !okx1m.available && !okxTick.available,
 
@@ -277,10 +341,13 @@ Deno.serve(async (req) => {
         recommendedIntradaySource,
         recommendedMacroSource,
         engineRule,
-        dataMode,
+        dataMode: isStaleData
+          ? 'POLYGON_DAILY_MACRO_STALE_PLUS_OKX_1M_INTRADAY_PLUS_OKX_TRADES_CONFIRMATION'
+          : dataMode,
         tradeAllowed: false, // always false — kill switch
+        realTradeAllowed: false,
         recommendedAction: recommendedAction || (isFullData ? 'TRADE_READY' : 'WATCH_ONLY'),
-        reason: reason || null,
+        reason: reason || (isStaleData ? `Stale macro cache (age=${polyDaily.cacheAgeSeconds}s). Paper signal may proceed if barriers pass.` : null),
 
         // Raw test results
         tests: {
@@ -304,16 +371,18 @@ Deno.serve(async (req) => {
     const anyOKXTick   = pairResults.some(r => r.okxTickOrSecondAvailable);
 
     // Per-pair coverage counts
-    const fullDataPairs      = pairResults.filter(r => r.isFullData).map(r => r.pair);
-    const limitedDataPairs   = pairResults.filter(r => r.isLimited).map(r => r.pair);
-    const unavailablePairs   = pairResults.filter(r => r.isUnavailable).map(r => r.pair);
-    const requestedPairs     = PRIMARY_PAIRS.map(p => p.okx);
-    const returnedPairs      = pairResults.map(r => r.pair);
-    const missingPairs       = requestedPairs.filter(p => !returnedPairs.includes(p));
+    const fullDataPairs    = pairResults.filter(r => r.isFullData).map(r => r.pair);
+    const staleMacroPairs  = pairResults.filter(r => r.isStaleData).map(r => r.pair);
+    const limitedDataPairs = pairResults.filter(r => r.isLimited).map(r => r.pair);
+    const unavailablePairs = pairResults.filter(r => r.isUnavailable).map(r => r.pair);
+    const requestedPairs   = PRIMARY_PAIRS.map(p => p.okx);
+    const returnedPairs    = pairResults.map(r => r.pair);
+    const missingPairs     = requestedPairs.filter(p => !returnedPairs.includes(p));
 
     const pairCoverage = {
       totalPairsRequested: requestedPairs.length,
       fullDataPairs,
+      staleMacroPairs,
       limitedDataPairs,
       unavailablePairs,
       missingPairs,
@@ -333,27 +402,34 @@ Deno.serve(async (req) => {
       globalEngineRule = 'WAIT_DATA_UNAVAILABLE';
     }
 
-    // Final phase 3 readiness verdict — requires BTC-USDT AND ETH-USDT to be fullData
-    const btcFull = pairResults.find(r => r.pair === 'BTC-USDT')?.isFullData ?? false;
-    const ethFull = pairResults.find(r => r.pair === 'ETH-USDT')?.isFullData ?? false;
-    const primaryCoreReady = btcFull && ethFull;
+    // Final phase 3 readiness verdict
+    // BTC/ETH core: full OR stale both count as "has macro"
+    const btcResult = pairResults.find(r => r.pair === 'BTC-USDT');
+    const ethResult = pairResults.find(r => r.pair === 'ETH-USDT');
+    const btcHasMacro = btcResult?.isFullData || btcResult?.isStaleData || false;
+    const ethHasMacro = ethResult?.isFullData || ethResult?.isStaleData || false;
+    const primaryCoreReady = btcHasMacro && ethHasMacro;
+
+    const freshOrStalePairs = [...fullDataPairs, ...staleMacroPairs];
 
     let finalVerdict;
     let finalVerdictReason;
     if (!primaryCoreReady) {
       finalVerdict = 'ENGINE_NOT_READY';
-      finalVerdictReason = `BTC full=${btcFull}, ETH full=${ethFull} — primary core pairs must both have full data`;
-    } else if (fullDataPairs.length === requestedPairs.length) {
-      finalVerdict = 'ENGINE_FULLY_READY_FOR_PHASE_3';
-      finalVerdictReason = 'All requested pairs have full data (Polygon daily + OKX 1m + OKX trades)';
+      finalVerdictReason = `BTC hasMacro=${btcHasMacro}, ETH hasMacro=${ethHasMacro} — primary core pairs must both have Polygon daily (fresh, cache, or stale)`;
+    } else if (freshOrStalePairs.length === requestedPairs.length) {
+      finalVerdict = staleMacroPairs.length === 0 ? 'ENGINE_FULLY_READY_FOR_PHASE_3' : 'ENGINE_FULLY_READY_FOR_PHASE_3';
+      finalVerdictReason = staleMacroPairs.length === 0
+        ? 'All pairs have fresh Polygon daily + OKX 1m + OKX trades'
+        : `All pairs have macro data (stale: [${staleMacroPairs.join(', ')}]). realTradeAllowed=false. paperSignalOnly may proceed if barriers pass.`;
     } else {
       finalVerdict = 'ENGINE_PARTIALLY_READY_FOR_PHASE_3';
-      finalVerdictReason = `BTC/ETH full. Limited pairs: [${limitedDataPairs.join(', ')}]. Missing macro: check Polygon rate limits for alt pairs.`;
+      finalVerdictReason = `BTC/ETH have macro data. Limited (no macro): [${limitedDataPairs.join(', ')}].`;
     }
 
     const bestIntradayModes = [...new Set(pairResults.map(r => r.recommendedIntradaySource))].filter(Boolean);
 
-    console.log(`[DATA_ACCESS_TEST] Complete. verdict=${finalVerdict} globalEngineRule=${globalEngineRule} btcFull=${btcFull} ethFull=${ethFull} fullPairs=${fullDataPairs.length}/${requestedPairs.length}`);
+    console.log(`[DATA_ACCESS_TEST] Complete. verdict=${finalVerdict} globalEngineRule=${globalEngineRule} btcHasMacro=${btcHasMacro} ethHasMacro=${ethHasMacro} fullPairs=${fullDataPairs.length} stalePairs=${staleMacroPairs.length} limitedPairs=${limitedDataPairs.length}`);
 
     return Response.json({
       diagnostic:               'DATA_ACCESS_TEST',
@@ -372,11 +448,13 @@ Deno.serve(async (req) => {
         globalEngineRule,
         bestIntradayModes,
         pairCoverage,
-        recommendation: finalVerdict === 'ENGINE_FULLY_READY_FOR_PHASE_3'
-          ? '✅ All pairs confirmed. Engine fully ready for Phase 3.'
+        recommendation: finalVerdict === 'ENGINE_FULLY_READY_FOR_PHASE_3' && staleMacroPairs.length === 0
+          ? '✅ All pairs have fresh Polygon daily. Engine fully ready for Phase 3.'
+          : finalVerdict === 'ENGINE_FULLY_READY_FOR_PHASE_3' && staleMacroPairs.length > 0
+          ? `⚠️ All pairs have macro data but stale cache used for: [${staleMacroPairs.join(', ')}]. realTradeAllowed=false. Paper signal only.`
           : finalVerdict === 'ENGINE_PARTIALLY_READY_FOR_PHASE_3'
-          ? '⚠️ BTC/ETH confirmed full. Some alt pairs limited (likely Polygon rate limit on alts). Partial Phase 3 ready.'
-          : '❌ Engine NOT ready. Primary core (BTC/ETH) missing full data.',
+          ? `⚠️ BTC/ETH have macro data. Alt pairs limited (no Polygon macro): [${limitedDataPairs.join(', ')}]. Partial Phase 3 ready.`
+          : '❌ Engine NOT ready. BTC/ETH missing Polygon daily macro (no cache available).',
         okxLimitsNote: `OKX: no 1s candle bars. /market/candles max=${OKX_CANDLE_LIMIT}/req. /market/history-candles max=${OKX_HISTORY_LIMIT}/req (paginate). /market/trades max=${OKX_TRADES_LIMIT} (tick confirmation).`,
       },
       pairs: pairResults,
