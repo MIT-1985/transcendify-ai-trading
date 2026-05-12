@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,34 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ShoppingCart, TrendingUp, TrendingDown, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function OrderManagement({ symbol = 'X:BTCUSD' }) {
+// currentPrice is passed from parent (from marketDataStore) — no polling here
+export default function OrderManagement({ symbol = 'BTC-USDT', currentPrice = 0 }) {
   const [orderSide, setOrderSide] = useState('BUY');
   const [orderType, setOrderType] = useState('MARKET');
   const [quantity, setQuantity] = useState('');
   const [limitPrice, setLimitPrice] = useState('');
-  const [currentPrice, setCurrentPrice] = useState(0);
   const queryClient = useQueryClient();
-
-  // Fetch current price
-  useEffect(() => {
-    const fetchPrice = async () => {
-      try {
-        const response = await base44.functions.invoke('polygonMarketData', {
-          action: 'ticker',
-          symbol: symbol
-        });
-        if (response.data?.success && response.data.data?.results?.[0]) {
-          setCurrentPrice(response.data.data.results[0].c);
-        }
-      } catch (error) {
-        console.error('Error fetching price:', error);
-      }
-    };
-
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 5000);
-    return () => clearInterval(interval);
-  }, [symbol]);
 
   const { data: wallet } = useQuery({
     queryKey: ['wallet'],
@@ -200,7 +179,7 @@ export default function OrderManagement({ symbol = 'X:BTCUSD' }) {
               disabled={!quantity || placeOrderMutation.isPending || (orderType !== 'MARKET' && !limitPrice)}
               className={`w-full ${orderSide === 'BUY' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'}`}
             >
-              {placeOrderMutation.isPending ? 'Placing...' : `${orderSide} ${symbol.replace('X:', '').replace('USD', '')}`}
+              {placeOrderMutation.isPending ? 'Placing...' : `${orderSide} ${symbol.replace('-USDT', '')}`}
             </Button>
           </TabsContent>
         </Tabs>

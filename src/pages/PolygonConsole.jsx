@@ -162,7 +162,7 @@ export default function PolygonConsole() {
               </TabsList>
 
               <TabsContent value="trading" className="space-y-4 mt-4">
-                <OrderManagement symbol={selectedPair} />
+                <OrderManagement symbol={selectedPair} currentPrice={currentPrice} />
                 <WatchlistPanel onSymbolSelect={setSelectedPair} />
               </TabsContent>
 

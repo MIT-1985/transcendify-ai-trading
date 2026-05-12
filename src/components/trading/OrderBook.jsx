@@ -1,88 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { getPrice } from '@/lib/marketDataStore';
 
-export default function OrderBook({ symbol = 'X:BTCUSD' }) {
+// Generates a simulated order book from a mid-price — no API calls
+function buildBook(midPrice) {
+  if (!midPrice) return { bids: [], asks: [] };
+  const spread = midPrice * 0.0005;
+  const bids = [], asks = [];
+  for (let i = 0; i < 10; i++) {
+    bids.push({ price: midPrice - spread - i * spread * 0.5, amount: (0.05 + Math.random() * 0.3) * Math.exp(-i * 0.15), total: 0 });
+    asks.push({ price: midPrice + spread + i * spread * 0.5, amount: (0.05 + Math.random() * 0.3) * Math.exp(-i * 0.15), total: 0 });
+  }
+  let t = 0; bids.forEach(b => { t += b.amount; b.total = t; });
+  t = 0;     asks.forEach(a => { t += a.amount; a.total = t; });
+  return { bids, asks };
+}
+
+export default function OrderBook({ symbol = 'BTC-USDT' }) {
   const [bids, setBids] = useState([]);
   const [asks, setAsks] = useState([]);
-  const [loading, setLoading] = useState(true);
 
+  // Rebuild simulated book whenever the store emits a new price for this symbol
   useEffect(() => {
-    const fetchOrderBook = async () => {
-      try {
-        console.log('Fetching order book for', symbol);
-        const response = await base44.functions.invoke('polygonMarketData', {
-          action: 'ticker',
-          symbol: symbol
-        });
-
-        console.log('Order book API response:', response.data);
-
-        if (response.data?.success && response.data.data?.results?.[0]) {
-          const ticker = response.data.data.results[0];
-          console.log('Order book price:', ticker.c);
-          const midPrice = ticker.c;
-          const spread = midPrice * 0.0005;
-
-          const newBids = [];
-          const newAsks = [];
-          
-          for (let i = 0; i < 10; i++) {
-            const bidPrice = midPrice - spread - (i * spread * 0.5);
-            const askPrice = midPrice + spread + (i * spread * 0.5);
-            
-            const bidAmount = (0.05 + Math.random() * 0.3) * Math.exp(-i * 0.15);
-            const askAmount = (0.05 + Math.random() * 0.3) * Math.exp(-i * 0.15);
-
-            newBids.push({
-              price: bidPrice,
-              amount: bidAmount,
-              total: 0
-            });
-
-            newAsks.push({
-              price: askPrice,
-              amount: askAmount,
-              total: 0
-            });
-          }
-          
-          let bidTotal = 0;
-          newBids.forEach(bid => {
-            bidTotal += bid.amount;
-            bid.total = bidTotal;
-          });
-          
-          let askTotal = 0;
-          newAsks.forEach(ask => {
-            askTotal += ask.amount;
-            ask.total = askTotal;
-          });
-          
-          setBids(newBids);
-          setAsks(newAsks);
-          console.log('Order book updated with real data');
-        } else {
-          console.error('No ticker results:', response.data);
-        }
-      } catch (error) {
-        console.error('Error fetching order book:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrderBook();
-    const interval = setInterval(fetchOrderBook, 30000);
-    return () => clearInterval(interval);
+    function refresh() {
+      const ticker = getPrice(symbol);
+      const midPrice = ticker?.last || ticker?.bid || 0;
+      const { bids: b, asks: a } = buildBook(midPrice);
+      setBids(b);
+      setAsks(a);
+    }
+    refresh();
+    // Poll store (no network call) at 5s — cheap since getPrice() is sync
+    const t = setInterval(refresh, 5000);
+    return () => clearInterval(t);
   }, [symbol]);
 
-  if (loading) {
+  if (!bids.length) {
     return (
       <Card className="bg-slate-900/50 border-slate-800">
         <CardContent className="p-6">
-          <div className="text-center text-slate-400">Loading order book...</div>
+          <div className="text-center text-slate-400 text-sm">Waiting for price data…</div>
         </CardContent>
       </Card>
     );
