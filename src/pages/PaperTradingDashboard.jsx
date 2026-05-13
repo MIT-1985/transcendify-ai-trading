@@ -64,8 +64,10 @@ export default function PaperTradingDashboard() {
               <span className="text-slate-500">·</span>
               <span className="text-yellow-400 font-bold">PAPER_ONLY — No real orders</span>
               <span className="text-slate-500">·</span>
-              <span className="text-blue-400 font-bold">Polygon: REMOVED</span>
-              {lastRun && <><span className="text-slate-500">·</span><span className="text-slate-400">Last run: {lastRun}</span></>}
+              <span className="text-emerald-400 font-bold">🕐 Auto-scan: every 5 min</span>
+              <span className="text-slate-500">·</span>
+              <span className="text-blue-400 font-bold">Max 5 open trades</span>
+              {lastRun && <><span className="text-slate-500">·</span><span className="text-slate-400">Last manual run: {lastRun}</span></>}
             </div>
           </div>
           <button

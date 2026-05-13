@@ -324,7 +324,20 @@ Deno.serve(async (req) => {
     // Re-fetch open trades after closes (for accurate duplicate check)
     const openAfterClose = await base44.entities.PaperTrade.filter({ status: 'OPEN' });
 
+    // MAX 5 OPEN PAPER TRADES TOTAL
+    const MAX_OPEN_TRADES = 5;
+    if (openAfterClose.length >= MAX_OPEN_TRADES) {
+      console.log(`[PHASE4_PAPER] Max open trades reached (${openAfterClose.length}/${MAX_OPEN_TRADES}) — skipping new entries`);
+      for (const instId of ALL_PAIRS) {
+        scanResults.push({ instId, action: 'SKIP_MAX_OPEN_TRADES', reason: `${openAfterClose.length}/${MAX_OPEN_TRADES} open trades` });
+      }
+    }
+
+    const canOpenNew = openAfterClose.length < MAX_OPEN_TRADES;
+
     for (const instId of ALL_PAIRS) {
+      if (!canOpenNew) break;
+
       // DUPLICATE PROTECTION: skip if pair already has an OPEN trade
       const existingOpen = openAfterClose.find(t => t.instId === instId);
       if (existingOpen) {
@@ -353,6 +366,13 @@ Deno.serve(async (req) => {
       scanResults.push({ instId, action, intraday: intraday.direction, tick: tick.tickDirection, score, barriers, allPass, reason });
 
       if (!allPass) continue;
+
+      // Re-check max open cap before each new entry (in case multiple pairs pass this cycle)
+      const currentOpen = openAfterClose.length + newEntries.length;
+      if (currentOpen >= MAX_OPEN_TRADES) {
+        scanResults.push({ instId, action: 'SKIP_MAX_OPEN_TRADES', reason: `cap=${MAX_OPEN_TRADES} reached mid-scan` });
+        continue;
+      }
 
       // Open virtual paper trade — NO real order endpoint called
       const entry       = ticker.ask;
