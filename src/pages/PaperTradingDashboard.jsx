@@ -79,6 +79,33 @@ export default function PaperTradingDashboard() {
           </button>
         </div>
 
+        {/* Auto Scanner Status Panel */}
+        <div className="bg-slate-900/60 border-2 border-emerald-800 rounded-2xl px-5 py-4">
+          <div className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-3">🤖 Auto Paper Scanner</div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+            <div className="bg-slate-800/60 rounded-xl px-3 py-2 border border-emerald-900">
+              <div className="text-slate-500 uppercase tracking-wide mb-1">Status</div>
+              <div className="font-black text-emerald-400">✅ ON</div>
+            </div>
+            <div className="bg-slate-800/60 rounded-xl px-3 py-2 border border-slate-700">
+              <div className="text-slate-500 uppercase tracking-wide mb-1">Interval</div>
+              <div className="font-black text-cyan-400">Every 5 min</div>
+            </div>
+            <div className="bg-slate-800/60 rounded-xl px-3 py-2 border border-slate-700">
+              <div className="text-slate-500 uppercase tracking-wide mb-1">Last Scan</div>
+              <div className="font-bold text-slate-300">{data?.lastRunAt ? new Date(data.lastRunAt).toLocaleTimeString('de-DE') : '—'}</div>
+            </div>
+            <div className="bg-slate-800/60 rounded-xl px-3 py-2 border border-slate-700">
+              <div className="text-slate-500 uppercase tracking-wide mb-1">Opened</div>
+              <div className={`font-black text-xl ${(data?.openedThisRun||0) > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>{data?.openedThisRun ?? '—'}</div>
+            </div>
+            <div className="bg-slate-800/60 rounded-xl px-3 py-2 border border-slate-700">
+              <div className="text-slate-500 uppercase tracking-wide mb-1">Closed</div>
+              <div className={`font-black text-xl ${(data?.closedThisRun||0) > 0 ? 'text-blue-400' : 'text-slate-400'}`}>{data?.closedThisRun ?? '—'}</div>
+            </div>
+          </div>
+        </div>
+
         {/* Safety banners */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="bg-red-950/40 border-2 border-red-700 rounded-xl px-5 py-3 flex items-center gap-3">

@@ -452,16 +452,31 @@ Deno.serve(async (req) => {
 
     console.log(`[PHASE4_PAPER] 24h: closed=${closedIn24h.length} netPnL=${totalNetPnL.toFixed(6)} wr=${winRate.toFixed(1)}% open=${stillOpen.length} newEntries=${newEntries.length}`);
 
+    const runTime = new Date().toISOString();
+    const INTERVAL_MINUTES = 5;
+    const nextRunAt = new Date(Date.now() + INTERVAL_MINUTES * 60 * 1000).toISOString();
+
     return Response.json({
       // ── Safety flags (always present) ──
       phase:                    'PHASE_4_PAPER_TRADING',
       globalEngineMode:         'OKX_ONLY_INTRADAY_PLUS_TRADES_CONFIRMATION',
       tradeAllowed:             TRADE_ALLOWED,
+      realTradeAllowed:         false,
       safeToTradeNow:           SAFE_TO_TRADE_NOW,
       killSwitchActive:         KILL_SWITCH_ACTIVE,
       noOKXOrderEndpointCalled: NO_OKX_ORDER_ENDPOINT,
       polygonRemoved:           POLYGON_REMOVED,
-      runTime:                  new Date().toISOString(),
+      runTime,
+
+      // ── Scheduler status ──
+      schedulerActive:          true,
+      intervalMinutes:          INTERVAL_MINUTES,
+      lastRunAt:                runTime,
+      nextRunAt,
+      openTradesBefore:         openTrades.length,
+      closedThisRun:            closedNow.length,
+      openedThisRun:            newEntries.length,
+      safetyStatus:             'PHASE_4_PAPER_ONLY',
 
       // ── Full safety audit block ──
       safetyAudit,
