@@ -22,6 +22,14 @@
       "type": "number",
       "description": "Simulated exit price (null if open)"
     },
+    "targetPrice": {
+      "type": "number",
+      "description": "Take profit target price (alias tpPrice)"
+    },
+    "stopLossPrice": {
+      "type": "number",
+      "description": "Stop loss price (alias slPrice)"
+    },
     "qty": {
       "type": "number",
       "description": "Trade quantity (USDT size / entry price)"
@@ -54,33 +62,58 @@
       "type": "number",
       "description": "Simulated exit fee"
     },
+    "fees": {
+      "type": "number",
+      "description": "Total fees (entry + exit)"
+    },
+    "grossPnL": {
+      "type": "number",
+      "description": "Gross P&L before fees (alias grossPnLUSDT)"
+    },
     "grossPnLUSDT": {
       "type": "number",
       "description": "Gross P&L before fees"
+    },
+    "netPnL": {
+      "type": "number",
+      "description": "Net P&L after fees and spread (alias netPnLUSDT)"
     },
     "netPnLUSDT": {
       "type": "number",
       "description": "Net P&L after fees and spread"
     },
+    "spreadCost": {
+      "type": "number",
+      "description": "Spread cost in USDT"
+    },
     "spreadCostUSDT": {
       "type": "number",
-      "description": "Estimated spread cost"
+      "description": "Spread cost in USDT"
+    },
+    "spreadPct": {
+      "type": "number",
+      "description": "Spread percentage at entry"
     },
     "status": {
       "type": "string",
       "enum": [
-        "open",
-        "closed_tp",
-        "closed_sl",
-        "closed_manual",
-        "expired"
+        "OPEN",
+        "CLOSED_TP",
+        "CLOSED_SL",
+        "EXPIRED",
+        "CLOSED_MANUAL"
       ],
-      "default": "open",
+      "default": "OPEN",
       "description": "Trade status"
     },
     "openedAt": {
       "type": "string",
       "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Auto-expiry time (openedAt + 15 minutes)"
     },
     "closedAt": {
       "type": "string",
@@ -92,15 +125,23 @@
     },
     "intradaySignal": {
       "type": "string",
-      "description": "Signal that triggered: BULLISH/NEUTRAL"
+      "description": "Signal direction: BULLISH/NEUTRAL/BEARISH"
     },
     "tickDirection": {
       "type": "string",
-      "description": "Tick confirmation: BUY_PRESSURE/NEUTRAL"
+      "description": "Tick confirmation: BUY_PRESSURE/NEUTRAL/SELL_PRESSURE"
+    },
+    "signalScore": {
+      "type": "number",
+      "description": "Composite score at entry (alias entryScore)"
     },
     "entryScore": {
       "type": "number",
       "description": "Composite score at entry"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Reason trade was opened or skipped"
     },
     "phase": {
       "type": "string",

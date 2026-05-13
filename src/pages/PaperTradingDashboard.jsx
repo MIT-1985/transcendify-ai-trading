@@ -26,7 +26,7 @@ export default function PaperTradingDashboard() {
   // Live open positions from entity
   const { data: openTrades = [], refetch: refetchOpen } = useQuery({
     queryKey: ['paper-open-trades', user?.email],
-    queryFn: () => base44.entities.PaperTrade.filter({ status: 'open' }, '-created_date', 50),
+    queryFn: () => base44.entities.PaperTrade.filter({ status: 'OPEN' }, '-created_date', 50),
     enabled: !!user,
     staleTime: 15000,
     refetchInterval: 15000,
@@ -42,7 +42,8 @@ export default function PaperTradingDashboard() {
 
   const r24  = data?.report24h || {};
   const run  = data?.thisRun   || {};
-  const pnlColor = (r24.totalNetPnLUSDT || 0) >= 0 ? 'text-emerald-400' : 'text-red-400';
+  const audit = data?.safetyAudit || {};
+  const pnlColor = (r24.totalNetPnL || 0) >= 0 ? 'text-emerald-400' : 'text-red-400';
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 lg:p-6">
@@ -105,7 +106,7 @@ export default function PaperTradingDashboard() {
           <div className="bg-slate-900/70 border-2 border-slate-700 rounded-2xl p-5">
             <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">📊 24h Virtual P&L Report</div>
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
-              <Tile label="Net P&L"      value={`${(r24.totalNetPnLUSDT||0)>=0?'+':''}${(r24.totalNetPnLUSDT||0).toFixed(4)} USDT`} color={pnlColor} />
+              <Tile label="Net P&L"      value={`${(r24.totalNetPnL||0)>=0?'+':''}${(r24.totalNetPnL||0).toFixed(4)} USDT`} color={pnlColor} />
               <Tile label="Trades"       value={r24.totalTrades || 0}     color="text-white" />
               <Tile label="Win Rate"     value={`${(r24.winRate||0).toFixed(1)}%`} color={(r24.winRate||0)>=50?'text-emerald-400':'text-red-400'} />
               <Tile label="TP Hits"      value={r24.tpHits || 0}          color="text-emerald-400" />
@@ -113,11 +114,24 @@ export default function PaperTradingDashboard() {
               <Tile label="Open"         value={openTrades.length}         color="text-yellow-400" />
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs mt-3">
-              <Tile label="Gross P&L"    value={`${(r24.totalGrossPnLUSDT||0)>=0?'+':''}${(r24.totalGrossPnLUSDT||0).toFixed(4)}`} color="text-blue-400" />
-              <Tile label="Fees Paid"    value={`-${(r24.totalFeesUSDT||0).toFixed(4)}`}      color="text-red-400" />
+              <Tile label="Gross P&L"    value={`${(r24.totalGrossPnL||0)>=0?'+':''}${(r24.totalGrossPnL||0).toFixed(4)}`} color="text-blue-400" />
+              <Tile label="Fees Paid"    value={`-${(r24.totalFees||0).toFixed(4)}`}      color="text-red-400" />
               <Tile label="P&L/Trade"    value={`${(r24.pnlPerTrade||0)>=0?'+':''}${(r24.pnlPerTrade||0).toFixed(4)}`} color="text-slate-300" />
               <Tile label="Expired"      value={r24.expired || 0}          color="text-slate-400" />
             </div>
+          </div>
+        )}
+
+        {/* Safety Audit Banner */}
+        {data && (
+          <div className={`rounded-xl border-2 px-5 py-3 text-xs flex flex-wrap items-center gap-4 ${audit.safetyStatus === 'SAFE' ? 'border-emerald-700 bg-emerald-950/20' : 'border-red-700 bg-red-950/30'}`}>
+            <span className="font-black text-sm">{audit.safetyStatus === 'SAFE' ? '✅' : '❌'} Safety Audit: <span className={audit.safetyStatus === 'SAFE' ? 'text-emerald-400' : 'text-red-400'}>{audit.safetyStatus}</span></span>
+            <span className={`font-bold ${!audit.realTradingEndpointDetected ? 'text-emerald-400' : 'text-red-400'}`}>realTradingEndpointDetected: {String(audit.realTradingEndpointDetected)}</span>
+            <span className={`font-bold ${audit.paperTradeStorageValid ? 'text-emerald-400' : 'text-red-400'}`}>paperTradeStorageValid: {String(audit.paperTradeStorageValid)}</span>
+            <span className={`font-bold ${audit.duplicateProtection ? 'text-emerald-400' : 'text-red-400'}`}>duplicateProtection: {String(audit.duplicateProtection)}</span>
+            <span className={`font-bold ${audit.autoCloseLogic ? 'text-emerald-400' : 'text-red-400'}`}>autoCloseLogic: {String(audit.autoCloseLogic)}</span>
+            <span className={`font-bold ${audit.dashboardReportValid ? 'text-emerald-400' : 'text-red-400'}`}>dashboardReportValid: {String(audit.dashboardReportValid)}</span>
+            {audit.finalVerdict && <span className="text-slate-400 italic">{audit.finalVerdict}</span>}
           </div>
         )}
 
@@ -143,12 +157,13 @@ export default function PaperTradingDashboard() {
                       <tr>
                         <th className="text-left px-2 py-2">Pair</th>
                         <th className="text-right px-2 py-2">Entry</th>
-                        <th className="text-right px-2 py-2">TP</th>
+                        <th className="text-right px-2 py-2">Target</th>
                         <th className="text-right px-2 py-2">SL</th>
                         <th className="text-right px-2 py-2">Size</th>
                         <th className="text-left px-2 py-2">Signal</th>
                         <th className="text-right px-2 py-2">Score</th>
                         <th className="text-left px-2 py-2">Opened</th>
+                        <th className="text-left px-2 py-2">Expires</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -156,14 +171,15 @@ export default function PaperTradingDashboard() {
                         <tr key={t.id} className="border-b border-slate-800/50 hover:bg-slate-800/20">
                           <td className="px-2 py-2 font-black text-yellow-400">{t.instId}</td>
                           <td className="px-2 py-2 text-right text-white">${t.entryPrice?.toLocaleString()}</td>
-                          <td className="px-2 py-2 text-right text-emerald-400">${t.tpPrice?.toLocaleString()}</td>
-                          <td className="px-2 py-2 text-right text-red-400">${t.slPrice?.toLocaleString()}</td>
+                          <td className="px-2 py-2 text-right text-emerald-400">${(t.targetPrice || t.tpPrice)?.toLocaleString()}</td>
+                          <td className="px-2 py-2 text-right text-red-400">${(t.stopLossPrice || t.slPrice)?.toLocaleString()}</td>
                           <td className="px-2 py-2 text-right text-slate-300">${t.sizeUSDT}</td>
                           <td className="px-2 py-2">
                             <span className={`font-bold ${t.intradaySignal === 'BULLISH' ? 'text-emerald-400' : 'text-yellow-400'}`}>{t.intradaySignal}</span>
                           </td>
-                          <td className="px-2 py-2 text-right text-cyan-400">{t.entryScore}</td>
+                          <td className="px-2 py-2 text-right text-cyan-400">{t.signalScore || t.entryScore}</td>
                           <td className="px-2 py-2 text-slate-400">{t.openedAt ? new Date(t.openedAt).toLocaleTimeString('de-DE') : '—'}</td>
+                          <td className="px-2 py-2 text-orange-400">{t.expiresAt ? new Date(t.expiresAt).toLocaleTimeString('de-DE') : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -177,7 +193,7 @@ export default function PaperTradingDashboard() {
           <TabsContent value="closed" className="mt-4">
             <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
               <div className="text-sm font-bold text-slate-300 mb-4">Closed Trades (last 50)</div>
-              {recentClosed.filter(t => t.status !== 'open').length === 0 ? (
+              {recentClosed.filter(t => t.status !== 'OPEN').length === 0 ? (
                 <div className="text-center text-slate-400 py-10">No closed trades yet. Run a cycle to start.</div>
               ) : (
                 <div className="overflow-x-auto">
@@ -195,8 +211,8 @@ export default function PaperTradingDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {recentClosed.filter(t => t.status !== 'open').map(t => {
-                        const net = t.netPnLUSDT || 0;
+                      {recentClosed.filter(t => t.status !== 'OPEN').map(t => {
+                        const net = t.netPnL || t.netPnLUSDT || 0;
                         return (
                           <tr key={t.id} className="border-b border-slate-800/50 hover:bg-slate-800/20">
                             <td className="px-2 py-2 font-black text-white">{t.instId}</td>
@@ -209,7 +225,7 @@ export default function PaperTradingDashboard() {
                             </td>
                             <td className="px-2 py-2 text-right text-slate-400">${t.entryPrice?.toLocaleString()}</td>
                             <td className="px-2 py-2 text-right text-slate-400">${t.exitPrice?.toLocaleString()}</td>
-                            <td className={`px-2 py-2 text-right font-bold ${(t.grossPnLUSDT||0)>=0?'text-emerald-400':'text-red-400'}`}>{(t.grossPnLUSDT||0)>=0?'+':''}{(t.grossPnLUSDT||0).toFixed(4)}</td>
+                            <td className={`px-2 py-2 text-right font-bold ${(t.grossPnL||t.grossPnLUSDT||0)>=0?'text-emerald-400':'text-red-400'}`}>{(t.grossPnL||t.grossPnLUSDT||0)>=0?'+':''}{(t.grossPnL||t.grossPnLUSDT||0).toFixed(4)}</td>
                             <td className={`px-2 py-2 text-right font-black ${net>=0?'text-emerald-400':'text-red-400'}`}>{net>=0?'+':''}{net.toFixed(4)}</td>
                             <td className="px-2 py-2 text-right text-slate-500">{t.holdingMs ? `${Math.round(t.holdingMs/1000)}s` : '—'}</td>
                             <td className="px-2 py-2 text-slate-400">{t.closedAt ? new Date(t.closedAt).toLocaleTimeString('de-DE') : '—'}</td>
@@ -288,15 +304,15 @@ export default function PaperTradingDashboard() {
           <TabsContent value="pairs" className="mt-4">
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
               {(r24.pairBreakdown || []).map(p => (
-                <div key={p.instId} className={`rounded-xl border-2 p-4 ${(p.netPnLUSDT||0) > 0 ? 'border-emerald-700 bg-emerald-950/20' : (p.netPnLUSDT||0) < 0 ? 'border-red-800 bg-red-950/10' : 'border-slate-700 bg-slate-900/40'}`}>
+                <div key={p.instId} className={`rounded-xl border-2 p-4 ${(p.netPnL||0) > 0 ? 'border-emerald-700 bg-emerald-950/20' : (p.netPnL||0) < 0 ? 'border-red-800 bg-red-950/10' : 'border-slate-700 bg-slate-900/40'}`}>
                   <div className="font-black text-white text-base mb-2">{p.instId}</div>
-                  <div className={`text-2xl font-black mb-2 ${(p.netPnLUSDT||0)>=0?'text-emerald-400':'text-red-400'}`}>
-                    {(p.netPnLUSDT||0)>=0?'+':''}{(p.netPnLUSDT||0).toFixed(4)}
+                  <div className={`text-2xl font-black mb-2 ${(p.netPnL||0)>=0?'text-emerald-400':'text-red-400'}`}>
+                    {(p.netPnL||0)>=0?'+':''}{(p.netPnL||0).toFixed(4)}
                   </div>
                   <div className="space-y-1 text-xs text-slate-400">
                     <div>Trades: <span className="text-white">{p.trades}</span></div>
                     <div>Wins: <span className="text-emerald-400">{p.wins}</span> / Losses: <span className="text-red-400">{p.losses}</span></div>
-                    <div>TP: <span className="text-emerald-400">{p.tpHits}</span> · SL: <span className="text-red-400">{p.slHits}</span></div>
+                    <div>TP: <span className="text-emerald-400">{p.tpHits}</span> · SL: <span className="text-red-400">{p.slHits}</span> · Exp: <span className="text-slate-400">{p.expired||0}</span></div>
                   </div>
                 </div>
               ))}
