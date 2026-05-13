@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import PaperReport24h from '@/components/dashboard/PaperReport24h';
 
 export default function PaperTradingDashboard() {
   const { user } = useAuth();
@@ -137,12 +138,18 @@ export default function PaperTradingDashboard() {
 
         {/* Tabs */}
         <Tabs defaultValue="open" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-slate-900/50 border border-slate-700 rounded-xl p-1">
+          <TabsList className="grid w-full grid-cols-5 bg-slate-900/50 border border-slate-700 rounded-xl p-1">
+            <TabsTrigger value="report"  className="text-xs">📋 24h Report</TabsTrigger>
             <TabsTrigger value="open"    className="text-xs">📂 Open ({openTrades.length})</TabsTrigger>
-            <TabsTrigger value="closed"  className="text-xs">✅ Closed (24h)</TabsTrigger>
+            <TabsTrigger value="closed"  className="text-xs">✅ Closed</TabsTrigger>
             <TabsTrigger value="scan"    className="text-xs">🔍 Last Scan</TabsTrigger>
             <TabsTrigger value="pairs"   className="text-xs">📈 By Pair</TabsTrigger>
           </TabsList>
+
+          {/* 24H REPORT */}
+          <TabsContent value="report" className="mt-4">
+            <PaperReport24h />
+          </TabsContent>
 
           {/* OPEN POSITIONS */}
           <TabsContent value="open" className="mt-4">
