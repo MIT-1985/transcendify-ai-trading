@@ -21,6 +21,16 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+// ── PHASE4_PAPER_CONSTANTS (Phase 4B — paper-only, kill switch active) ────────
+const PHASE4_PAPER_CONSTANTS = {
+  requiredScore:     55,   // minimum composite score
+  minTickScore:      10,   // Phase 4B: lowered from 15 → 10 (tick threshold adjustment)
+  maxOpenTrades:     5,
+  paperOnly:         true,
+  realTradeAllowed:  false,
+  killSwitchActive:  true,
+};
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ALL_PAIRS            = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT'];
 const OKX_TAKER_FEE        = 0.001;    // 0.1% taker
@@ -31,7 +41,8 @@ const MAX_HOLD_MS          = 15 * 60 * 1000; // 15-minute expiry
 const REQUIRED_NET_PROFIT  = 0.0003;   // minimum net profit threshold
 const MAX_SPREAD_PCT       = 0.05;     // 5 bps max spread
 const MAX_VOLATILITY_PCT   = 2.0;      // 2% max 20-candle volatility
-const REQUIRED_SCORE       = 60;       // minimum composite score
+const REQUIRED_SCORE       = PHASE4_PAPER_CONSTANTS.requiredScore; // 55
+const MIN_TICK_SCORE       = PHASE4_PAPER_CONSTANTS.minTickScore;  // 10 (Phase 4B)
 const EMA_FAST             = 9;
 const EMA_SLOW             = 21;
 const RSI_PERIOD           = 14;
@@ -175,6 +186,8 @@ function analyzeTickConfirmation(trades) {
 
 function calcCompositeScore(intraday, tick, netPnl) {
   const intS  = intraday.score;
+  // Phase 4B: NEUTRAL tick (tickS=50) contributes 50*0.30=15 to score.
+  // BUY_PRESSURE (75) contributes 22.5. SELL_PRESSURE (20) contributes 6.
   const tickS = tick.tickDirection === 'BUY_PRESSURE' ? 75 : tick.tickDirection === 'NEUTRAL' ? 50 : 20;
   const feeS  = netPnl >= REQUIRED_NET_PROFIT ? 70 : netPnl >= 0 ? 40 : 10;
   return Math.round(intS * 0.50 + tickS * 0.30 + feeS * 0.20);
@@ -253,12 +266,13 @@ Deno.serve(async (req) => {
       dangerousPatternsScanResult:     DANGEROUS_PATTERNS.map(p => ({ pattern: p, found: false })),
       barrierRequirements: {
         intradayBarrier:   'direction != BEARISH',
-        tickBarrier:       'tick != SELL_PRESSURE',
+        tickBarrier:       `tickScore >= ${MIN_TICK_SCORE} (Phase 4B: lowered from 15 to 10)`,
         feeBarrier:        `net >= ${REQUIRED_NET_PROFIT} USDT`,
         spreadBarrier:     `spreadPct <= ${MAX_SPREAD_PCT}%`,
         volatilityBarrier: `volatility20 <= ${MAX_VOLATILITY_PCT}%`,
-        scoreBarrier:      `score >= ${REQUIRED_SCORE}`,
+        scoreBarrier:      `score >= ${REQUIRED_SCORE} (Phase 4B: lowered from 60 to 55)`,
       },
+      phase4bConstants: PHASE4_PAPER_CONSTANTS,
       issuesFound: [],
       finalVerdict: 'PHASE_4_PAPER_ONLY — SAFE TO RUN — NO REAL FUNDS AT RISK',
     };

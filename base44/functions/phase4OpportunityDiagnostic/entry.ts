@@ -231,7 +231,7 @@ async function analyzePair(instId, openTrades) {
   else                      tickScore = 5;  // sell pressure
 
   result.tickScore   = tickScore;
-  result.tickBarrier = tickScore >= 15 ? 'PASS' : 'FAIL';
+  result.tickBarrier = tickScore >= 10 ? 'PASS' : 'FAIL'; // Phase 4B: threshold lowered 15 → 10
 
   // ── COMPOSITE SCORE ───────────────────────────────────────────────────────
   const totalScore = intradayScore + tickScore + result.spreadScore + result.feeScore;
@@ -262,7 +262,7 @@ async function analyzePair(instId, openTrades) {
   if (!spreadPass)     barriers.push({ name: 'SPREAD_TOO_WIDE',     weight: 4, fix: `Increase MAX_SPREAD_PCT above ${spreadPct.toFixed(4)}%` });
   if (!feePass)        barriers.push({ name: 'FEE_VIABILITY_FAIL',  weight: 3, fix: `Increase TP_PCT above ${minMoveForProfit.toFixed(3)}%` });
   if (result.intradayBarrier === 'FAIL') barriers.push({ name: 'WEAK_INTRADAY_MOMENTUM', weight: 3, fix: 'Lower REQUIRED_SCORE or wait for trend confirmation' });
-  if (result.tickBarrier === 'FAIL')     barriers.push({ name: 'WEAK_TICK_PRESSURE',     weight: 2, fix: 'Lower tickScore threshold from 15 to 10' });
+  if (result.tickBarrier === 'FAIL')     barriers.push({ name: 'WEAK_TICK_PRESSURE',     weight: 2, fix: 'Lower tickScore threshold from 10 to 5 (Phase 4B already applied: 15→10)' });
   if (!volatilityPass) barriers.push({ name: 'VOLATILITY_OUT_OF_RANGE', weight: 2, fix: 'Adjust volatility window or min/max thresholds' });
   if (totalScore < REQUIRED_SCORE) barriers.push({ name: `SCORE_TOO_LOW (${totalScore}/${REQUIRED_SCORE})`, weight: 5, fix: `Lower REQUIRED_SCORE to ${totalScore + 5}` });
 
