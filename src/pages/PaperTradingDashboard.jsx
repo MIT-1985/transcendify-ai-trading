@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,18 +8,20 @@ import PaperReport24h from '@/components/dashboard/PaperReport24h';
 
 export default function PaperTradingDashboard() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [lastRun, setLastRun] = useState(null);
+  const [manualRunning, setManualRunning] = useState(false);
+  const [lastResult, setLastResult] = useState(null);
 
-  // Run paper trading cycle
-  const { data, isLoading, refetch, isFetching, error } = useQuery({
+  // Latest cycle data (loaded on mount, updated by manual run)
+  const { data, isLoading, error } = useQuery({
     queryKey: ['phase4-paper-trading', user?.email],
     queryFn: async () => {
       const res = await base44.functions.invoke('phase4OKXPaperTrading', {});
-      setLastRun(new Date().toLocaleTimeString('de-DE'));
       return res.data;
     },
     enabled: !!user,
-    staleTime: 30000,
+    staleTime: Infinity,
     refetchInterval: false,
     gcTime: 0,
   });
@@ -34,12 +36,37 @@ export default function PaperTradingDashboard() {
   });
 
   // Recent closed trades
-  const { data: recentClosed = [] } = useQuery({
+  const { data: recentClosed = [], refetch: refetchClosed } = useQuery({
     queryKey: ['paper-closed-trades', user?.email],
     queryFn: () => base44.entities.PaperTrade.list('-closedAt', 50),
     enabled: !!user,
     staleTime: 30000,
   });
+
+  // Manual "Run Paper Scan Now" — calls function, then refreshes all data
+  const handleManualRun = async () => {
+    setManualRunning(true);
+    setLastResult(null);
+    try {
+      const res = await base44.functions.invoke('phase4OKXPaperTrading', {});
+      const d = res.data;
+      setLastResult({
+        openedThisRun: d?.openedThisRun ?? 0,
+        closedThisRun: d?.closedThisRun ?? 0,
+        skippedPairs: (d?.thisRun?.scanResults || []).filter(r => r.action !== 'PAPER_BUY'),
+        openedDetails: d?.thisRun?.newPaperEntries || [],
+        closedDetails: d?.thisRun?.closedThisRun || [],
+        runTime: d?.lastRunAt,
+      });
+      setLastRun(new Date().toLocaleTimeString('de-DE'));
+      // Update main data cache + refresh entity queries
+      queryClient.setQueryData(['phase4-paper-trading', user?.email], d);
+      await Promise.all([refetchOpen(), refetchClosed()]);
+      queryClient.invalidateQueries({ queryKey: ['paper-report-24h'] });
+    } finally {
+      setManualRunning(false);
+    }
+  };
 
   const r24  = data?.report24h || {};
   const run  = data?.thisRun   || {};
@@ -71,13 +98,87 @@ export default function PaperTradingDashboard() {
             </div>
           </div>
           <button
-            onClick={() => { refetch(); refetchOpen(); }}
-            disabled={isFetching || isLoading}
+            onClick={handleManualRun}
+            disabled={manualRunning || isLoading}
             className="px-5 py-2.5 text-xs font-bold rounded-xl bg-yellow-700/30 border border-yellow-600 hover:bg-yellow-700/50 text-yellow-300 disabled:opacity-50 transition-all shrink-0"
           >
-            {isFetching || isLoading ? '⏳ Running…' : '▶ Run Paper Trading Cycle'}
+            {manualRunning ? '⏳ Scanning…' : '▶ Run Paper Scan Now'}
           </button>
         </div>
+
+        {/* Manual Run Result Banner */}
+        {lastResult && (
+          <div className="bg-slate-900/80 border-2 border-cyan-700 rounded-2xl px-5 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest">⚡ Manual Scan Result — {lastResult.runTime ? new Date(lastResult.runTime).toLocaleTimeString('de-DE') : lastRun}</div>
+              <button onClick={() => setLastResult(null)} className="text-slate-500 hover:text-white text-xs">✕ dismiss</button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
+              <div className="bg-emerald-950/40 border border-emerald-800 rounded-xl px-3 py-2">
+                <div className="text-slate-500 uppercase tracking-wide mb-1">Opened</div>
+                <div className={`font-black text-2xl ${lastResult.openedThisRun > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>{lastResult.openedThisRun}</div>
+              </div>
+              <div className="bg-blue-950/30 border border-blue-800 rounded-xl px-3 py-2">
+                <div className="text-slate-500 uppercase tracking-wide mb-1">Closed</div>
+                <div className={`font-black text-2xl ${lastResult.closedThisRun > 0 ? 'text-blue-400' : 'text-slate-400'}`}>{lastResult.closedThisRun}</div>
+              </div>
+              <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-3 py-2">
+                <div className="text-slate-500 uppercase tracking-wide mb-1">Skipped Pairs</div>
+                <div className="font-black text-2xl text-slate-400">{lastResult.skippedPairs?.length ?? 0}</div>
+              </div>
+              <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-3 py-2">
+                <div className="text-slate-500 uppercase tracking-wide mb-1">Safety</div>
+                <div className="font-black text-emerald-400 text-xs mt-1">PAPER_ONLY ✅</div>
+              </div>
+            </div>
+            {/* Opened details */}
+            {lastResult.openedDetails?.length > 0 && (
+              <div className="space-y-1 mb-2">
+                <div className="text-xs text-emerald-400 font-bold mb-1">📄 Opened This Run:</div>
+                {lastResult.openedDetails.map((e, i) => (
+                  <div key={i} className="flex flex-wrap items-center gap-3 text-xs bg-emerald-950/20 border border-emerald-900 rounded-lg px-3 py-1.5">
+                    <span className="font-black text-white">{e.instId}</span>
+                    <span className="text-slate-400">entry <span className="text-white">${e.entryPrice?.toLocaleString()}</span></span>
+                    <span className="text-emerald-400">TP ${e.targetPrice?.toLocaleString()}</span>
+                    <span className="text-red-400">SL ${e.stopLossPrice?.toLocaleString()}</span>
+                    <span className="text-cyan-400">score {e.score}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Closed details */}
+            {lastResult.closedDetails?.length > 0 && (
+              <div className="space-y-1 mb-2">
+                <div className="text-xs text-blue-400 font-bold mb-1">🔒 Closed This Run:</div>
+                {lastResult.closedDetails.map((e, i) => {
+                  const net = e.netPnL ?? e.netPnLUSDT ?? 0;
+                  return (
+                    <div key={i} className="flex flex-wrap items-center gap-3 text-xs bg-blue-950/20 border border-blue-900 rounded-lg px-3 py-1.5">
+                      <span className="font-black text-white">{e.instId}</span>
+                      <span className={`font-bold ${e.status === 'CLOSED_TP' ? 'text-emerald-400' : e.status === 'CLOSED_SL' ? 'text-red-400' : 'text-slate-400'}`}>{e.status}</span>
+                      <span className="text-slate-400">exit <span className="text-white">${e.exitPrice?.toLocaleString()}</span></span>
+                      <span className={`font-bold ${net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{net >= 0 ? '+' : ''}{net.toFixed(4)} USDT</span>
+                      <span className="text-slate-500 italic text-xs">{e.reason}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {/* Skipped pairs */}
+            {lastResult.skippedPairs?.length > 0 && (
+              <div>
+                <div className="text-xs text-slate-500 font-bold mb-1">⏭ Skipped:</div>
+                <div className="flex flex-wrap gap-2">
+                  {lastResult.skippedPairs.map((r, i) => (
+                    <span key={i} className="text-xs bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-slate-400">
+                      <span className="text-white font-bold">{r.instId}</span> — {r.action}{r.reason ? ` (${r.reason})` : ''}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Auto Scanner Status Panel */}
         <div className="bg-slate-900/60 border-2 border-emerald-800 rounded-2xl px-5 py-4">
