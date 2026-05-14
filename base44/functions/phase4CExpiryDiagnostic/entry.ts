@@ -29,6 +29,13 @@ const PAIRS        = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT
 // Expiry limit used in the engine (15 minutes)
 const EXPIRY_LIMIT_MS = 15 * 60 * 1000;
 
+// ── Phase 4D constants (mirrored for fee-drain classification) ────────────────
+const PHASE4D_MIN_NET_PROFIT    = 0.10;   // raised from 0.05
+const PHASE4D_FEE_EFFICIENCY    = 0.30;   // tightened from 0.40
+const PHASE4D_GROSS_FLOOR       = 0.15;   // new gross profit floor
+const PHASE4D_EXPIRY_THRESHOLD  = 0.50;   // raised from 0.40
+const PHASE4D_EXPIRY_SCORE_FLOOR = 75;    // raised from 70
+
 // ── Classify reason for expiry ────────────────────────────────────────────────
 function classifyReason(stats) {
   const {

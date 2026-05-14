@@ -21,13 +21,18 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// ── PHASE4_PAPER_CONSTANTS (Phase 4B correction — fee overtrading fix) ────────
+// ── PHASE4_PAPER_CONSTANTS (Phase 4D correction — fee-profit correction) ─────
+// Phase 4B: requiredScore 55→65, minTickScore 10→12, feeEfficiency 40%
+// Phase 4D: minEstimatedNetProfit 0.05→0.10, feeEfficiency 40%→30%,
+//            grossProfitFloor 0.15, tpRealismCheck, expiryPenalty 50%→75
 const PHASE4_PAPER_CONSTANTS = {
-  requiredScore:          65,    // Phase 4B correction: raised 55 → 65 (reduce overtrading)
-  minTickScore:           12,    // Phase 4B correction: raised 10 → 12 (stronger tick filter)
-  minEstimatedNetProfit:  0.05,  // NEW: minimum expected net profit per trade in USDT
-  feeEfficiencyMaxRatio:  0.40,  // NEW: fees+spread must not exceed 40% of gross profit
-  highExpiryScoreFloor:   70,    // NEW: if expiry ratio > 40%, require score >= 70
+  requiredScore:          65,    // base; raised to 75 if recentExpiredRatio > 50% (Phase 4D)
+  minTickScore:           12,    // Phase 4B correction: raised 10 → 12
+  minEstimatedNetProfit:  0.10,  // Phase 4D: raised 0.05 → 0.10 USDT (fee drain fix)
+  feeEfficiencyMaxRatio:  0.30,  // Phase 4D: tightened 40% → 30% (fee drain fix)
+  grossProfitFloor:       0.15,  // Phase 4D NEW: expectedGrossProfitUSDT must be >= 0.15
+  highExpiryScoreFloor:   75,    // Phase 4D: raised 70 → 75; active when expiredRatio > 50%
+  highExpiryThreshold:    0.50,  // Phase 4D: trigger raised 40% → 50%
   maxOpenTrades:          5,
   paperOnly:              true,
   realTradeAllowed:       false,
@@ -44,11 +49,13 @@ const MAX_HOLD_MS          = 15 * 60 * 1000; // 15-minute expiry
 const REQUIRED_NET_PROFIT  = 0.0003;   // minimum net profit threshold
 const MAX_SPREAD_PCT       = 0.05;     // 5 bps max spread
 const MAX_VOLATILITY_PCT   = 2.0;      // 2% max 20-candle volatility
-const REQUIRED_SCORE            = PHASE4_PAPER_CONSTANTS.requiredScore;         // 65
+const REQUIRED_SCORE            = PHASE4_PAPER_CONSTANTS.requiredScore;         // 65 base
 const MIN_TICK_SCORE            = PHASE4_PAPER_CONSTANTS.minTickScore;           // 12
-const MIN_ESTIMATED_NET_PROFIT  = PHASE4_PAPER_CONSTANTS.minEstimatedNetProfit;  // 0.05 USDT
-const FEE_EFFICIENCY_MAX_RATIO  = PHASE4_PAPER_CONSTANTS.feeEfficiencyMaxRatio;  // 0.40
-const HIGH_EXPIRY_SCORE_FLOOR   = PHASE4_PAPER_CONSTANTS.highExpiryScoreFloor;   // 70
+const MIN_ESTIMATED_NET_PROFIT  = PHASE4_PAPER_CONSTANTS.minEstimatedNetProfit;  // 0.10 USDT (Phase 4D)
+const FEE_EFFICIENCY_MAX_RATIO  = PHASE4_PAPER_CONSTANTS.feeEfficiencyMaxRatio;  // 0.30 (Phase 4D)
+const GROSS_PROFIT_FLOOR        = PHASE4_PAPER_CONSTANTS.grossProfitFloor;       // 0.15 USDT (Phase 4D)
+const HIGH_EXPIRY_SCORE_FLOOR   = PHASE4_PAPER_CONSTANTS.highExpiryScoreFloor;   // 75 (Phase 4D)
+const HIGH_EXPIRY_THRESHOLD     = PHASE4_PAPER_CONSTANTS.highExpiryThreshold;    // 0.50 (Phase 4D)
 const EMA_FAST             = 9;
 const EMA_SLOW             = 21;
 const RSI_PERIOD           = 14;
@@ -228,22 +235,27 @@ function checkBarriers(intraday, tick, spreadPct, score, tickScore, recentExpiry
   const spreadCost  = K_SIZE * (spreadPct / 100);
   const feeNet      = grossProfit - fees - spreadCost;
 
-  // Fee efficiency: fees+spread must not exceed 40% of gross profit
+  // Phase 4D: fee efficiency tightened 40% → 30%
   const feeEfficiencyRatio = grossProfit > 0 ? (fees + spreadCost) / grossProfit : 1;
 
-  // Expiry filter: if recent expiry ratio > 40%, require higher score
-  const effectiveScoreFloor = recentExpiryRatio > 0.40 ? HIGH_EXPIRY_SCORE_FLOOR : REQUIRED_SCORE;
+  // Phase 4D: expiry penalty threshold raised 40% → 50%, score floor 70 → 75
+  const effectiveScoreFloor = recentExpiryRatio > HIGH_EXPIRY_THRESHOLD ? HIGH_EXPIRY_SCORE_FLOOR : REQUIRED_SCORE;
+
+  // Phase 4D: TP realism check — abs(momentum)*3 must reach TP%, or score >= 75
+  const tpRealismPass = (Math.abs(intraday.momentum) * 3 >= K_TP) || (score >= 75);
 
   return {
     intradayBarrier:      intraday.direction !== 'BEARISH',
     tickBarrier:          tickScore >= MIN_TICK_SCORE,
     feeBarrier:           feeNet >= REQUIRED_NET_PROFIT,
-    minNetProfitBarrier:  feeNet >= MIN_ESTIMATED_NET_PROFIT,
-    feeEfficiencyBarrier: feeEfficiencyRatio <= FEE_EFFICIENCY_MAX_RATIO,
+    minNetProfitBarrier:  feeNet >= MIN_ESTIMATED_NET_PROFIT,          // Phase 4D: 0.10 USDT
+    grossProfitFloorBarrier: grossProfit >= GROSS_PROFIT_FLOOR,        // Phase 4D NEW
+    feeEfficiencyBarrier: feeEfficiencyRatio <= FEE_EFFICIENCY_MAX_RATIO, // Phase 4D: 30%
     spreadBarrier:        spreadPct <= MAX_SPREAD_PCT,
     volatilityBarrier:    intraday.volatilityPct <= MAX_VOLATILITY_PCT,
     scoreBarrier:         score >= effectiveScoreFloor,
-    momentumBarrier:      Math.abs(intraday.momentum) >= 0.03, // must have real price movement
+    momentumBarrier:      Math.abs(intraday.momentum) >= 0.03,
+    tpRealismBarrier:     tpRealismPass,                               // Phase 4D NEW
   };
 }
 
@@ -290,17 +302,19 @@ Deno.serve(async (req) => {
       ],
       dangerousPatternsScanResult:     DANGEROUS_PATTERNS.map(p => ({ pattern: p, found: false })),
       barrierRequirements: {
-        intradayBarrier:      'direction != BEARISH',
-        tickBarrier:          `tickScore >= ${MIN_TICK_SCORE} (Phase 4B correction: 10→12)`,
-        feeBarrier:           `net >= ${REQUIRED_NET_PROFIT} USDT`,
-        minNetProfitBarrier:  `estimatedNetProfit >= ${MIN_ESTIMATED_NET_PROFIT} USDT (NEW)`,
-        feeEfficiencyBarrier: `(fees+spread)/grossProfit <= ${FEE_EFFICIENCY_MAX_RATIO * 100}% (NEW)`,
-        spreadBarrier:        `spreadPct <= ${MAX_SPREAD_PCT}%`,
-        volatilityBarrier:    `volatility20 <= ${MAX_VOLATILITY_PCT}%`,
-        scoreBarrier:         `score >= ${REQUIRED_SCORE} (Phase 4B correction: 55→65); or >= ${HIGH_EXPIRY_SCORE_FLOOR} if recentExpiryRatio > 40%`,
-        momentumBarrier:      'abs(momentum) >= 0.03% (NEW)',
+        intradayBarrier:          'direction != BEARISH',
+        tickBarrier:              `tickScore >= ${MIN_TICK_SCORE} (Phase 4B: 10→12)`,
+        feeBarrier:               `net >= ${REQUIRED_NET_PROFIT} USDT`,
+        minNetProfitBarrier:      `estimatedNetProfit >= ${MIN_ESTIMATED_NET_PROFIT} USDT (Phase 4D: 0.05→0.10)`,
+        grossProfitFloorBarrier:  `expectedGrossProfit >= ${GROSS_PROFIT_FLOOR} USDT (Phase 4D NEW)`,
+        feeEfficiencyBarrier:     `(fees+spread)/grossProfit <= ${FEE_EFFICIENCY_MAX_RATIO * 100}% (Phase 4D: 40%→30%)`,
+        spreadBarrier:            `spreadPct <= ${MAX_SPREAD_PCT}%`,
+        volatilityBarrier:        `volatility20 <= ${MAX_VOLATILITY_PCT}%`,
+        scoreBarrier:             `score >= ${REQUIRED_SCORE} base; or >= ${HIGH_EXPIRY_SCORE_FLOOR} if recentExpiredRatio > ${HIGH_EXPIRY_THRESHOLD * 100}% (Phase 4D: floor 70→75, threshold 40%→50%)`,
+        momentumBarrier:          'abs(momentum) >= 0.03%',
+        tpRealismBarrier:         `abs(momentum)*3 >= ${K_TP}% OR score >= 75 (Phase 4D NEW)`,
       },
-      phase4bConstants: PHASE4_PAPER_CONSTANTS,
+      phase4dConstants: PHASE4_PAPER_CONSTANTS,
       issuesFound: [],
       finalVerdict: 'PHASE_4_PAPER_ONLY — SAFE TO RUN — NO REAL FUNDS AT RISK',
     };

@@ -23,29 +23,43 @@ function pairRecommendation(netPnL, winRate, tradesCount) {
   return { recommendation: 'WATCH', reason: `netPnL=${netPnL.toFixed(6)} winRate=${winRate.toFixed(1)}% — monitoring` };
 }
 
-// ── Engine status rules ───────────────────────────────────────────────────────
-function calcEngineStatus(totalTrades, netPnL, winRate) {
+// ── Engine status rules (Phase 4D updated) ────────────────────────────────────
+function calcEngineStatus(totalTrades, netPnL, winRate, grossPnL, totalFees) {
   // Report verdict: real trade unlock is NEVER allowed from paper results
   const realTradeUnlockAllowed = false; // hardcoded — kill switch governs this, not report
 
   if (totalTrades < 10) return {
-    engineStatus: 'INSUFFICIENT_DATA',
-    engineReason: `Only ${totalTrades} trades — need >= 10`,
+    engineStatus:   'INSUFFICIENT_DATA',
+    engineReason:   `Only ${totalTrades} trades — need >= 10`,
+    phase4DVerdict: 'COLLECTING_DATA',
+    realTradeUnlockAllowed,
+  };
+
+  // Phase 4D: detect fee drain explicitly
+  const feeDrainActive = grossPnL !== undefined && totalFees !== undefined && totalFees > Math.abs(grossPnL);
+
+  if (feeDrainActive) return {
+    engineStatus:   'PAPER_ENGINE_FEE_DRAIN',
+    engineReason:   `fees=${totalFees.toFixed(4)} > grossPnL=${grossPnL.toFixed(4)} — Phase 4D barriers active to filter low-profit entries`,
+    phase4DVerdict: 'FEE_DRAIN_DETECTED — 4D barriers filtering',
     realTradeUnlockAllowed,
   };
   if (winRate < 45 || netPnL <= 0) return {
-    engineStatus: 'PAPER_ENGINE_NOT_PROFITABLE_YET',
-    engineReason: `winRate=${winRate.toFixed(1)}% < 45% or netPnL=${netPnL.toFixed(6)} <= 0 — overtrading/fee drain detected`,
+    engineStatus:   'PAPER_ENGINE_NOT_PROFITABLE_YET',
+    engineReason:   `winRate=${winRate.toFixed(1)}% < 45% or netPnL=${netPnL.toFixed(6)} <= 0`,
+    phase4DVerdict: 'MONITORING — await 4D constant effect',
     realTradeUnlockAllowed,
   };
   if (totalTrades >= 20 && netPnL > 0 && winRate >= 55) return {
-    engineStatus: 'PAPER_ENGINE_PROMISING',
-    engineReason: `${totalTrades} trades, netPnL=${netPnL.toFixed(6)}, wr=${winRate.toFixed(1)}%`,
+    engineStatus:   'PAPER_ENGINE_PROMISING',
+    engineReason:   `${totalTrades} trades, netPnL=${netPnL.toFixed(6)}, wr=${winRate.toFixed(1)}%`,
+    phase4DVerdict: 'APPROACHING_UNLOCK_CRITERIA — keep collecting',
     realTradeUnlockAllowed,
   };
   return {
-    engineStatus: 'PAPER_ENGINE_NOT_PROFITABLE_YET',
-    engineReason: `winRate=${winRate.toFixed(1)}% < 55% or totalTrades=${totalTrades} < 20`,
+    engineStatus:   'PAPER_ENGINE_NOT_PROFITABLE_YET',
+    engineReason:   `winRate=${winRate.toFixed(1)}% < 55% or totalTrades=${totalTrades} < 20`,
+    phase4DVerdict: 'MONITORING',
     realTradeUnlockAllowed,
   };
 }
@@ -164,7 +178,7 @@ Deno.serve(async (req) => {
       ? pairsWithTrades.reduce((a, b) => b.netPnL < a.netPnL ? b : a).instId : null;
 
     // ── Engine status ────────────────────────────────────────────────────────
-    const { engineStatus, engineReason, realTradeUnlockAllowed } = calcEngineStatus(totalPaperTrades, netPnL, winRate);
+    const { engineStatus, engineReason, phase4DVerdict, realTradeUnlockAllowed } = calcEngineStatus(totalPaperTrades, netPnL, winRate, grossPnL, totalFees);
 
     console.log(`[PHASE4_REPORT] totalTrades=${totalPaperTrades} netPnL=${netPnL.toFixed(6)} winRate=${winRate.toFixed(1)}% engineStatus=${engineStatus}`);
 
@@ -181,6 +195,7 @@ Deno.serve(async (req) => {
       // ── Engine verdict ────────────────────────────────────────────────────
       engineStatus,
       engineReason,
+      phase4DVerdict,
       realTradeUnlockAllowed,
 
       // ── Global 24h metrics ────────────────────────────────────────────────

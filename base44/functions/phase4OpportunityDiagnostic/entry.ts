@@ -18,8 +18,8 @@ const NO_OKX_ORDER_ENDPOINT   = true;
 
 const PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT'];
 
-// Thresholds (mirror phase4OKXPaperTrading — Phase 4B correction)
-const REQUIRED_SCORE            = 65;     // Phase 4B correction: raised 55 → 65
+// Thresholds (mirror phase4OKXPaperTrading — Phase 4D correction)
+const REQUIRED_SCORE            = 65;     // base; 75 if recentExpiredRatio > 50% (Phase 4D)
 const MIN_TICK_SCORE_THRESHOLD  = 12;     // Phase 4B correction: raised 10 → 12
 const TP_PCT                    = 0.25;
 const SL_PCT                    = 0.18;
@@ -27,10 +27,12 @@ const K_SIZE_DIAG               = 10;     // USDT per trade (for fee calc)
 const MAX_SPREAD_PCT            = 0.06;
 const MAX_OPEN_TRADES           = 5;
 const FEE_RATE                  = 0.001;  // 0.1% per leg
-const MIN_ESTIMATED_NET_PROFIT  = 0.05;   // NEW: min net profit barrier
-const FEE_EFFICIENCY_MAX_RATIO  = 0.40;   // NEW: (fees+spread)/grossProfit <= 40%
-const MIN_MOMENTUM_PCT          = 0.03;   // NEW: abs(momentum) >= 0.03%
-const HIGH_EXPIRY_SCORE_FLOOR   = 70;     // NEW: score floor when expiry ratio > 40%
+const MIN_ESTIMATED_NET_PROFIT  = 0.10;   // Phase 4D: raised 0.05 → 0.10 USDT
+const FEE_EFFICIENCY_MAX_RATIO  = 0.30;   // Phase 4D: tightened 40% → 30%
+const GROSS_PROFIT_FLOOR        = 0.15;   // Phase 4D NEW: grossProfit must be >= 0.15 USDT
+const MIN_MOMENTUM_PCT          = 0.03;   // momentum barrier unchanged
+const HIGH_EXPIRY_SCORE_FLOOR   = 75;     // Phase 4D: raised 70 → 75
+const HIGH_EXPIRY_THRESHOLD     = 0.50;   // Phase 4D: trigger raised 40% → 50%
 const MIN_VOL_USDT              = 500_000;
 const CANDLE_LIMIT              = 30;
 const TICK_LIMIT                = 50;
@@ -245,10 +247,17 @@ async function analyzePair(instId, openTrades) {
   const spreadCostDiag = K_SIZE_DIAG * (spreadPct / 100);
   const estimatedNet  = grossProfit - feesTotal - spreadCostDiag;
   const feeRatio      = grossProfit > 0 ? (feesTotal + spreadCostDiag) / grossProfit : 1;
-  result.minNetProfitBarrier  = estimatedNet >= MIN_ESTIMATED_NET_PROFIT ? 'PASS' : 'FAIL';
-  result.feeEfficiencyBarrier = feeRatio <= FEE_EFFICIENCY_MAX_RATIO ? 'PASS' : 'FAIL';
-  result.estimatedNetProfit   = parseFloat(estimatedNet.toFixed(6));
-  result.feeEfficiencyRatio   = parseFloat(feeRatio.toFixed(4));
+  result.minNetProfitBarrier   = estimatedNet >= MIN_ESTIMATED_NET_PROFIT ? 'PASS' : 'FAIL'; // Phase 4D: 0.10
+  result.feeEfficiencyBarrier  = feeRatio <= FEE_EFFICIENCY_MAX_RATIO ? 'PASS' : 'FAIL';     // Phase 4D: 30%
+  result.grossProfitFloorBarrier = grossProfit >= GROSS_PROFIT_FLOOR ? 'PASS' : 'FAIL';       // Phase 4D NEW
+  result.estimatedNetProfit    = parseFloat(estimatedNet.toFixed(6));
+  result.feeEfficiencyRatio    = parseFloat(feeRatio.toFixed(4));
+  result.expectedGrossProfit   = parseFloat(grossProfit.toFixed(6));
+
+  // ── TP REALISM BARRIER (Phase 4D NEW) ────────────────────────────────────
+  const tpRealismPass = (Math.abs(momentum) * 3 >= TP_PCT) || (result.totalScore >= 75);
+  result.tpRealismBarrier = tpRealismPass ? 'PASS' : 'FAIL';
+  result.tpRealismDetail  = `abs(${momentum.toFixed(4)})*3=${(Math.abs(momentum)*3).toFixed(4)} vs tp=${TP_PCT}`;
 
   // ── MOMENTUM BARRIER ──────────────────────────────────────────────────────
   result.momentumBarrier = Math.abs(momentum) >= MIN_MOMENTUM_PCT ? 'PASS' : 'FAIL';
@@ -272,6 +281,8 @@ async function analyzePair(instId, openTrades) {
   // ── DETERMINE ACTION ──────────────────────────────────────────────────────
   const allNewBarriersPass = result.minNetProfitBarrier === 'PASS'
     && result.feeEfficiencyBarrier === 'PASS'
+    && result.grossProfitFloorBarrier === 'PASS'
+    && result.tpRealismBarrier === 'PASS'
     && result.momentumBarrier === 'PASS';
 
   if (totalScore >= REQUIRED_SCORE && spreadPass && feePass && allNewBarriersPass) {
@@ -286,9 +297,11 @@ async function analyzePair(instId, openTrades) {
   const barriers = [];
   if (!spreadPass)     barriers.push({ name: 'SPREAD_TOO_WIDE',        weight: 4, fix: `Increase MAX_SPREAD_PCT above ${spreadPct.toFixed(4)}%` });
   if (!feePass)        barriers.push({ name: 'FEE_VIABILITY_FAIL',     weight: 3, fix: `Increase TP_PCT above ${minMoveForProfit.toFixed(3)}%` });
-  if (result.minNetProfitBarrier === 'FAIL')  barriers.push({ name: 'MIN_NET_PROFIT_TOO_LOW',  weight: 4, fix: `estimatedNet=${estimatedNet.toFixed(4)} USDT < ${MIN_ESTIMATED_NET_PROFIT} USDT minimum` });
-  if (result.feeEfficiencyBarrier === 'FAIL') barriers.push({ name: 'FEE_EFFICIENCY_BREACH',   weight: 4, fix: `fees+spread=${(feeRatio*100).toFixed(1)}% of gross > ${FEE_EFFICIENCY_MAX_RATIO*100}% max` });
-  if (result.momentumBarrier === 'FAIL')      barriers.push({ name: 'INSUFFICIENT_MOMENTUM',   weight: 3, fix: `momentum=${result.momentumPct}% < ${MIN_MOMENTUM_PCT}% minimum` });
+  if (result.minNetProfitBarrier     === 'FAIL') barriers.push({ name: 'MIN_NET_PROFIT_TOO_LOW',    weight: 4, fix: `estimatedNet=${estimatedNet.toFixed(4)} USDT < ${MIN_ESTIMATED_NET_PROFIT} USDT (Phase 4D: 0.10)` });
+  if (result.feeEfficiencyBarrier    === 'FAIL') barriers.push({ name: 'FEE_EFFICIENCY_BREACH',     weight: 4, fix: `fees+spread=${(feeRatio*100).toFixed(1)}% of gross > ${FEE_EFFICIENCY_MAX_RATIO*100}% max (Phase 4D: 30%)` });
+  if (result.grossProfitFloorBarrier === 'FAIL') barriers.push({ name: 'GROSS_PROFIT_BELOW_FLOOR',  weight: 4, fix: `expectedGross=${grossProfit.toFixed(4)} USDT < ${GROSS_PROFIT_FLOOR} floor (Phase 4D)` });
+  if (result.tpRealismBarrier        === 'FAIL') barriers.push({ name: 'TP_REALISM_FAIL',           weight: 4, fix: `${result.tpRealismDetail} — momentum too weak to reach TP (Phase 4D)` });
+  if (result.momentumBarrier         === 'FAIL') barriers.push({ name: 'INSUFFICIENT_MOMENTUM',     weight: 3, fix: `momentum=${result.momentumPct}% < ${MIN_MOMENTUM_PCT}% minimum` });
   if (result.intradayBarrier === 'FAIL') barriers.push({ name: 'WEAK_INTRADAY_MOMENTUM',  weight: 3, fix: 'Wait for trend confirmation (EMA cross + RSI + candle momentum)' });
   if (result.tickBarrier === 'FAIL')     barriers.push({ name: 'WEAK_TICK_PRESSURE',       weight: 2, fix: `tickScore < ${MIN_TICK_SCORE_THRESHOLD} — need stronger buy pressure` });
   if (!volatilityPass) barriers.push({ name: 'VOLATILITY_OUT_OF_RANGE', weight: 2, fix: 'Adjust volatility window or min/max thresholds' });
@@ -324,7 +337,7 @@ Deno.serve(async (req) => {
     const recentClosedValid = recentClosed.filter(t => t.status !== 'OPEN' && t.closedAt);
     const recentExpired = recentClosedValid.filter(t => t.status === 'EXPIRED');
     const recentExpiryRatio = recentClosedValid.length > 0 ? recentExpired.length / recentClosedValid.length : 0;
-    const expiryFilterActive = recentExpiryRatio > 0.40;
+    const expiryFilterActive = recentExpiryRatio > HIGH_EXPIRY_THRESHOLD;
 
     // ── Fetch last 24h closed trades ─────────────────────────────────────
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -382,12 +395,15 @@ Deno.serve(async (req) => {
       FEE_RATE,
       MIN_ESTIMATED_NET_PROFIT,
       FEE_EFFICIENCY_MAX_RATIO,
+      GROSS_PROFIT_FLOOR,
       MIN_MOMENTUM_PCT,
       HIGH_EXPIRY_SCORE_FLOOR,
+      HIGH_EXPIRY_THRESHOLD,
       MIN_VOL_USDT,
       recentExpiryRatio:   parseFloat(recentExpiryRatio.toFixed(3)),
       expiryFilterActive,
       effectiveScoreFloor: expiryFilterActive ? HIGH_EXPIRY_SCORE_FLOOR : REQUIRED_SCORE,
+      phase4DActive:       true,
     };
 
     // ── Suggestions ───────────────────────────────────────────────────────
@@ -432,9 +448,11 @@ Deno.serve(async (req) => {
         intradayBarrier:           p.intradayBarrier,
         tickBarrier:               p.tickBarrier,
         feeBarrier:                p.feeBarrier,
-        minNetProfitBarrier:       p.minNetProfitBarrier,
-        feeEfficiencyBarrier:      p.feeEfficiencyBarrier,
-        momentumBarrier:           p.momentumBarrier,
+        minNetProfitBarrier:         p.minNetProfitBarrier,
+        feeEfficiencyBarrier:        p.feeEfficiencyBarrier,
+        grossProfitFloorBarrier:     p.grossProfitFloorBarrier,
+        tpRealismBarrier:            p.tpRealismBarrier,
+        momentumBarrier:             p.momentumBarrier,
         spreadBarrier:             p.spreadBarrier,
         volatilityBarrier:         p.volatilityBarrier,
         duplicateOpenTradeBlocked: p.duplicateOpenTradeBlocked,
@@ -450,8 +468,10 @@ Deno.serve(async (req) => {
           askPx:                p.askPx,
           bidPx:                p.bidPx,
           momentumPct:          p.momentumPct,
-          estimatedNetProfit:   p.estimatedNetProfit,
-          feeEfficiencyRatio:   p.feeEfficiencyRatio,
+          estimatedNetProfit:    p.estimatedNetProfit,
+          feeEfficiencyRatio:    p.feeEfficiencyRatio,
+          expectedGrossProfit:   p.expectedGrossProfit,
+          tpRealismDetail:       p.tpRealismDetail,
         },
         allBarriers: p.allBarriers,
       })),
