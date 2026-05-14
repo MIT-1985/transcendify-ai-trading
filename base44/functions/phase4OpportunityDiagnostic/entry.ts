@@ -18,16 +18,22 @@ const NO_OKX_ORDER_ENDPOINT   = true;
 
 const PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT'];
 
-// Thresholds (mirror phase4OKXPaperTrading)
-const REQUIRED_SCORE       = 55;   // minimum composite score to open a paper trade
-const TP_PCT               = 0.25;
-const SL_PCT               = 0.18;
-const MAX_SPREAD_PCT        = 0.06;
-const MAX_OPEN_TRADES       = 5;
-const FEE_RATE             = 0.001; // 0.1% per leg
-const MIN_VOL_USDT         = 500_000; // minimum 24h volume
-const CANDLE_LIMIT         = 30;
-const TICK_LIMIT           = 50;
+// Thresholds (mirror phase4OKXPaperTrading — Phase 4B correction)
+const REQUIRED_SCORE            = 65;     // Phase 4B correction: raised 55 → 65
+const MIN_TICK_SCORE_THRESHOLD  = 12;     // Phase 4B correction: raised 10 → 12
+const TP_PCT                    = 0.25;
+const SL_PCT                    = 0.18;
+const K_SIZE_DIAG               = 10;     // USDT per trade (for fee calc)
+const MAX_SPREAD_PCT            = 0.06;
+const MAX_OPEN_TRADES           = 5;
+const FEE_RATE                  = 0.001;  // 0.1% per leg
+const MIN_ESTIMATED_NET_PROFIT  = 0.05;   // NEW: min net profit barrier
+const FEE_EFFICIENCY_MAX_RATIO  = 0.40;   // NEW: (fees+spread)/grossProfit <= 40%
+const MIN_MOMENTUM_PCT          = 0.03;   // NEW: abs(momentum) >= 0.03%
+const HIGH_EXPIRY_SCORE_FLOOR   = 70;     // NEW: score floor when expiry ratio > 40%
+const MIN_VOL_USDT              = 500_000;
+const CANDLE_LIMIT              = 30;
+const TICK_LIMIT                = 50;
 
 // ── OKX public endpoints (read-only, no auth) ────────────────────────────────
 const OKX_BASE = 'https://www.okx.com';
@@ -231,7 +237,22 @@ async function analyzePair(instId, openTrades) {
   else                      tickScore = 5;  // sell pressure
 
   result.tickScore   = tickScore;
-  result.tickBarrier = tickScore >= 10 ? 'PASS' : 'FAIL'; // Phase 4B: threshold lowered 15 → 10
+  result.tickBarrier = tickScore >= MIN_TICK_SCORE_THRESHOLD ? 'PASS' : 'FAIL'; // Phase 4B correction: 12
+
+  // ── MIN NET PROFIT BARRIER ────────────────────────────────────────────────
+  const grossProfit   = K_SIZE_DIAG * (TP_PCT / 100);
+  const feesTotal     = K_SIZE_DIAG * FEE_RATE * 2;
+  const spreadCostDiag = K_SIZE_DIAG * (spreadPct / 100);
+  const estimatedNet  = grossProfit - feesTotal - spreadCostDiag;
+  const feeRatio      = grossProfit > 0 ? (feesTotal + spreadCostDiag) / grossProfit : 1;
+  result.minNetProfitBarrier  = estimatedNet >= MIN_ESTIMATED_NET_PROFIT ? 'PASS' : 'FAIL';
+  result.feeEfficiencyBarrier = feeRatio <= FEE_EFFICIENCY_MAX_RATIO ? 'PASS' : 'FAIL';
+  result.estimatedNetProfit   = parseFloat(estimatedNet.toFixed(6));
+  result.feeEfficiencyRatio   = parseFloat(feeRatio.toFixed(4));
+
+  // ── MOMENTUM BARRIER ──────────────────────────────────────────────────────
+  result.momentumBarrier = Math.abs(momentum) >= MIN_MOMENTUM_PCT ? 'PASS' : 'FAIL';
+  result.momentumPct     = parseFloat(momentum.toFixed(4));
 
   // ── COMPOSITE SCORE ───────────────────────────────────────────────────────
   const totalScore = intradayScore + tickScore + result.spreadScore + result.feeScore;
@@ -249,7 +270,11 @@ async function analyzePair(instId, openTrades) {
   };
 
   // ── DETERMINE ACTION ──────────────────────────────────────────────────────
-  if (totalScore >= REQUIRED_SCORE && spreadPass && feePass) {
+  const allNewBarriersPass = result.minNetProfitBarrier === 'PASS'
+    && result.feeEfficiencyBarrier === 'PASS'
+    && result.momentumBarrier === 'PASS';
+
+  if (totalScore >= REQUIRED_SCORE && spreadPass && feePass && allNewBarriersPass) {
     result.currentAction = 'PAPER_SIGNAL_ONLY';
   } else if (totalScore >= REQUIRED_SCORE - 10) {
     result.currentAction = 'WATCH';
@@ -259,12 +284,15 @@ async function analyzePair(instId, openTrades) {
 
   // ── MAIN BLOCKING REASON ──────────────────────────────────────────────────
   const barriers = [];
-  if (!spreadPass)     barriers.push({ name: 'SPREAD_TOO_WIDE',     weight: 4, fix: `Increase MAX_SPREAD_PCT above ${spreadPct.toFixed(4)}%` });
-  if (!feePass)        barriers.push({ name: 'FEE_VIABILITY_FAIL',  weight: 3, fix: `Increase TP_PCT above ${minMoveForProfit.toFixed(3)}%` });
-  if (result.intradayBarrier === 'FAIL') barriers.push({ name: 'WEAK_INTRADAY_MOMENTUM', weight: 3, fix: 'Lower REQUIRED_SCORE or wait for trend confirmation' });
-  if (result.tickBarrier === 'FAIL')     barriers.push({ name: 'WEAK_TICK_PRESSURE',     weight: 2, fix: 'Lower tickScore threshold from 10 to 5 (Phase 4B already applied: 15→10)' });
+  if (!spreadPass)     barriers.push({ name: 'SPREAD_TOO_WIDE',        weight: 4, fix: `Increase MAX_SPREAD_PCT above ${spreadPct.toFixed(4)}%` });
+  if (!feePass)        barriers.push({ name: 'FEE_VIABILITY_FAIL',     weight: 3, fix: `Increase TP_PCT above ${minMoveForProfit.toFixed(3)}%` });
+  if (result.minNetProfitBarrier === 'FAIL')  barriers.push({ name: 'MIN_NET_PROFIT_TOO_LOW',  weight: 4, fix: `estimatedNet=${estimatedNet.toFixed(4)} USDT < ${MIN_ESTIMATED_NET_PROFIT} USDT minimum` });
+  if (result.feeEfficiencyBarrier === 'FAIL') barriers.push({ name: 'FEE_EFFICIENCY_BREACH',   weight: 4, fix: `fees+spread=${(feeRatio*100).toFixed(1)}% of gross > ${FEE_EFFICIENCY_MAX_RATIO*100}% max` });
+  if (result.momentumBarrier === 'FAIL')      barriers.push({ name: 'INSUFFICIENT_MOMENTUM',   weight: 3, fix: `momentum=${result.momentumPct}% < ${MIN_MOMENTUM_PCT}% minimum` });
+  if (result.intradayBarrier === 'FAIL') barriers.push({ name: 'WEAK_INTRADAY_MOMENTUM',  weight: 3, fix: 'Wait for trend confirmation (EMA cross + RSI + candle momentum)' });
+  if (result.tickBarrier === 'FAIL')     barriers.push({ name: 'WEAK_TICK_PRESSURE',       weight: 2, fix: `tickScore < ${MIN_TICK_SCORE_THRESHOLD} — need stronger buy pressure` });
   if (!volatilityPass) barriers.push({ name: 'VOLATILITY_OUT_OF_RANGE', weight: 2, fix: 'Adjust volatility window or min/max thresholds' });
-  if (totalScore < REQUIRED_SCORE) barriers.push({ name: `SCORE_TOO_LOW (${totalScore}/${REQUIRED_SCORE})`, weight: 5, fix: `Lower REQUIRED_SCORE to ${totalScore + 5}` });
+  if (totalScore < REQUIRED_SCORE) barriers.push({ name: `SCORE_TOO_LOW (${totalScore}/${REQUIRED_SCORE})`, weight: 5, fix: `Score ${totalScore} below required ${REQUIRED_SCORE}` });
 
   if (barriers.length === 0 && result.currentAction !== 'PAPER_SIGNAL_ONLY') {
     barriers.push({ name: 'UNKNOWN_BARRIER', weight: 1, fix: 'Review raw market data' });
@@ -287,9 +315,16 @@ Deno.serve(async (req) => {
 
     console.log('[PHASE4_DIAG] Starting opportunity diagnostic...');
 
-    // ── Fetch open paper trades ───────────────────────────────────────────
+    // ── Fetch open paper trades + expiry ratio ────────────────────────────
     const openTrades = await base44.entities.PaperTrade.filter({ status: 'OPEN' });
     console.log(`[PHASE4_DIAG] Open trades: ${openTrades.length}`);
+
+    // Compute recent expiry ratio (last 100 closed)
+    const recentClosed = await base44.entities.PaperTrade.list('-closedAt', 100);
+    const recentClosedValid = recentClosed.filter(t => t.status !== 'OPEN' && t.closedAt);
+    const recentExpired = recentClosedValid.filter(t => t.status === 'EXPIRED');
+    const recentExpiryRatio = recentClosedValid.length > 0 ? recentExpired.length / recentClosedValid.length : 0;
+    const expiryFilterActive = recentExpiryRatio > 0.40;
 
     // ── Fetch last 24h closed trades ─────────────────────────────────────
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -330,6 +365,8 @@ Deno.serve(async (req) => {
       isStrategyTooStrict,
       pairsReady:              paperSignalsFound24h,
       pairsBlocked:            PAIRS.length - paperSignalsFound24h,
+      recentExpiryRatio:       parseFloat(recentExpiryRatio.toFixed(3)),
+      expiryFilterActive,
     };
 
     console.log(`[PHASE4_DIAG] Summary: openTrades=${openTrades.length}, signals=${paperSignalsFound24h}, tooStrict=${isStrategyTooStrict}`);
@@ -337,12 +374,20 @@ Deno.serve(async (req) => {
     // ── Threshold reference ───────────────────────────────────────────────
     const currentThresholds = {
       REQUIRED_SCORE,
+      MIN_TICK_SCORE_THRESHOLD,
       TP_PCT,
       SL_PCT,
       MAX_SPREAD_PCT,
       MAX_OPEN_TRADES,
       FEE_RATE,
+      MIN_ESTIMATED_NET_PROFIT,
+      FEE_EFFICIENCY_MAX_RATIO,
+      MIN_MOMENTUM_PCT,
+      HIGH_EXPIRY_SCORE_FLOOR,
       MIN_VOL_USDT,
+      recentExpiryRatio:   parseFloat(recentExpiryRatio.toFixed(3)),
+      expiryFilterActive,
+      effectiveScoreFloor: expiryFilterActive ? HIGH_EXPIRY_SCORE_FLOOR : REQUIRED_SCORE,
     };
 
     // ── Suggestions ───────────────────────────────────────────────────────
@@ -387,6 +432,9 @@ Deno.serve(async (req) => {
         intradayBarrier:           p.intradayBarrier,
         tickBarrier:               p.tickBarrier,
         feeBarrier:                p.feeBarrier,
+        minNetProfitBarrier:       p.minNetProfitBarrier,
+        feeEfficiencyBarrier:      p.feeEfficiencyBarrier,
+        momentumBarrier:           p.momentumBarrier,
         spreadBarrier:             p.spreadBarrier,
         volatilityBarrier:         p.volatilityBarrier,
         duplicateOpenTradeBlocked: p.duplicateOpenTradeBlocked,
@@ -395,12 +443,15 @@ Deno.serve(async (req) => {
         recommendedConstantChange: p.recommendedConstantChange,
         scoreBreakdown:            p.scoreBreakdown,
         marketData: {
-          spreadPct:     p.spreadPct,
-          vol24hUSDT:    p.vol24h,
-          rsi:           p.rsiValue,
-          volatilityPct: p.volatilityPct,
-          askPx:         p.askPx,
-          bidPx:         p.bidPx,
+          spreadPct:            p.spreadPct,
+          vol24hUSDT:           p.vol24h,
+          rsi:                  p.rsiValue,
+          volatilityPct:        p.volatilityPct,
+          askPx:                p.askPx,
+          bidPx:                p.bidPx,
+          momentumPct:          p.momentumPct,
+          estimatedNetProfit:   p.estimatedNetProfit,
+          feeEfficiencyRatio:   p.feeEfficiencyRatio,
         },
         allBarriers: p.allBarriers,
       })),

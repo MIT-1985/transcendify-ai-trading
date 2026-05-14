@@ -25,10 +25,29 @@ function pairRecommendation(netPnL, winRate, tradesCount) {
 
 // ── Engine status rules ───────────────────────────────────────────────────────
 function calcEngineStatus(totalTrades, netPnL, winRate) {
-  if (totalTrades < 10) return { engineStatus: 'INSUFFICIENT_DATA', engineReason: `Only ${totalTrades} trades — need >= 10` };
-  if (totalTrades >= 20 && netPnL > 0 && winRate >= 55) return { engineStatus: 'PAPER_ENGINE_PROMISING', engineReason: `${totalTrades} trades, netPnL=${netPnL.toFixed(6)}, wr=${winRate.toFixed(1)}%` };
-  if (netPnL <= 0) return { engineStatus: 'PAPER_ENGINE_NOT_PROFITABLE_YET', engineReason: `netPnL=${netPnL.toFixed(6)} <= 0` };
-  return { engineStatus: 'PAPER_ENGINE_NOT_PROFITABLE_YET', engineReason: `winRate=${winRate.toFixed(1)}% < 55% or totalTrades=${totalTrades} < 20` };
+  // Report verdict: real trade unlock is NEVER allowed from paper results
+  const realTradeUnlockAllowed = false; // hardcoded — kill switch governs this, not report
+
+  if (totalTrades < 10) return {
+    engineStatus: 'INSUFFICIENT_DATA',
+    engineReason: `Only ${totalTrades} trades — need >= 10`,
+    realTradeUnlockAllowed,
+  };
+  if (winRate < 45 || netPnL <= 0) return {
+    engineStatus: 'PAPER_ENGINE_NOT_PROFITABLE_YET',
+    engineReason: `winRate=${winRate.toFixed(1)}% < 45% or netPnL=${netPnL.toFixed(6)} <= 0 — overtrading/fee drain detected`,
+    realTradeUnlockAllowed,
+  };
+  if (totalTrades >= 20 && netPnL > 0 && winRate >= 55) return {
+    engineStatus: 'PAPER_ENGINE_PROMISING',
+    engineReason: `${totalTrades} trades, netPnL=${netPnL.toFixed(6)}, wr=${winRate.toFixed(1)}%`,
+    realTradeUnlockAllowed,
+  };
+  return {
+    engineStatus: 'PAPER_ENGINE_NOT_PROFITABLE_YET',
+    engineReason: `winRate=${winRate.toFixed(1)}% < 55% or totalTrades=${totalTrades} < 20`,
+    realTradeUnlockAllowed,
+  };
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -145,7 +164,7 @@ Deno.serve(async (req) => {
       ? pairsWithTrades.reduce((a, b) => b.netPnL < a.netPnL ? b : a).instId : null;
 
     // ── Engine status ────────────────────────────────────────────────────────
-    const { engineStatus, engineReason } = calcEngineStatus(totalPaperTrades, netPnL, winRate);
+    const { engineStatus, engineReason, realTradeUnlockAllowed } = calcEngineStatus(totalPaperTrades, netPnL, winRate);
 
     console.log(`[PHASE4_REPORT] totalTrades=${totalPaperTrades} netPnL=${netPnL.toFixed(6)} winRate=${winRate.toFixed(1)}% engineStatus=${engineStatus}`);
 
@@ -162,6 +181,7 @@ Deno.serve(async (req) => {
       // ── Engine verdict ────────────────────────────────────────────────────
       engineStatus,
       engineReason,
+      realTradeUnlockAllowed,
 
       // ── Global 24h metrics ────────────────────────────────────────────────
       global: {

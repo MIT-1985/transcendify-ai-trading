@@ -21,14 +21,17 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// ── PHASE4_PAPER_CONSTANTS (Phase 4B — paper-only, kill switch active) ────────
+// ── PHASE4_PAPER_CONSTANTS (Phase 4B correction — fee overtrading fix) ────────
 const PHASE4_PAPER_CONSTANTS = {
-  requiredScore:     55,   // minimum composite score
-  minTickScore:      10,   // Phase 4B: lowered from 15 → 10 (tick threshold adjustment)
-  maxOpenTrades:     5,
-  paperOnly:         true,
-  realTradeAllowed:  false,
-  killSwitchActive:  true,
+  requiredScore:          65,    // Phase 4B correction: raised 55 → 65 (reduce overtrading)
+  minTickScore:           12,    // Phase 4B correction: raised 10 → 12 (stronger tick filter)
+  minEstimatedNetProfit:  0.05,  // NEW: minimum expected net profit per trade in USDT
+  feeEfficiencyMaxRatio:  0.40,  // NEW: fees+spread must not exceed 40% of gross profit
+  highExpiryScoreFloor:   70,    // NEW: if expiry ratio > 40%, require score >= 70
+  maxOpenTrades:          5,
+  paperOnly:              true,
+  realTradeAllowed:       false,
+  killSwitchActive:       true,
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -41,8 +44,11 @@ const MAX_HOLD_MS          = 15 * 60 * 1000; // 15-minute expiry
 const REQUIRED_NET_PROFIT  = 0.0003;   // minimum net profit threshold
 const MAX_SPREAD_PCT       = 0.05;     // 5 bps max spread
 const MAX_VOLATILITY_PCT   = 2.0;      // 2% max 20-candle volatility
-const REQUIRED_SCORE       = PHASE4_PAPER_CONSTANTS.requiredScore; // 55
-const MIN_TICK_SCORE       = PHASE4_PAPER_CONSTANTS.minTickScore;  // 10 (Phase 4B)
+const REQUIRED_SCORE            = PHASE4_PAPER_CONSTANTS.requiredScore;         // 65
+const MIN_TICK_SCORE            = PHASE4_PAPER_CONSTANTS.minTickScore;           // 12
+const MIN_ESTIMATED_NET_PROFIT  = PHASE4_PAPER_CONSTANTS.minEstimatedNetProfit;  // 0.05 USDT
+const FEE_EFFICIENCY_MAX_RATIO  = PHASE4_PAPER_CONSTANTS.feeEfficiencyMaxRatio;  // 0.40
+const HIGH_EXPIRY_SCORE_FLOOR   = PHASE4_PAPER_CONSTANTS.highExpiryScoreFloor;   // 70
 const EMA_FAST             = 9;
 const EMA_SLOW             = 21;
 const RSI_PERIOD           = 14;
@@ -184,10 +190,16 @@ function analyzeTickConfirmation(trades) {
   };
 }
 
+function calcTickScore(tick) {
+  const buyPct = tick.buyPressurePercent;
+  if (buyPct >= 65) return 25;      // strong buy pressure
+  if (buyPct >= 55) return 18;
+  if (buyPct >= 45) return 10;      // neutral
+  return 5;                         // sell pressure
+}
+
 function calcCompositeScore(intraday, tick, netPnl) {
   const intS  = intraday.score;
-  // Phase 4B: NEUTRAL tick (tickS=50) contributes 50*0.30=15 to score.
-  // BUY_PRESSURE (75) contributes 22.5. SELL_PRESSURE (20) contributes 6.
   const tickS = tick.tickDirection === 'BUY_PRESSURE' ? 75 : tick.tickDirection === 'NEUTRAL' ? 50 : 20;
   const feeS  = netPnl >= REQUIRED_NET_PROFIT ? 70 : netPnl >= 0 ? 40 : 10;
   return Math.round(intS * 0.50 + tickS * 0.30 + feeS * 0.20);
@@ -210,15 +222,28 @@ function calcPnL(entry, exit, spreadPct) {
   };
 }
 
-function checkBarriers(intraday, tick, spreadPct, score) {
-  const feeNet = K_SIZE * (K_TP / 100) - K_SIZE * OKX_TAKER_FEE * 2 - K_SIZE * (spreadPct / 100);
+function checkBarriers(intraday, tick, spreadPct, score, tickScore, recentExpiryRatio) {
+  const grossProfit = K_SIZE * (K_TP / 100);
+  const fees        = K_SIZE * OKX_TAKER_FEE * 2;
+  const spreadCost  = K_SIZE * (spreadPct / 100);
+  const feeNet      = grossProfit - fees - spreadCost;
+
+  // Fee efficiency: fees+spread must not exceed 40% of gross profit
+  const feeEfficiencyRatio = grossProfit > 0 ? (fees + spreadCost) / grossProfit : 1;
+
+  // Expiry filter: if recent expiry ratio > 40%, require higher score
+  const effectiveScoreFloor = recentExpiryRatio > 0.40 ? HIGH_EXPIRY_SCORE_FLOOR : REQUIRED_SCORE;
+
   return {
-    intradayBarrier:   intraday.direction !== 'BEARISH',
-    tickBarrier:       tick.tickDirection !== 'SELL_PRESSURE',
-    feeBarrier:        feeNet >= REQUIRED_NET_PROFIT,
-    spreadBarrier:     spreadPct <= MAX_SPREAD_PCT,
-    volatilityBarrier: intraday.volatilityPct <= MAX_VOLATILITY_PCT,
-    scoreBarrier:      score >= REQUIRED_SCORE,
+    intradayBarrier:      intraday.direction !== 'BEARISH',
+    tickBarrier:          tickScore >= MIN_TICK_SCORE,
+    feeBarrier:           feeNet >= REQUIRED_NET_PROFIT,
+    minNetProfitBarrier:  feeNet >= MIN_ESTIMATED_NET_PROFIT,
+    feeEfficiencyBarrier: feeEfficiencyRatio <= FEE_EFFICIENCY_MAX_RATIO,
+    spreadBarrier:        spreadPct <= MAX_SPREAD_PCT,
+    volatilityBarrier:    intraday.volatilityPct <= MAX_VOLATILITY_PCT,
+    scoreBarrier:         score >= effectiveScoreFloor,
+    momentumBarrier:      Math.abs(intraday.momentum) >= 0.03, // must have real price movement
   };
 }
 
@@ -265,12 +290,15 @@ Deno.serve(async (req) => {
       ],
       dangerousPatternsScanResult:     DANGEROUS_PATTERNS.map(p => ({ pattern: p, found: false })),
       barrierRequirements: {
-        intradayBarrier:   'direction != BEARISH',
-        tickBarrier:       `tickScore >= ${MIN_TICK_SCORE} (Phase 4B: lowered from 15 to 10)`,
-        feeBarrier:        `net >= ${REQUIRED_NET_PROFIT} USDT`,
-        spreadBarrier:     `spreadPct <= ${MAX_SPREAD_PCT}%`,
-        volatilityBarrier: `volatility20 <= ${MAX_VOLATILITY_PCT}%`,
-        scoreBarrier:      `score >= ${REQUIRED_SCORE} (Phase 4B: lowered from 60 to 55)`,
+        intradayBarrier:      'direction != BEARISH',
+        tickBarrier:          `tickScore >= ${MIN_TICK_SCORE} (Phase 4B correction: 10→12)`,
+        feeBarrier:           `net >= ${REQUIRED_NET_PROFIT} USDT`,
+        minNetProfitBarrier:  `estimatedNetProfit >= ${MIN_ESTIMATED_NET_PROFIT} USDT (NEW)`,
+        feeEfficiencyBarrier: `(fees+spread)/grossProfit <= ${FEE_EFFICIENCY_MAX_RATIO * 100}% (NEW)`,
+        spreadBarrier:        `spreadPct <= ${MAX_SPREAD_PCT}%`,
+        volatilityBarrier:    `volatility20 <= ${MAX_VOLATILITY_PCT}%`,
+        scoreBarrier:         `score >= ${REQUIRED_SCORE} (Phase 4B correction: 55→65); or >= ${HIGH_EXPIRY_SCORE_FLOOR} if recentExpiryRatio > 40%`,
+        momentumBarrier:      'abs(momentum) >= 0.03% (NEW)',
       },
       phase4bConstants: PHASE4_PAPER_CONSTANTS,
       issuesFound: [],
@@ -331,7 +359,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Step 2: Scan pairs for new paper entries ────────────────────────────
+    // ── Step 2: Compute recent expiry ratio for expiry filter ──────────────
+    const recentClosed100 = await base44.entities.PaperTrade.list('-closedAt', 100);
+    const recentClosedValid = recentClosed100.filter(t => t.status !== 'OPEN' && t.closedAt);
+    const recentExpired = recentClosedValid.filter(t => t.status === 'EXPIRED');
+    const recentExpiryRatio = recentClosedValid.length > 0 ? recentExpired.length / recentClosedValid.length : 0;
+    console.log(`[PHASE4_PAPER] recentExpiryRatio=${recentExpiryRatio.toFixed(2)} (${recentExpired.length}/${recentClosedValid.length})`);
+
+    // ── Step 3: Scan pairs for new paper entries ────────────────────────────
     const newEntries  = [];
     const scanResults = [];
 
@@ -370,9 +405,10 @@ Deno.serve(async (req) => {
 
       const intraday    = analyzeIntraday(candles, ticker);
       const tick        = analyzeTickConfirmation(trades);
+      const tickScore   = calcTickScore(tick);
       const roughNetPnl = K_SIZE * (K_TP / 100) - K_SIZE * OKX_TAKER_FEE * 2 - K_SIZE * (ticker.spreadPct / 100);
       const score       = calcCompositeScore(intraday, tick, roughNetPnl);
-      const barriers    = checkBarriers(intraday, tick, ticker.spreadPct, score);
+      const barriers    = checkBarriers(intraday, tick, ticker.spreadPct, score, tickScore, recentExpiryRatio);
       const allPass     = Object.values(barriers).every(Boolean);
       const reason      = buildReason(barriers, intraday, tick, score);
 
@@ -432,7 +468,7 @@ Deno.serve(async (req) => {
       newEntries.push({ instId, entryPrice: entry, targetPrice: tpPrice, stopLossPrice: slPrice, expiresAt, score, id: paperTrade.id });
     }
 
-    // ── Step 3: 24h virtual P&L report ─────────────────────────────────────
+    // ── Step 4: 24h virtual P&L report ─────────────────────────────────────
     const since24h   = new Date(now - 24 * 60 * 60 * 1000).toISOString();
     const all24h     = await base44.entities.PaperTrade.filter({ phase: 'PHASE_4_PAPER_TRADING' });
     const closedIn24h = all24h.filter(t => t.status !== 'OPEN' && t.closedAt && t.closedAt >= since24h);
