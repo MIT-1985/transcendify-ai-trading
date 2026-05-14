@@ -61,23 +61,28 @@ export default function PaperTradingDashboard() {
     gcTime: 0,
   });
 
-  // ── Live open positions (BTC-USDT only) ────────────────────
-  const { data: openTrades = [], refetch: refetchOpen } = useQuery({
+  // ── Phase 4F open positions — strict mode filter ────────────
+  // Must match phase4FPerformanceReport: mode = PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE
+  const { data: allOpenRaw = [], refetch: refetchOpen } = useQuery({
     queryKey: ['paper-open-trades', user?.email],
-    queryFn: () => base44.entities.PaperTrade.filter({ status: 'OPEN', instId: 'BTC-USDT' }, '-created_date', 10),
+    queryFn: () => base44.entities.PaperTrade.filter({ status: 'OPEN', instId: 'BTC-USDT' }, '-created_date', 50),
     enabled: !!user,
     staleTime: 15000,
     refetchInterval: 15000,
   });
+  const openTrades   = allOpenRaw.filter(t => t.mode === P4F.mode);
+  const legacyOpen   = allOpenRaw.filter(t => t.mode !== P4F.mode);
 
-  // ── Recent closed trades (BTC-USDT only) ───────────────────
-  const { data: recentClosedRaw = [], refetch: refetchClosed } = useQuery({
+  // ── Phase 4F closed trades — strict mode filter ─────────────
+  const { data: allClosedRaw = [], refetch: refetchClosed } = useQuery({
     queryKey: ['paper-closed-trades', user?.email],
-    queryFn: () => base44.entities.PaperTrade.filter({ instId: 'BTC-USDT' }, '-closedAt', 50),
+    queryFn: () => base44.entities.PaperTrade.filter({ instId: 'BTC-USDT' }, '-closedAt', 200),
     enabled: !!user,
     staleTime: 30000,
   });
-  const recentClosed = recentClosedRaw.filter(t => t.status !== 'OPEN');
+  const recentClosed  = allClosedRaw.filter(t => t.mode === P4F.mode && t.status !== 'OPEN');
+  const legacyClosed  = allClosedRaw.filter(t => t.mode !== P4F.mode && t.status !== 'OPEN');
+  const excludedLegacyCount = legacyOpen.length + legacyClosed.length;
 
   // ── Manual "Run Paper Scan Now" — calls phase4FBTCOnlyPaperMode ──
   const handleManualRun = async () => {
@@ -283,7 +288,7 @@ export default function PaperTradingDashboard() {
               <Tile label="Win Rate"      value={`${winRate.toFixed(1)}%`} color={winRate >= 55 ? 'text-emerald-400' : winRate >= 45 ? 'text-yellow-400' : 'text-red-400'} />
               <Tile label="TP Hits"       value={tpHits}        color="text-emerald-400" />
               <Tile label="SL Hits"       value={slHits}        color="text-red-400" />
-              <Tile label="Open Now"      value={openTrades.length} color="text-yellow-400" />
+              <Tile label="Open Now (4F)" value={openTrades.length} color="text-yellow-400" />
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 text-xs mt-3">
               <Tile label="Gross PnL"     value={`${grossPnL >= 0 ? '+' : ''}${grossPnL.toFixed(4)}`} color="text-blue-400" />
@@ -305,7 +310,7 @@ export default function PaperTradingDashboard() {
             <TabsTrigger value="hard_blocker"     className="text-xs font-bold text-red-300">🛑 Hard Blocker</TabsTrigger>
             <TabsTrigger value="verify_final"    className="text-xs font-bold text-cyan-300">🔬 Final Verify</TabsTrigger>
             <TabsTrigger value="open"            className="text-xs">📂 Open ({openTrades.length})</TabsTrigger>
-            <TabsTrigger value="closed"          className="text-xs">✅ Closed</TabsTrigger>
+            <TabsTrigger value="closed"          className="text-xs">✅ Closed ({recentClosed.length})</TabsTrigger>
             <TabsTrigger value="phase4f_report"  className="text-xs">📊 4F Report</TabsTrigger>
             <TabsTrigger value="phase4f_verify"  className="text-xs">✅ 4F Verify</TabsTrigger>
             <TabsTrigger value="phase4f_why"     className="text-xs">🔎 4F Why?</TabsTrigger>
@@ -336,15 +341,28 @@ export default function PaperTradingDashboard() {
             </div>
           </TabsContent>
 
-          {/* OPEN POSITIONS */}
+          {/* OPEN POSITIONS — Phase 4F only */}
           <TabsContent value="open" className="mt-4">
             <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="text-sm font-bold text-slate-300">Open Paper Positions — BTC-USDT</div>
+              {/* Phase 4F filter banner */}
+              <div className="bg-cyan-950/20 border border-cyan-800 rounded-lg px-3 py-2 mb-4 flex flex-wrap items-center gap-3 text-xs">
+                <span className="text-cyan-400 font-black">🔍 Showing Phase 4F BTC-only trades only. Legacy BTC trades excluded.</span>
+                <span className="text-cyan-300/70">mode = PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</span>
+                <span className="ml-auto text-slate-400">Included: <span className="text-cyan-400 font-bold">{openTrades.length}</span> · Excluded legacy: <span className="text-amber-400 font-bold">{legacyOpen.length}</span></span>
+              </div>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="text-sm font-bold text-slate-300">Open Paper Positions — Phase 4F BTC-USDT</div>
                 <span className="text-xs text-slate-500">Max 1 allowed · Kill switch active</span>
               </div>
               {openTrades.length === 0 ? (
-                <div className="text-center text-slate-400 py-10">No open BTC-USDT paper positions.</div>
+                <div className="text-center text-slate-500 py-10">
+                  <div className="text-2xl mb-2">📂</div>
+                  <div className="font-bold text-slate-400">No Phase 4F BTC-only trades yet.</div>
+                  <div className="text-xs mt-1 text-slate-600">Waiting for first trade with mode = PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</div>
+                  {legacyOpen.length > 0 && (
+                    <div className="mt-3 text-xs text-amber-500">{legacyOpen.length} legacy BTC open trade(s) hidden — visible in Archive / Legacy tab.</div>
+                  )}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
@@ -402,12 +420,25 @@ export default function PaperTradingDashboard() {
             </div>
           </TabsContent>
 
-          {/* CLOSED */}
+          {/* CLOSED — Phase 4F only */}
           <TabsContent value="closed" className="mt-4">
             <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
-              <div className="text-sm font-bold text-slate-300 mb-4">Closed BTC-USDT Trades (last 50)</div>
+              {/* Phase 4F filter banner */}
+              <div className="bg-cyan-950/20 border border-cyan-800 rounded-lg px-3 py-2 mb-4 flex flex-wrap items-center gap-3 text-xs">
+                <span className="text-cyan-400 font-black">🔍 Showing Phase 4F BTC-only trades only. Legacy BTC trades excluded.</span>
+                <span className="text-cyan-300/70">mode = PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</span>
+                <span className="ml-auto text-slate-400">Included: <span className="text-cyan-400 font-bold">{recentClosed.length}</span> · Excluded legacy: <span className="text-amber-400 font-bold">{legacyClosed.length}</span> · Total legacy excluded: <span className="text-amber-400 font-bold">{excludedLegacyCount}</span></span>
+              </div>
+              <div className="text-sm font-bold text-slate-300 mb-3">Closed Phase 4F BTC-USDT Trades</div>
               {recentClosed.length === 0 ? (
-                <div className="text-center text-slate-400 py-10">No closed trades yet.</div>
+                <div className="text-center text-slate-500 py-10">
+                  <div className="text-2xl mb-2">✅</div>
+                  <div className="font-bold text-slate-400">No Phase 4F BTC-only trades yet.</div>
+                  <div className="text-xs mt-1 text-slate-600">Waiting for first closed trade with mode = PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</div>
+                  {legacyClosed.length > 0 && (
+                    <div className="mt-3 text-xs text-amber-500">{legacyClosed.length} legacy BTC closed trade(s) hidden — visible in Archive / Legacy tab.</div>
+                  )}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
@@ -571,8 +602,9 @@ export default function PaperTradingDashboard() {
                 Active engine: <span className="font-mono text-cyan-400">phase4FBTCOnlyPaperMode</span> · Active report: <span className="font-mono text-cyan-400">phase4FPerformanceReport</span>
               </div>
             </div>
-            <Tabs defaultValue="legacy_report" className="w-full">
+            <Tabs defaultValue="legacy_btc_trades" className="w-full">
               <TabsList className="flex flex-wrap gap-1 bg-slate-900/50 border border-slate-700 rounded-xl p-1 h-auto mb-4">
+                <TabsTrigger value="legacy_btc_trades" className="text-xs text-amber-500">🗃 Old BTC Trades ({legacyClosed.length + legacyOpen.length})</TabsTrigger>
                 <TabsTrigger value="legacy_report" className="text-xs text-slate-500">📄 Legacy Multi-Pair Report</TabsTrigger>
                 <TabsTrigger value="compare"       className="text-xs text-slate-500">⚖ Before/After (4B)</TabsTrigger>
                 <TabsTrigger value="phase4c"       className="text-xs text-slate-500">🔬 4C Expiry</TabsTrigger>
@@ -580,6 +612,60 @@ export default function PaperTradingDashboard() {
                 <TabsTrigger value="phase4e"       className="text-xs text-slate-500">📐 4E Size</TabsTrigger>
                 <TabsTrigger value="phase4e2"      className="text-xs text-slate-500">🧾 4E Accounting</TabsTrigger>
               </TabsList>
+              <TabsContent value="legacy_btc_trades">
+                <div className="bg-slate-900/70 border border-amber-800 rounded-xl p-4">
+                  <div className="bg-amber-950/30 border border-amber-700 rounded-lg px-3 py-2 mb-4 text-xs">
+                    <span className="text-amber-400 font-black">🗃 Legacy Multi-Pair / old BTC paper trades — historical only.</span>
+                    <span className="text-amber-300/70 ml-2">These trades have no <code className="font-mono bg-slate-800 px-1 rounded">mode</code> field or a different mode. They are excluded from all Phase 4F metrics.</span>
+                  </div>
+                  <div className="flex gap-4 mb-4 text-xs">
+                    <span className="bg-slate-800 border border-slate-700 rounded px-2 py-1">Open legacy: <span className="text-amber-400 font-bold">{legacyOpen.length}</span></span>
+                    <span className="bg-slate-800 border border-slate-700 rounded px-2 py-1">Closed legacy: <span className="text-amber-400 font-bold">{legacyClosed.length}</span></span>
+                    <span className="bg-slate-800 border border-slate-700 rounded px-2 py-1">Total excluded: <span className="text-amber-400 font-bold">{excludedLegacyCount}</span></span>
+                  </div>
+                  {[...legacyOpen, ...legacyClosed].length === 0 ? (
+                    <div className="text-center text-slate-500 py-8 text-xs">No legacy BTC trades found.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="border-b border-slate-700 text-slate-500">
+                          <tr>
+                            <th className="text-left px-2 py-2">Pair</th>
+                            <th className="text-left px-2 py-2">Status</th>
+                            <th className="text-right px-2 py-2">Entry</th>
+                            <th className="text-right px-2 py-2">Exit</th>
+                            <th className="text-right px-2 py-2">NetPnL</th>
+                            <th className="text-left px-2 py-2">Mode</th>
+                            <th className="text-left px-2 py-2">Phase</th>
+                            <th className="text-right px-2 py-2">Held</th>
+                            <th className="text-left px-2 py-2">Opened</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[...legacyOpen, ...legacyClosed].map(t => {
+                            const net = t.netPnL || t.netPnLUSDT || 0;
+                            return (
+                              <tr key={t.id} className="border-b border-slate-800/30 hover:bg-slate-800/10 opacity-70">
+                                <td className="px-2 py-2 text-slate-400">{t.instId}</td>
+                                <td className="px-2 py-2">
+                                  <span className="text-xs text-slate-500 px-1 py-0.5 bg-slate-800 rounded">{t.status}</span>
+                                </td>
+                                <td className="px-2 py-2 text-right text-slate-500">${t.entryPrice?.toLocaleString()}</td>
+                                <td className="px-2 py-2 text-right text-slate-500">${t.exitPrice?.toLocaleString() ?? '—'}</td>
+                                <td className={`px-2 py-2 text-right text-xs ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{net >= 0 ? '+' : ''}{net.toFixed(4)}</td>
+                                <td className="px-2 py-2 text-slate-600 text-xs font-mono">{t.mode ?? '—'}</td>
+                                <td className="px-2 py-2 text-slate-600 text-xs">{t.phase ?? '—'}</td>
+                                <td className="px-2 py-2 text-right text-slate-600">{t.holdingMs ? `${Math.round(t.holdingMs/1000)}s` : '—'}</td>
+                                <td className="px-2 py-2 text-slate-600">{t.openedAt ? new Date(t.openedAt).toLocaleTimeString('de-DE') : '—'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
               <TabsContent value="legacy_report"><PaperReport24h /></TabsContent>
               <TabsContent value="compare"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4BeforeAfterPanel /></div></TabsContent>
               <TabsContent value="phase4c"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4CExpiryDiagnosticPanel /></div></TabsContent>
