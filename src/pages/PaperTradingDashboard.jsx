@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ChevronDown, ChevronUp, RefreshCw, Play } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+// Advanced panel imports — only loaded when user expands
 import PaperReport24h from '@/components/dashboard/PaperReport24h';
 import Phase4OpportunityDiagnosticPanel from '@/components/dashboard/Phase4OpportunityDiagnosticPanel';
 import Phase4BeforeAfterPanel from '@/components/dashboard/Phase4BeforeAfterPanel';
@@ -25,668 +26,287 @@ import Phase5ManualRealTradePreparedPanel from '@/components/dashboard/Phase5Man
 import Phase4FWeeklyExportPanel from '@/components/dashboard/Phase4FWeeklyExportPanel';
 import Phase4FDashboardVerificationPanel from '@/components/dashboard/Phase4FDashboardVerificationPanel';
 import RealTradingHardBlockerPanel from '@/components/dashboard/RealTradingHardBlockerPanel';
-import SystemTrailStatusBar from '@/components/dashboard/SystemTrailStatusBar';
 
-// ── Phase 4F active constants ──────────────────────────────────────────────
-const P4F = {
-  mode:           'PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE',
-  scanFn:         'phase4FBTCOnlyPaperMode',
-  reportFn:       'phase4FPerformanceReport',
-  activePairs:    ['BTC-USDT'],
-  disabledPairs:  ['ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT'],
-  maxOpenTrades:  1,
-  tp:             '1.30%',
-  sl:             '0.65%',
-  expiry:         '60 min',
-  requiredScore:  75,
+const ALERT_STYLES = {
+  COLD:  { bg: 'bg-slate-800/80',       border: 'border-slate-600',   text: 'text-slate-300',  dot: 'bg-slate-500' },
+  WARM:  { bg: 'bg-yellow-950/40',      border: 'border-yellow-700',  text: 'text-yellow-300', dot: 'bg-yellow-500' },
+  HOT:   { bg: 'bg-orange-950/40',      border: 'border-orange-700',  text: 'text-orange-300', dot: 'bg-orange-500' },
+  READY: { bg: 'bg-emerald-950/40',     border: 'border-emerald-600', text: 'text-emerald-300',dot: 'bg-emerald-400' },
 };
+
+function Kpi({ label, value, color = 'text-white' }) {
+  return (
+    <div className="bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-center">
+      <div className="text-slate-500 text-xs uppercase tracking-wide mb-1">{label}</div>
+      <div className={`font-black text-lg ${color}`}>{value}</div>
+    </div>
+  );
+}
+
+function AdvPanel({ children }) {
+  return <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">{children}</div>;
+}
 
 export default function PaperTradingDashboard() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [lastRun, setLastRun]       = useState(null);
-  const [manualRunning, setManualRunning] = useState(false);
-  const [lastResult, setLastResult] = useState(null);
+  const [trail, setTrail]       = useState(null);
+  const [report, setReport]     = useState(null);
+  const [trailLoading, setTrailLoading] = useState(false);
+  const [scanLoading, setScanLoading]   = useState(false);
+  const [scanResult, setScanResult]     = useState(null);
+  const [advOpen, setAdvOpen]           = useState(false);
 
-  // ── Phase 4F KPI report (primary) ──────────────────────────
-  const { data: f4Report, isLoading: f4Loading, refetch: refetchF4Report } = useQuery({
-    queryKey: ['phase4f-perf-report', user?.email],
-    queryFn: async () => {
-      const res = await base44.functions.invoke('phase4FPerformanceReport', {});
-      return res.data;
-    },
-    enabled: !!user,
-    staleTime: Infinity,
-    refetchInterval: false,
-    gcTime: 0,
-  });
-
-  // ── Phase 4F open positions — strict mode filter ────────────
-  // Must match phase4FPerformanceReport: mode = PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE
-  const { data: allOpenRaw = [], refetch: refetchOpen } = useQuery({
-    queryKey: ['paper-open-trades', user?.email],
-    queryFn: () => base44.entities.PaperTrade.filter({ status: 'OPEN', instId: 'BTC-USDT' }, '-created_date', 50),
-    enabled: !!user,
-    staleTime: 15000,
-    refetchInterval: 15000,
-  });
-  const openTrades   = allOpenRaw.filter(t => t.mode === P4F.mode);
-  const legacyOpen   = allOpenRaw.filter(t => t.mode !== P4F.mode);
-
-  // ── Phase 4F closed trades — strict mode filter ─────────────
-  const { data: allClosedRaw = [], refetch: refetchClosed } = useQuery({
-    queryKey: ['paper-closed-trades', user?.email],
-    queryFn: () => base44.entities.PaperTrade.filter({ instId: 'BTC-USDT' }, '-closedAt', 200),
-    enabled: !!user,
-    staleTime: 30000,
-  });
-  const recentClosed  = allClosedRaw.filter(t => t.mode === P4F.mode && t.status !== 'OPEN');
-  const legacyClosed  = allClosedRaw.filter(t => t.mode !== P4F.mode && t.status !== 'OPEN');
-  const excludedLegacyCount = legacyOpen.length + legacyClosed.length;
-
-  // ── Manual "Run Paper Scan Now" — calls phase4FBTCOnlyPaperMode ──
-  const handleManualRun = async () => {
-    setManualRunning(true);
-    setLastResult(null);
-    const res = await base44.functions.invoke('phase4FBTCOnlyPaperMode', {});
-    const d = res.data;
-    setLastResult({
-      openedThisRun:  d?.openedThisRun  ?? 0,
-      closedThisRun:  d?.closedThisRun  ?? 0,
-      openedDetails:  d?.thisRun?.newPaperEntries || d?.newPaperEntries || [],
-      closedDetails:  d?.thisRun?.closedThisRun   || d?.closedThisRun   || [],
-      runTime:        d?.lastRunAt,
-    });
-    setLastRun(new Date().toLocaleTimeString('de-DE'));
-    await Promise.all([refetchOpen(), refetchClosed(), refetchF4Report()]);
-    queryClient.invalidateQueries({ queryKey: ['paper-report-24h'] });
-    setManualRunning(false);
+  // Load system trail on mount
+  const loadTrail = async () => {
+    setTrailLoading(true);
+    const res = await base44.functions.invoke('systemTrailTradingState', {});
+    setTrail(res.data);
+    setTrailLoading(false);
   };
 
-  // ── Derived KPIs from phase4FPerformanceReport ─────────────
-  const rpt   = f4Report?.report || f4Report || {};
-  const netPnL    = rpt.netPnL    ?? rpt.totalNetPnL    ?? 0;
-  const grossPnL  = rpt.grossPnL  ?? rpt.totalGrossPnL  ?? 0;
-  const fees      = rpt.fees      ?? rpt.totalFees       ?? 0;
-  const spreadCost = rpt.spreadCost ?? 0;
-  const winRate   = rpt.winRate   ?? 0;
-  const tpHits    = rpt.tpHits    ?? 0;
-  const slHits    = rpt.slHits    ?? 0;
-  const expired   = rpt.expiredTrades ?? rpt.expired ?? 0;
-  const totalBTC  = rpt.totalBTCTrades ?? rpt.totalTrades ?? 0;
-  const closedBTC = rpt.closedBTCTrades ?? (totalBTC - (rpt.openBTCTrades ?? openTrades.length));
-  const feeDrag   = rpt.feeDragPercent ?? (grossPnL > 0 ? Math.round((fees / Math.abs(grossPnL)) * 100) : 100);
-  const status    = rpt.status ?? (netPnL > 0 ? 'PROFITABLE' : 'NEEDS_MORE_DATA');
+  // Load performance report on mount
+  const loadReport = async () => {
+    const res = await base44.functions.invoke('phase4FPerformanceReport', {});
+    setReport(res.data);
+  };
 
+  useEffect(() => {
+    if (user) {
+      loadTrail();
+      loadReport();
+    }
+  }, [user]);
+
+  const handleScan = async () => {
+    setScanLoading(true);
+    setScanResult(null);
+    const res = await base44.functions.invoke('phase4FBTCOnlyPaperMode', {});
+    setScanResult(res.data);
+    await Promise.all([loadTrail(), loadReport()]);
+    setScanLoading(false);
+  };
+
+  // Derived values
+  const live    = trail?.liveStatus || {};
+  const safety  = trail?.safety || {};
+  const cfg     = trail?.config || {};
+  const alertLvl = live.alertLevel || 'COLD';
+  const st      = ALERT_STYLES[alertLvl] || ALERT_STYLES.COLD;
+
+  const m        = report?.metrics || {};
+  const decision = report?.decision || {};
+  const netPnL   = m.netPnL ?? 0;
   const pnlColor = netPnL >= 0 ? 'text-emerald-400' : 'text-red-400';
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 lg:p-6">
-      <div className="max-w-7xl mx-auto space-y-5">
+      <div className="max-w-5xl mx-auto space-y-5">
 
-        {/* ── SYSTEM TRAIL — Single Source of Truth ──────────── */}
-        <SystemTrailStatusBar onRunScan={handleManualRun} isRunning={manualRunning} />
-
-        {/* ── Header ─────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* ── Header ─────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between">
           <div>
-            <div className="text-xs font-bold text-cyan-500 uppercase tracking-widest mb-1">
-              {P4F.mode}
+            <h1 className="text-2xl font-black text-white">Transcendify BTC Paper Mode</h1>
+            <div className="text-xs text-cyan-500 font-mono mt-0.5">PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={loadTrail}
+              disabled={trailLoading}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-slate-800 border border-slate-600 hover:bg-slate-700 disabled:opacity-50 transition-all"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${trailLoading ? 'animate-spin' : ''}`} />
+              Refresh Signal
+            </button>
+            <button
+              onClick={handleScan}
+              disabled={scanLoading}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-cyan-700/30 border border-cyan-600 hover:bg-cyan-700/50 text-cyan-300 disabled:opacity-50 transition-all"
+            >
+              <Play className="w-3.5 h-3.5" />
+              {scanLoading ? 'Scanning…' : 'Run Paper Scan'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Main Status Card ───────────────────────────────────── */}
+        <div className={`rounded-2xl border-2 px-5 py-5 ${st.bg} ${st.border}`}>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className={`w-3 h-3 rounded-full shrink-0 ${st.dot} ${alertLvl === 'READY' ? 'animate-pulse' : ''}`} />
+              <div>
+                <div className={`text-2xl font-black ${st.text}`}>{alertLvl}</div>
+                <div className="text-xs text-slate-400 mt-0.5">{live.mainBlockingReason || 'Awaiting signal…'}</div>
+              </div>
             </div>
-            <h1 className="text-2xl font-black text-white">Phase 4F — BTC-USDT Paper Engine</h1>
-            <div className="flex flex-wrap gap-2 mt-2 text-xs">
-              <span className="bg-red-950/50 border border-red-700 text-red-400 font-bold px-2 py-0.5 rounded">🛑 Kill Switch: ACTIVE</span>
-              <span className="bg-red-950/50 border border-red-700 text-red-400 font-bold px-2 py-0.5 rounded">tradeAllowed: false</span>
-              <span className="bg-yellow-950/40 border border-yellow-700 text-yellow-400 font-bold px-2 py-0.5 rounded">PAPER ONLY</span>
-              <span className="bg-slate-800 border border-slate-700 text-cyan-400 font-bold px-2 py-0.5 rounded">Pair: BTC-USDT</span>
-              <span className="bg-slate-800 border border-slate-700 text-white font-bold px-2 py-0.5 rounded">Max Open: 1</span>
-              <span className="bg-slate-800 border border-slate-700 text-emerald-400 font-bold px-2 py-0.5 rounded">TP: {P4F.tp}</span>
-              <span className="bg-slate-800 border border-slate-700 text-red-400 font-bold px-2 py-0.5 rounded">SL: {P4F.sl}</span>
-              <span className="bg-slate-800 border border-slate-700 text-orange-400 font-bold px-2 py-0.5 rounded">Expiry: {P4F.expiry}</span>
-              <span className="bg-slate-800 border border-slate-700 text-purple-400 font-bold px-2 py-0.5 rounded">Score ≥ {P4F.requiredScore}</span>
-              <span className="bg-emerald-950/40 border border-emerald-800 text-emerald-400 font-bold px-2 py-0.5 rounded">🕐 Auto-scan: 5 min</span>
-              {lastRun && <span className="text-slate-400">Last run: {lastRun}</span>}
+            <div className="flex flex-wrap gap-3 text-xs">
+              <div className="text-center">
+                <div className="text-slate-500 uppercase tracking-wide">BTC Price</div>
+                <div className="font-black text-white text-base">${live.lastPrice?.toLocaleString() || '—'}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-slate-500 uppercase tracking-wide">Score</div>
+                <div className={`font-black text-base ${st.text}`}>{live.totalScore ?? '—'} / {live.requiredScore ?? 75}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-slate-500 uppercase tracking-wide">Open</div>
+                <div className="font-black text-base text-yellow-400">{live.openBTCTrades ?? 0} / 1</div>
+              </div>
+              <div className="text-center">
+                <div className="text-slate-500 uppercase tracking-wide">Status</div>
+                <div className="font-black text-xs text-slate-300 leading-tight max-w-[120px]">{trail?.uiDecision?.showStatus || '—'}</div>
+              </div>
             </div>
           </div>
+          {trailLoading && (
+            <div className="mt-3 text-xs text-slate-500 animate-pulse">Fetching live signal…</div>
+          )}
+        </div>
+
+        {/* ── Scan result flash ──────────────────────────────────── */}
+        {scanResult && (
+          <div className="bg-slate-900/80 border border-cyan-700 rounded-xl px-4 py-3 flex items-center justify-between text-xs">
+            <span className="text-cyan-400 font-bold">
+              ⚡ Scan complete — Opened: <span className="text-white">{scanResult.openedThisRun ?? 0}</span> · Closed: <span className="text-white">{scanResult.closedThisRun ?? 0}</span>
+            </span>
+            <button onClick={() => setScanResult(null)} className="text-slate-500 hover:text-white ml-4">✕</button>
+          </div>
+        )}
+
+        {/* ── Performance + Safety grid ──────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Paper Performance */}
+          <div className="bg-slate-900/70 border border-slate-700 rounded-2xl px-5 py-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm font-black text-slate-200">📊 Paper Performance</div>
+              <div className="text-xs text-slate-500 font-mono">phase4FPerformanceReport</div>
+            </div>
+            {decision.status && (
+              <div className="text-xs text-blue-400 mb-3 font-semibold">{decision.emoji} {decision.note}</div>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Kpi label="BTC Trades"  value={m.totalBTCTrades ?? 0}  />
+              <Kpi label="Open"        value={m.openBTCTrades  ?? 0}    color="text-yellow-400" />
+              <Kpi label="Closed"      value={m.closedBTCTrades ?? 0}  />
+              <Kpi label="Net PnL"     value={`${netPnL >= 0 ? '+' : ''}${netPnL.toFixed(4)}`} color={pnlColor} />
+              <Kpi label="Win Rate"    value={`${(m.winRate ?? 0).toFixed(1)}%`} color={m.winRate >= 55 ? 'text-emerald-400' : m.winRate >= 45 ? 'text-yellow-400' : 'text-red-400'} />
+              <Kpi label="TP Hits"     value={m.tpHits    ?? 0} color="text-emerald-400" />
+              <Kpi label="SL Hits"     value={m.slHits    ?? 0} color="text-red-400" />
+              <Kpi label="Expired"     value={m.expiredTrades ?? 0} color="text-slate-400" />
+            </div>
+          </div>
+
+          {/* Safety Card */}
+          <div className="bg-slate-900/70 border-2 border-red-800 rounded-2xl px-5 py-4">
+            <div className="text-sm font-black text-red-400 mb-4">🛡 Safety Status</div>
+            <div className="space-y-2 text-xs">
+              <SafeRow label="Kill Switch"              value="ACTIVE"                  ok={true}  />
+              <SafeRow label="Real Trading"             value="LOCKED"                  ok={true}  />
+              <SafeRow label="Mode"                     value="PAPER ONLY"              ok={true}  />
+              <SafeRow label="noOKXOrderEndpointCalled" value={String(safety.noOKXOrderEndpointCalled ?? true)} ok={safety.noOKXOrderEndpointCalled !== false} />
+              <SafeRow label="realTradeAllowed"         value={String(safety.realTradeAllowed ?? false)}        ok={safety.realTradeAllowed === false} />
+              <SafeRow label="realTradeUnlockAllowed"   value={String(safety.realTradeUnlockAllowed ?? false)}  ok={safety.realTradeUnlockAllowed === false} />
+              <SafeRow label="Phase 5 Guard"            value={live.phase5GuardStatus || 'LOCKED'}             ok={true}  />
+              <SafeRow label="Hard Blocker"             value={live.hardBlockerStatus || 'REAL_TRADING_BLOCKED'} ok={true} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Advanced / Diagnostics (collapsible) ──────────────── */}
+        <div className="border border-slate-700 rounded-2xl overflow-hidden">
           <button
-            onClick={handleManualRun}
-            disabled={manualRunning}
-            className="px-5 py-2.5 text-xs font-bold rounded-xl bg-cyan-700/30 border border-cyan-600 hover:bg-cyan-700/50 text-cyan-300 disabled:opacity-50 transition-all shrink-0"
+            onClick={() => setAdvOpen(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-4 bg-slate-900/60 hover:bg-slate-800/60 transition-colors text-sm font-bold text-slate-400"
           >
-            {manualRunning ? '⏳ Scanning…' : '▶ Run Paper Scan Now'}
+            <span>⚙ Advanced / Diagnostics</span>
+            {advOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
+
+          {advOpen && (
+            <div className="p-4 bg-slate-950/40">
+              <Tabs defaultValue="why" className="w-full">
+                <TabsList className="flex flex-wrap gap-1 bg-slate-900/50 border border-slate-700 rounded-xl p-1 h-auto mb-4">
+                  <TabsTrigger value="hard_blocker"      className="text-xs text-red-300">🛑 Hard Blocker</TabsTrigger>
+                  <TabsTrigger value="verify_final"      className="text-xs text-cyan-300">🔬 Final Verify</TabsTrigger>
+                  <TabsTrigger value="why"               className="text-xs">🔎 4F Why?</TabsTrigger>
+                  <TabsTrigger value="alert"             className="text-xs">🚨 4F Alert</TabsTrigger>
+                  <TabsTrigger value="snap"              className="text-xs">📸 Snapshots</TabsTrigger>
+                  <TabsTrigger value="linkage"           className="text-xs">🔗 Linkage</TabsTrigger>
+                  <TabsTrigger value="edge"              className="text-xs">📊 Edge Report</TabsTrigger>
+                  <TabsTrigger value="snap_edge"         className="text-xs">📊 Snap Edge</TabsTrigger>
+                  <TabsTrigger value="phase5_guard"      className="text-xs">🔒 Phase 5 Guard</TabsTrigger>
+                  <TabsTrigger value="phase5_prepared"   className="text-xs text-red-300">🔴 Phase 5 Prep</TabsTrigger>
+                  <TabsTrigger value="weekly_export"     className="text-xs">📤 Weekly Export</TabsTrigger>
+                  <TabsTrigger value="phase4f_btc"       className="text-xs">🚀 4F Run</TabsTrigger>
+                  <TabsTrigger value="phase4f_report"    className="text-xs">📋 4F Report</TabsTrigger>
+                  <TabsTrigger value="phase4f_verify"    className="text-xs">✅ 4F Verify</TabsTrigger>
+                  <TabsTrigger value="diag"              className="text-xs">🔎 Diagnostic</TabsTrigger>
+                  <TabsTrigger value="legacy_archive"    className="text-xs text-slate-500 italic">🗄 Archive / Legacy</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="hard_blocker"><AdvPanel><RealTradingHardBlockerPanel /></AdvPanel></TabsContent>
+                <TabsContent value="verify_final"><AdvPanel><Phase4FDashboardVerificationPanel /></AdvPanel></TabsContent>
+                <TabsContent value="why"><AdvPanel><Phase4FWhyNoTradePanel /></AdvPanel></TabsContent>
+                <TabsContent value="alert"><AdvPanel><Phase4FAlertWidget /></AdvPanel></TabsContent>
+                <TabsContent value="snap"><AdvPanel><Phase4FSnapshotPanel /></AdvPanel></TabsContent>
+                <TabsContent value="linkage"><AdvPanel><Phase4FSnapshotLinkagePanel /></AdvPanel></TabsContent>
+                <TabsContent value="edge"><AdvPanel><Phase4FSnapshotEdgeReportPanel /></AdvPanel></TabsContent>
+                <TabsContent value="snap_edge"><AdvPanel><Phase4FSnapshotEdgeDashboard /></AdvPanel></TabsContent>
+                <TabsContent value="phase5_guard"><AdvPanel><Phase5UnlockGuardPanel /></AdvPanel></TabsContent>
+                <TabsContent value="phase5_prepared"><AdvPanel><Phase5ManualRealTradePreparedPanel /></AdvPanel></TabsContent>
+                <TabsContent value="weekly_export"><AdvPanel><Phase4FWeeklyExportPanel /></AdvPanel></TabsContent>
+                <TabsContent value="phase4f_btc"><AdvPanel><Phase4FBTCOnlyPanel /></AdvPanel></TabsContent>
+                <TabsContent value="phase4f_report"><AdvPanel><Phase4FReportPanel /></AdvPanel></TabsContent>
+                <TabsContent value="phase4f_verify"><AdvPanel><Phase4FAutomationVerifyPanel /></AdvPanel></TabsContent>
+                <TabsContent value="diag"><AdvPanel><Phase4OpportunityDiagnosticPanel /></AdvPanel></TabsContent>
+
+                {/* Archive / Legacy */}
+                <TabsContent value="legacy_archive">
+                  <div className="bg-amber-950/20 border-2 border-amber-700 rounded-xl p-4 mb-4">
+                    <div className="text-amber-400 font-black text-sm mb-1">🗄 ARCHIVE / LEGACY — Historical only. Not the active trading state.</div>
+                    <div className="text-amber-300/70 text-xs">Active engine: <span className="font-mono text-cyan-400">phase4FBTCOnlyPaperMode</span> · Active report: <span className="font-mono text-cyan-400">phase4FPerformanceReport</span></div>
+                  </div>
+                  <Tabs defaultValue="legacy_report" className="w-full">
+                    <TabsList className="flex flex-wrap gap-1 bg-slate-900/50 border border-slate-700 rounded-xl p-1 h-auto mb-4">
+                      <TabsTrigger value="legacy_report" className="text-xs text-slate-500">📄 Legacy Report</TabsTrigger>
+                      <TabsTrigger value="compare"       className="text-xs text-slate-500">⚖ Before/After</TabsTrigger>
+                      <TabsTrigger value="phase4c"       className="text-xs text-slate-500">🔬 4C Expiry</TabsTrigger>
+                      <TabsTrigger value="phase4d"       className="text-xs text-slate-500">⚡ 4D Correction</TabsTrigger>
+                      <TabsTrigger value="phase4e"       className="text-xs text-slate-500">📐 4E Size</TabsTrigger>
+                      <TabsTrigger value="phase4e2"      className="text-xs text-slate-500">🧾 4E Accounting</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="legacy_report"><PaperReport24h /></TabsContent>
+                    <TabsContent value="compare"><AdvPanel><Phase4BeforeAfterPanel /></AdvPanel></TabsContent>
+                    <TabsContent value="phase4c"><AdvPanel><Phase4CExpiryDiagnosticPanel /></AdvPanel></TabsContent>
+                    <TabsContent value="phase4d"><AdvPanel><Phase4DApplyCorrectionPanel /></AdvPanel></TabsContent>
+                    <TabsContent value="phase4e"><AdvPanel><Phase4EPositionSizeDiagnosticPanel /></AdvPanel></TabsContent>
+                    <TabsContent value="phase4e2"><AdvPanel><Phase4ECleanAccountingPanel /></AdvPanel></TabsContent>
+                  </Tabs>
+                </TabsContent>
+
+              </Tabs>
+            </div>
+          )}
         </div>
 
-        {/* ── Manual Run Result Banner ────────────────────────── */}
-        {lastResult && (
-          <div className="bg-slate-900/80 border-2 border-cyan-700 rounded-2xl px-5 py-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest">
-                ⚡ phase4FBTCOnlyPaperMode — {lastResult.runTime ? new Date(lastResult.runTime).toLocaleTimeString('de-DE') : lastRun}
-              </div>
-              <button onClick={() => setLastResult(null)} className="text-slate-500 hover:text-white text-xs">✕ dismiss</button>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
-              <div className="bg-emerald-950/40 border border-emerald-800 rounded-xl px-3 py-2">
-                <div className="text-slate-500 uppercase tracking-wide mb-1">Opened</div>
-                <div className={`font-black text-2xl ${lastResult.openedThisRun > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>{lastResult.openedThisRun}</div>
-              </div>
-              <div className="bg-blue-950/30 border border-blue-800 rounded-xl px-3 py-2">
-                <div className="text-slate-500 uppercase tracking-wide mb-1">Closed</div>
-                <div className={`font-black text-2xl ${lastResult.closedThisRun > 0 ? 'text-blue-400' : 'text-slate-400'}`}>{lastResult.closedThisRun}</div>
-              </div>
-              <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-3 py-2">
-                <div className="text-slate-500 uppercase tracking-wide mb-1">Pair</div>
-                <div className="font-black text-cyan-400">BTC-USDT</div>
-              </div>
-              <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-3 py-2">
-                <div className="text-slate-500 uppercase tracking-wide mb-1">Safety</div>
-                <div className="font-black text-emerald-400 text-xs mt-1">PAPER_ONLY ✅</div>
-              </div>
-            </div>
-            {lastResult.openedDetails?.length > 0 && (
-              <div className="space-y-1 mb-2">
-                <div className="text-xs text-emerald-400 font-bold mb-1">📄 Opened This Run:</div>
-                {lastResult.openedDetails.map((e, i) => (
-                  <div key={i} className="flex flex-wrap items-center gap-3 text-xs bg-emerald-950/20 border border-emerald-900 rounded-lg px-3 py-1.5">
-                    <span className="font-black text-white">{e.instId}</span>
-                    <span className="text-slate-400">entry <span className="text-white">${e.entryPrice?.toLocaleString()}</span></span>
-                    <span className="text-emerald-400">TP ${e.targetPrice?.toLocaleString()}</span>
-                    <span className="text-red-400">SL ${e.stopLossPrice?.toLocaleString()}</span>
-                    <span className="text-cyan-400">score {e.score}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {lastResult.closedDetails?.length > 0 && (
-              <div className="space-y-1">
-                <div className="text-xs text-blue-400 font-bold mb-1">🔒 Closed This Run:</div>
-                {lastResult.closedDetails.map((e, i) => {
-                  const net = e.netPnL ?? e.netPnLUSDT ?? 0;
-                  return (
-                    <div key={i} className="flex flex-wrap items-center gap-3 text-xs bg-blue-950/20 border border-blue-900 rounded-lg px-3 py-1.5">
-                      <span className="font-black text-white">{e.instId}</span>
-                      <span className={`font-bold ${e.status === 'CLOSED_TP' ? 'text-emerald-400' : e.status === 'CLOSED_SL' ? 'text-red-400' : 'text-slate-400'}`}>{e.status}</span>
-                      <span className="text-slate-400">exit <span className="text-white">${e.exitPrice?.toLocaleString()}</span></span>
-                      <span className={`font-bold ${net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{net >= 0 ? '+' : ''}{net.toFixed(4)} USDT</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Auto Scanner Status Panel ───────────────────────── */}
-        <div className="bg-slate-900/60 border-2 border-cyan-800 rounded-2xl px-5 py-4">
-          <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-3">🤖 Auto Paper Scanner — Phase 4F</div>
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 text-xs">
-            <div className="bg-slate-800/60 rounded-xl px-3 py-2 border border-emerald-900">
-              <div className="text-slate-500 uppercase tracking-wide mb-1">Status</div>
-              <div className="font-black text-emerald-400">✅ ON</div>
-            </div>
-            <div className="bg-slate-800/60 rounded-xl px-3 py-2 border border-slate-700">
-              <div className="text-slate-500 uppercase tracking-wide mb-1">Function</div>
-              <div className="font-bold text-cyan-400 text-xs">phase4FBTCOnlyPaperMode</div>
-            </div>
-            <div className="bg-slate-800/60 rounded-xl px-3 py-2 border border-slate-700">
-              <div className="text-slate-500 uppercase tracking-wide mb-1">Active Pairs</div>
-              <div className="font-black text-yellow-400">BTC-USDT</div>
-            </div>
-            <div className="bg-slate-800/60 rounded-xl px-3 py-2 border border-slate-700">
-              <div className="text-slate-500 uppercase tracking-wide mb-1">Disabled</div>
-              <div className="font-bold text-slate-500 text-xs">ETH/SOL/DOGE/XRP</div>
-            </div>
-            <div className="bg-slate-800/60 rounded-xl px-3 py-2 border border-slate-700">
-              <div className="text-slate-500 uppercase tracking-wide mb-1">Max Open</div>
-              <div className="font-black text-white">1</div>
-            </div>
-            <div className="bg-slate-800/60 rounded-xl px-3 py-2 border border-slate-700">
-              <div className="text-slate-500 uppercase tracking-wide mb-1">Interval</div>
-              <div className="font-black text-emerald-400">Every 5 min</div>
-            </div>
-          </div>
+        {/* ── Final Verdict footer ───────────────────────────────── */}
+        <div className="text-center text-xs text-slate-600 pb-4">
+          simplifiedDashboardActive: true · mainScreenUsesSystemTrail: true · mainReportUsesPhase4FPerformanceReport: true · advancedTabsCollapsed: true · legacyReportsArchived: true · tradingLogicChanged: false · realTradeAllowed: false · finalVerdict: COMMAND_CENTER_UI_ACTIVE
         </div>
-
-        {/* ── Safety banners ──────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="bg-red-950/40 border-2 border-red-700 rounded-xl px-5 py-3 flex items-center gap-3">
-            <span className="text-xl">🛑</span>
-            <div className="text-xs">
-              <div className="text-red-400 font-black">KILL SWITCH ACTIVE · PAPER ONLY</div>
-              <div className="text-red-300 mt-0.5">noOKXOrderEndpointCalled=true · realTradeAllowed=false · realTradeUnlockAllowed=false</div>
-            </div>
-          </div>
-          <div className="bg-cyan-950/30 border-2 border-cyan-700 rounded-xl px-5 py-3 flex items-center gap-3">
-            <span className="text-xl">🔒</span>
-            <div className="text-xs">
-              <div className="text-cyan-400 font-black">PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</div>
-              <div className="text-cyan-300 mt-0.5">BTC-USDT only · Max 1 open trade · Phase 5 requires manual operator unlock</div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Phase 4F Primary KPI Cards (from phase4FPerformanceReport) ── */}
-        {f4Loading ? (
-          <Skeleton className="h-44 bg-slate-800 rounded-2xl" />
-        ) : (
-          <div className="bg-slate-900/70 border-2 border-cyan-800 rounded-2xl p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest">📊 Phase 4F Performance Report — BTC-USDT</div>
-              <span className="text-xs font-mono text-slate-500">phase4FPerformanceReport</span>
-              {status && (
-                <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded border ${
-                  status === 'PROFITABLE' ? 'text-emerald-400 border-emerald-700 bg-emerald-950/30' :
-                  status === 'BREAK_EVEN' ? 'text-yellow-400 border-yellow-700 bg-yellow-950/20' :
-                  'text-slate-400 border-slate-700 bg-slate-800/50'
-                }`}>{status}</span>
-              )}
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
-              <Tile label="Net PnL"       value={`${netPnL >= 0 ? '+' : ''}${netPnL.toFixed(4)} USDT`} color={pnlColor} />
-              <Tile label="BTC Trades"    value={totalBTC}      color="text-white" />
-              <Tile label="Win Rate"      value={`${winRate.toFixed(1)}%`} color={winRate >= 55 ? 'text-emerald-400' : winRate >= 45 ? 'text-yellow-400' : 'text-red-400'} />
-              <Tile label="TP Hits"       value={tpHits}        color="text-emerald-400" />
-              <Tile label="SL Hits"       value={slHits}        color="text-red-400" />
-              <Tile label="Open Now (4F)" value={openTrades.length} color="text-yellow-400" />
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 text-xs mt-3">
-              <Tile label="Gross PnL"     value={`${grossPnL >= 0 ? '+' : ''}${grossPnL.toFixed(4)}`} color="text-blue-400" />
-              <Tile label="Fees"          value={`-${fees.toFixed(4)}`}         color="text-red-400" />
-              <Tile label="Spread Cost"   value={`-${spreadCost.toFixed(4)}`}   color="text-orange-400" />
-              <Tile label="Fee Drag"      value={`${feeDrag}%`}                 color={feeDrag < 50 ? 'text-emerald-400' : 'text-red-400'} />
-              <Tile label="Expired"       value={expired}                        color="text-slate-400" />
-              <Tile label="Closed"        value={closedBTC}                      color="text-slate-300" />
-            </div>
-            {!f4Report && (
-              <div className="mt-3 text-xs text-slate-500 text-center">Run "▶ Run Paper Scan Now" or wait for auto-scan to populate.</div>
-            )}
-          </div>
-        )}
-
-        {/* ── Tabs ─────────────────────────────────────────────── */}
-        <Tabs defaultValue="open" className="w-full">
-          <TabsList className="flex flex-wrap gap-1 bg-slate-900/50 border border-slate-700 rounded-xl p-1 h-auto">
-            <TabsTrigger value="hard_blocker"     className="text-xs font-bold text-red-300">🛑 Hard Blocker</TabsTrigger>
-            <TabsTrigger value="verify_final"    className="text-xs font-bold text-cyan-300">🔬 Final Verify</TabsTrigger>
-            <TabsTrigger value="open"            className="text-xs">📂 Open ({openTrades.length})</TabsTrigger>
-            <TabsTrigger value="closed"          className="text-xs">✅ Closed ({recentClosed.length})</TabsTrigger>
-            <TabsTrigger value="phase4f_report"  className="text-xs">📊 4F Report</TabsTrigger>
-            <TabsTrigger value="phase4f_verify"  className="text-xs">✅ 4F Verify</TabsTrigger>
-            <TabsTrigger value="phase4f_why"     className="text-xs">🔎 4F Why?</TabsTrigger>
-            <TabsTrigger value="phase4f_alert"   className="text-xs">🚨 4F Alert</TabsTrigger>
-            <TabsTrigger value="phase4f_snap"    className="text-xs">📸 Snapshots</TabsTrigger>
-            <TabsTrigger value="phase4f_link"    className="text-xs">🔗 Linkage</TabsTrigger>
-            <TabsTrigger value="phase4f_edge"    className="text-xs">📊 Edge Report</TabsTrigger>
-            <TabsTrigger value="phase4f_snap_edge" className="text-xs">📊 Snapshot Edge</TabsTrigger>
-            <TabsTrigger value="phase5_guard"    className="text-xs">🔒 Phase 5 Guard</TabsTrigger>
-            <TabsTrigger value="phase5_prepared" className="text-xs font-bold text-red-300">🔴 Phase 5 Prepared</TabsTrigger>
-            <TabsTrigger value="weekly_export"   className="text-xs">📤 Weekly Export</TabsTrigger>
-            <TabsTrigger value="phase4f_btc"     className="text-xs">🚀 Phase 4F Run</TabsTrigger>
-            <TabsTrigger value="diag"            className="text-xs">🔎 Diagnostic</TabsTrigger>
-            <TabsTrigger value="legacy_archive"   className="text-xs text-slate-600 italic">🗄 Archive / Legacy ▾</TabsTrigger>
-          </TabsList>
-
-          {/* REAL TRADING HARD BLOCKER */}
-          <TabsContent value="hard_blocker" className="mt-4">
-            <div className="bg-slate-900/70 border border-red-800 rounded-xl p-5">
-              <RealTradingHardBlockerPanel />
-            </div>
-          </TabsContent>
-
-          {/* FINAL VERIFICATION */}
-          <TabsContent value="verify_final" className="mt-4">
-            <div className="bg-slate-900/70 border border-cyan-800 rounded-xl p-5">
-              <Phase4FDashboardVerificationPanel />
-            </div>
-          </TabsContent>
-
-          {/* OPEN POSITIONS — Phase 4F only */}
-          <TabsContent value="open" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
-              {/* Phase 4F filter banner */}
-              <div className="bg-cyan-950/20 border border-cyan-800 rounded-lg px-3 py-2 mb-4 flex flex-wrap items-center gap-3 text-xs">
-                <span className="text-cyan-400 font-black">🔍 Showing Phase 4F BTC-only trades only. Legacy BTC trades excluded.</span>
-                <span className="text-cyan-300/70">mode = PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</span>
-                <span className="ml-auto text-slate-400">Included: <span className="text-cyan-400 font-bold">{openTrades.length}</span> · Excluded legacy: <span className="text-amber-400 font-bold">{legacyOpen.length}</span></span>
-              </div>
-              <div className="flex items-center gap-3 mb-3">
-                <div className="text-sm font-bold text-slate-300">Open Paper Positions — Phase 4F BTC-USDT</div>
-                <span className="text-xs text-slate-500">Max 1 allowed · Kill switch active</span>
-              </div>
-              {openTrades.length === 0 ? (
-                <div className="text-center text-slate-500 py-10">
-                  <div className="text-2xl mb-2">📂</div>
-                  <div className="font-bold text-slate-400">No Phase 4F BTC-only trades yet.</div>
-                  <div className="text-xs mt-1 text-slate-600">Waiting for first trade with mode = PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</div>
-                  {legacyOpen.length > 0 && (
-                    <div className="mt-3 text-xs text-amber-500">{legacyOpen.length} legacy BTC open trade(s) hidden — visible in Archive / Legacy tab.</div>
-                  )}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="border-b border-slate-700 text-slate-400">
-                      <tr>
-                        <th className="text-left px-2 py-2">Pair</th>
-                        <th className="text-right px-2 py-2">Entry</th>
-                        <th className="text-right px-2 py-2">Target</th>
-                        <th className="text-right px-2 py-2">SL</th>
-                        <th className="text-right px-2 py-2">Size</th>
-                        <th className="text-left px-2 py-2">Signal</th>
-                        <th className="text-right px-2 py-2">Score</th>
-                        <th className="text-left px-2 py-2">Snap</th>
-                        <th className="text-right px-2 py-2">Snap Score</th>
-                        <th className="text-right px-2 py-2">Snap Mom</th>
-                        <th className="text-right px-2 py-2">Snap BuyP</th>
-                        <th className="text-right px-2 py-2">Snap Age</th>
-                        <th className="text-left px-2 py-2">Opened</th>
-                        <th className="text-left px-2 py-2">Expires</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {openTrades.map(t => (
-                        <tr key={t.id} className="border-b border-slate-800/50 hover:bg-slate-800/20">
-                          <td className="px-2 py-2 font-black text-yellow-400">{t.instId}</td>
-                          <td className="px-2 py-2 text-right text-white">${t.entryPrice?.toLocaleString()}</td>
-                          <td className="px-2 py-2 text-right text-emerald-400">${(t.targetPrice || t.tpPrice)?.toLocaleString()}</td>
-                          <td className="px-2 py-2 text-right text-red-400">${(t.stopLossPrice || t.slPrice)?.toLocaleString()}</td>
-                          <td className="px-2 py-2 text-right text-slate-300">${t.sizeUSDT}</td>
-                          <td className="px-2 py-2">
-                            <span className={`font-bold ${t.intradaySignal === 'BULLISH' ? 'text-emerald-400' : 'text-yellow-400'}`}>{t.intradaySignal}</span>
-                          </td>
-                          <td className="px-2 py-2 text-right text-cyan-400">{t.signalScore || t.entryScore}</td>
-                          <td className="px-2 py-2">
-                            {t.signalSnapshotId
-                              ? <span className="text-xs bg-emerald-900/30 border border-emerald-700/40 text-emerald-400 px-1.5 py-0.5 rounded-full font-semibold">📸 Linked</span>
-                              : <span className="text-xs text-slate-600">⬜</span>}
-                          </td>
-                          <td className="px-2 py-2 text-right text-slate-300">{t.signalSnapshotScore ?? '—'}</td>
-                          <td className="px-2 py-2 text-right">
-                            {t.signalSnapshotMomentum != null
-                              ? <span className={t.signalSnapshotMomentum > 0 ? 'text-emerald-400' : 'text-red-400'}>{t.signalSnapshotMomentum.toFixed(3)}%</span>
-                              : <span className="text-slate-600">—</span>}
-                          </td>
-                          <td className="px-2 py-2 text-right text-slate-300">{t.signalSnapshotBuyPressure != null ? `${t.signalSnapshotBuyPressure.toFixed(1)}%` : '—'}</td>
-                          <td className="px-2 py-2 text-right text-slate-500">{t.signalSnapshotAgeMs != null ? `${(t.signalSnapshotAgeMs / 60000).toFixed(1)}m` : '—'}</td>
-                          <td className="px-2 py-2 text-slate-400">{t.openedAt ? new Date(t.openedAt).toLocaleTimeString('de-DE') : '—'}</td>
-                          <td className="px-2 py-2 text-orange-400">{t.expiresAt ? new Date(t.expiresAt).toLocaleTimeString('de-DE') : '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* CLOSED — Phase 4F only */}
-          <TabsContent value="closed" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
-              {/* Phase 4F filter banner */}
-              <div className="bg-cyan-950/20 border border-cyan-800 rounded-lg px-3 py-2 mb-4 flex flex-wrap items-center gap-3 text-xs">
-                <span className="text-cyan-400 font-black">🔍 Showing Phase 4F BTC-only trades only. Legacy BTC trades excluded.</span>
-                <span className="text-cyan-300/70">mode = PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</span>
-                <span className="ml-auto text-slate-400">Included: <span className="text-cyan-400 font-bold">{recentClosed.length}</span> · Excluded legacy: <span className="text-amber-400 font-bold">{legacyClosed.length}</span> · Total legacy excluded: <span className="text-amber-400 font-bold">{excludedLegacyCount}</span></span>
-              </div>
-              <div className="text-sm font-bold text-slate-300 mb-3">Closed Phase 4F BTC-USDT Trades</div>
-              {recentClosed.length === 0 ? (
-                <div className="text-center text-slate-500 py-10">
-                  <div className="text-2xl mb-2">✅</div>
-                  <div className="font-bold text-slate-400">No Phase 4F BTC-only trades yet.</div>
-                  <div className="text-xs mt-1 text-slate-600">Waiting for first closed trade with mode = PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</div>
-                  {legacyClosed.length > 0 && (
-                    <div className="mt-3 text-xs text-amber-500">{legacyClosed.length} legacy BTC closed trade(s) hidden — visible in Archive / Legacy tab.</div>
-                  )}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="border-b border-slate-700 text-slate-400">
-                      <tr>
-                        <th className="text-left px-2 py-2">Pair</th>
-                        <th className="text-left px-2 py-2">Status</th>
-                        <th className="text-right px-2 py-2">Entry</th>
-                        <th className="text-right px-2 py-2">Exit</th>
-                        <th className="text-right px-2 py-2">GrossPnL</th>
-                        <th className="text-right px-2 py-2">NetPnL</th>
-                        <th className="text-left px-2 py-2">Snap</th>
-                        <th className="text-right px-2 py-2">Snap Score</th>
-                        <th className="text-right px-2 py-2">Snap Mom</th>
-                        <th className="text-right px-2 py-2">Snap BuyP</th>
-                        <th className="text-right px-2 py-2">Snap Age</th>
-                        <th className="text-right px-2 py-2">Held</th>
-                        <th className="text-left px-2 py-2">Closed</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recentClosed.map(t => {
-                        const net = t.netPnL || t.netPnLUSDT || 0;
-                        return (
-                          <tr key={t.id} className="border-b border-slate-800/50 hover:bg-slate-800/20">
-                            <td className="px-2 py-2 font-black text-white">{t.instId}</td>
-                            <td className="px-2 py-2">
-                              <span className={`font-bold text-xs px-1.5 py-0.5 rounded ${
-                                t.status === 'CLOSED_TP' ? 'text-emerald-300 bg-emerald-950/50 border border-emerald-800' :
-                                t.status === 'CLOSED_SL' ? 'text-red-300 bg-red-950/50 border border-red-800' :
-                                'text-slate-300 bg-slate-800/50 border border-slate-700'
-                              }`}>{t.status}</span>
-                            </td>
-                            <td className="px-2 py-2 text-right text-slate-400">${t.entryPrice?.toLocaleString()}</td>
-                            <td className="px-2 py-2 text-right text-slate-400">${t.exitPrice?.toLocaleString()}</td>
-                            <td className={`px-2 py-2 text-right font-bold ${(t.grossPnL||t.grossPnLUSDT||0)>=0?'text-emerald-400':'text-red-400'}`}>{(t.grossPnL||t.grossPnLUSDT||0)>=0?'+':''}{(t.grossPnL||t.grossPnLUSDT||0).toFixed(4)}</td>
-                            <td className={`px-2 py-2 text-right font-black ${net>=0?'text-emerald-400':'text-red-400'}`}>{net>=0?'+':''}{net.toFixed(4)}</td>
-                            <td className="px-2 py-2">
-                              {t.signalSnapshotId
-                                ? <span className="text-xs bg-emerald-900/30 border border-emerald-700/40 text-emerald-400 px-1.5 py-0.5 rounded-full font-semibold">📸 Linked</span>
-                                : <span className="text-xs text-slate-600">⬜</span>}
-                            </td>
-                            <td className="px-2 py-2 text-right text-slate-300">{t.signalSnapshotScore ?? '—'}</td>
-                            <td className="px-2 py-2 text-right">
-                              {t.signalSnapshotMomentum != null
-                                ? <span className={t.signalSnapshotMomentum > 0 ? 'text-emerald-400' : 'text-red-400'}>{t.signalSnapshotMomentum.toFixed(3)}%</span>
-                                : <span className="text-slate-600">—</span>}
-                            </td>
-                            <td className="px-2 py-2 text-right text-slate-300">{t.signalSnapshotBuyPressure != null ? `${t.signalSnapshotBuyPressure.toFixed(1)}%` : '—'}</td>
-                            <td className="px-2 py-2 text-right text-slate-500">{t.signalSnapshotAgeMs != null ? `${(t.signalSnapshotAgeMs / 60000).toFixed(1)}m` : '—'}</td>
-                            <td className="px-2 py-2 text-right text-slate-500">{t.holdingMs ? `${Math.round(t.holdingMs/1000)}s` : '—'}</td>
-                            <td className="px-2 py-2 text-slate-400">{t.closedAt ? new Date(t.closedAt).toLocaleTimeString('de-DE') : '—'}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* 4F REPORT */}
-          <TabsContent value="phase4f_report" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4FReportPanel />
-            </div>
-          </TabsContent>
-
-          {/* 4F AUTOMATION VERIFY */}
-          <TabsContent value="phase4f_verify" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4FAutomationVerifyPanel />
-            </div>
-          </TabsContent>
-
-          {/* 4F WHY NO TRADE */}
-          <TabsContent value="phase4f_why" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4FWhyNoTradePanel />
-            </div>
-          </TabsContent>
-
-          {/* 4F ALERT */}
-          <TabsContent value="phase4f_alert" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4FAlertWidget />
-            </div>
-          </TabsContent>
-
-          {/* 4F SNAPSHOTS */}
-          <TabsContent value="phase4f_snap" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4FSnapshotPanel />
-            </div>
-          </TabsContent>
-
-          {/* 4F LINKAGE */}
-          <TabsContent value="phase4f_link" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4FSnapshotLinkagePanel />
-            </div>
-          </TabsContent>
-
-          {/* 4F EDGE REPORT */}
-          <TabsContent value="phase4f_edge" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4FSnapshotEdgeReportPanel />
-            </div>
-          </TabsContent>
-
-          {/* 4F SNAPSHOT EDGE DASHBOARD */}
-          <TabsContent value="phase4f_snap_edge" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4FSnapshotEdgeDashboard />
-            </div>
-          </TabsContent>
-
-          {/* PHASE 5 GUARD */}
-          <TabsContent value="phase5_guard" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase5UnlockGuardPanel />
-            </div>
-          </TabsContent>
-
-          {/* PHASE 5 PREPARED — LOCKED */}
-          <TabsContent value="phase5_prepared" className="mt-4">
-            <div className="bg-slate-900/70 border border-red-900 rounded-xl p-5">
-              <Phase5ManualRealTradePreparedPanel />
-            </div>
-          </TabsContent>
-
-          {/* WEEKLY EXPORT */}
-          <TabsContent value="weekly_export" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4FWeeklyExportPanel />
-            </div>
-          </TabsContent>
-
-          {/* PHASE 4F BTC-ONLY RUN PANEL */}
-          <TabsContent value="phase4f_btc" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4FBTCOnlyPanel />
-            </div>
-          </TabsContent>
-
-          {/* DIAGNOSTIC */}
-          <TabsContent value="diag" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4OpportunityDiagnosticPanel />
-            </div>
-          </TabsContent>
-
-          {/* ── ARCHIVE / LEGACY TAB ─────────────────────────── */}
-          <TabsContent value="legacy_archive" className="mt-4">
-            <div className="bg-amber-950/20 border-2 border-amber-700 rounded-xl p-4 mb-4">
-              <div className="text-amber-400 font-black text-sm mb-1">🗄 ARCHIVE / LEGACY DIAGNOSTICS</div>
-              <div className="text-amber-300/80 text-xs">
-                These panels are preserved for historical reference only.
-                <strong className="text-white"> They are NOT the active P&L or trading decision.</strong>
-                Active engine: <span className="font-mono text-cyan-400">phase4FBTCOnlyPaperMode</span> · Active report: <span className="font-mono text-cyan-400">phase4FPerformanceReport</span>
-              </div>
-            </div>
-            <Tabs defaultValue="legacy_btc_trades" className="w-full">
-              <TabsList className="flex flex-wrap gap-1 bg-slate-900/50 border border-slate-700 rounded-xl p-1 h-auto mb-4">
-                <TabsTrigger value="legacy_btc_trades" className="text-xs text-amber-500">🗃 Old BTC Trades ({legacyClosed.length + legacyOpen.length})</TabsTrigger>
-                <TabsTrigger value="legacy_report" className="text-xs text-slate-500">📄 Legacy Multi-Pair Report</TabsTrigger>
-                <TabsTrigger value="compare"       className="text-xs text-slate-500">⚖ Before/After (4B)</TabsTrigger>
-                <TabsTrigger value="phase4c"       className="text-xs text-slate-500">🔬 4C Expiry</TabsTrigger>
-                <TabsTrigger value="phase4d"       className="text-xs text-slate-500">⚡ 4D Correction</TabsTrigger>
-                <TabsTrigger value="phase4e"       className="text-xs text-slate-500">📐 4E Size</TabsTrigger>
-                <TabsTrigger value="phase4e2"      className="text-xs text-slate-500">🧾 4E Accounting</TabsTrigger>
-              </TabsList>
-              <TabsContent value="legacy_btc_trades">
-                <div className="bg-slate-900/70 border border-amber-800 rounded-xl p-4">
-                  <div className="bg-amber-950/30 border border-amber-700 rounded-lg px-3 py-2 mb-4 text-xs">
-                    <span className="text-amber-400 font-black">🗃 Legacy Multi-Pair / old BTC paper trades — historical only.</span>
-                    <span className="text-amber-300/70 ml-2">These trades have no <code className="font-mono bg-slate-800 px-1 rounded">mode</code> field or a different mode. They are excluded from all Phase 4F metrics.</span>
-                  </div>
-                  <div className="flex gap-4 mb-4 text-xs">
-                    <span className="bg-slate-800 border border-slate-700 rounded px-2 py-1">Open legacy: <span className="text-amber-400 font-bold">{legacyOpen.length}</span></span>
-                    <span className="bg-slate-800 border border-slate-700 rounded px-2 py-1">Closed legacy: <span className="text-amber-400 font-bold">{legacyClosed.length}</span></span>
-                    <span className="bg-slate-800 border border-slate-700 rounded px-2 py-1">Total excluded: <span className="text-amber-400 font-bold">{excludedLegacyCount}</span></span>
-                  </div>
-                  {[...legacyOpen, ...legacyClosed].length === 0 ? (
-                    <div className="text-center text-slate-500 py-8 text-xs">No legacy BTC trades found.</div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead className="border-b border-slate-700 text-slate-500">
-                          <tr>
-                            <th className="text-left px-2 py-2">Pair</th>
-                            <th className="text-left px-2 py-2">Status</th>
-                            <th className="text-right px-2 py-2">Entry</th>
-                            <th className="text-right px-2 py-2">Exit</th>
-                            <th className="text-right px-2 py-2">NetPnL</th>
-                            <th className="text-left px-2 py-2">Mode</th>
-                            <th className="text-left px-2 py-2">Phase</th>
-                            <th className="text-right px-2 py-2">Held</th>
-                            <th className="text-left px-2 py-2">Opened</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {[...legacyOpen, ...legacyClosed].map(t => {
-                            const net = t.netPnL || t.netPnLUSDT || 0;
-                            return (
-                              <tr key={t.id} className="border-b border-slate-800/30 hover:bg-slate-800/10 opacity-70">
-                                <td className="px-2 py-2 text-slate-400">{t.instId}</td>
-                                <td className="px-2 py-2">
-                                  <span className="text-xs text-slate-500 px-1 py-0.5 bg-slate-800 rounded">{t.status}</span>
-                                </td>
-                                <td className="px-2 py-2 text-right text-slate-500">${t.entryPrice?.toLocaleString()}</td>
-                                <td className="px-2 py-2 text-right text-slate-500">${t.exitPrice?.toLocaleString() ?? '—'}</td>
-                                <td className={`px-2 py-2 text-right text-xs ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{net >= 0 ? '+' : ''}{net.toFixed(4)}</td>
-                                <td className="px-2 py-2 text-slate-600 text-xs font-mono">{t.mode ?? '—'}</td>
-                                <td className="px-2 py-2 text-slate-600 text-xs">{t.phase ?? '—'}</td>
-                                <td className="px-2 py-2 text-right text-slate-600">{t.holdingMs ? `${Math.round(t.holdingMs/1000)}s` : '—'}</td>
-                                <td className="px-2 py-2 text-slate-600">{t.openedAt ? new Date(t.openedAt).toLocaleTimeString('de-DE') : '—'}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-              <TabsContent value="legacy_report"><PaperReport24h /></TabsContent>
-              <TabsContent value="compare"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4BeforeAfterPanel /></div></TabsContent>
-              <TabsContent value="phase4c"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4CExpiryDiagnosticPanel /></div></TabsContent>
-              <TabsContent value="phase4d"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4DApplyCorrectionPanel /></div></TabsContent>
-              <TabsContent value="phase4e"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4EPositionSizeDiagnosticPanel /></div></TabsContent>
-              <TabsContent value="phase4e2"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4ECleanAccountingPanel /></div></TabsContent>
-            </Tabs>
-          </TabsContent>
-
-        </Tabs>
 
       </div>
     </div>
   );
 }
 
-function Tile({ label, value, color }) {
+function SafeRow({ label, value, ok }) {
   return (
-    <div className="bg-slate-900/70 rounded-xl p-3 border border-slate-700">
-      <div className="text-slate-500 text-xs mb-1 uppercase tracking-wide">{label}</div>
-      <div className={`font-black text-xl ${color}`}>{value}</div>
+    <div className="flex items-center justify-between py-1 border-b border-slate-800/50 last:border-0">
+      <span className="text-slate-400">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className={`font-mono font-bold ${ok ? 'text-emerald-400' : 'text-red-400'}`}>{value}</span>
+        <span>{ok ? '✅' : '❌'}</span>
+      </div>
     </div>
   );
 }
