@@ -24,6 +24,7 @@ import Phase5UnlockGuardPanel from '@/components/dashboard/Phase5UnlockGuardPane
 import Phase4FWeeklyExportPanel from '@/components/dashboard/Phase4FWeeklyExportPanel';
 import Phase4FDashboardVerificationPanel from '@/components/dashboard/Phase4FDashboardVerificationPanel';
 import RealTradingHardBlockerPanel from '@/components/dashboard/RealTradingHardBlockerPanel';
+import SystemTrailStatusBar from '@/components/dashboard/SystemTrailStatusBar';
 
 // ── Phase 4F active constants ──────────────────────────────────────────────
 const P4F = {
@@ -116,6 +117,9 @@ export default function PaperTradingDashboard() {
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 lg:p-6">
       <div className="max-w-7xl mx-auto space-y-5">
+
+        {/* ── SYSTEM TRAIL — Single Source of Truth ──────────── */}
+        <SystemTrailStatusBar onRunScan={handleManualRun} isRunning={manualRunning} />
 
         {/* ── Header ─────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -313,12 +317,7 @@ export default function PaperTradingDashboard() {
             <TabsTrigger value="weekly_export"   className="text-xs">📤 Weekly Export</TabsTrigger>
             <TabsTrigger value="phase4f_btc"     className="text-xs">🚀 Phase 4F Run</TabsTrigger>
             <TabsTrigger value="diag"            className="text-xs">🔎 Diagnostic</TabsTrigger>
-            <TabsTrigger value="legacy_report"   className="text-xs text-slate-500">🗄 Legacy Report</TabsTrigger>
-            <TabsTrigger value="compare"         className="text-xs text-slate-500">⚖ Before/After</TabsTrigger>
-            <TabsTrigger value="phase4c"         className="text-xs text-slate-500">🔬 4C</TabsTrigger>
-            <TabsTrigger value="phase4d"         className="text-xs text-slate-500">⚡ 4D</TabsTrigger>
-            <TabsTrigger value="phase4e"         className="text-xs text-slate-500">📐 4E Size</TabsTrigger>
-            <TabsTrigger value="phase4e2"        className="text-xs text-slate-500">🧾 4E Acct</TabsTrigger>
+            <TabsTrigger value="legacy_archive"   className="text-xs text-slate-600 italic">🗄 Archive / Legacy ▾</TabsTrigger>
           </TabsList>
 
           {/* REAL TRADING HARD BLOCKER */}
@@ -553,42 +552,32 @@ export default function PaperTradingDashboard() {
             </div>
           </TabsContent>
 
-          {/* ── LEGACY TABS (historical only) ────────────────── */}
-          <TabsContent value="legacy_report" className="mt-4">
-            <div className="bg-amber-950/20 border-2 border-amber-700 rounded-xl p-3 mb-3 text-xs text-amber-400 font-bold">
-              🗄 Legacy Multi-Pair Paper Report — historical only. Active mode is PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE.
+          {/* ── ARCHIVE / LEGACY TAB ─────────────────────────── */}
+          <TabsContent value="legacy_archive" className="mt-4">
+            <div className="bg-amber-950/20 border-2 border-amber-700 rounded-xl p-4 mb-4">
+              <div className="text-amber-400 font-black text-sm mb-1">🗄 ARCHIVE / LEGACY DIAGNOSTICS</div>
+              <div className="text-amber-300/80 text-xs">
+                These panels are preserved for historical reference only.
+                <strong className="text-white"> They are NOT the active P&L or trading decision.</strong>
+                Active engine: <span className="font-mono text-cyan-400">phase4FBTCOnlyPaperMode</span> · Active report: <span className="font-mono text-cyan-400">phase4FPerformanceReport</span>
+              </div>
             </div>
-            <PaperReport24h />
-          </TabsContent>
-
-          <TabsContent value="compare" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4BeforeAfterPanel />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="phase4c" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4CExpiryDiagnosticPanel />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="phase4d" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4DApplyCorrectionPanel />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="phase4e" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4EPositionSizeDiagnosticPanel />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="phase4e2" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
-              <Phase4ECleanAccountingPanel />
-            </div>
+            <Tabs defaultValue="legacy_report" className="w-full">
+              <TabsList className="flex flex-wrap gap-1 bg-slate-900/50 border border-slate-700 rounded-xl p-1 h-auto mb-4">
+                <TabsTrigger value="legacy_report" className="text-xs text-slate-500">📄 Legacy Multi-Pair Report</TabsTrigger>
+                <TabsTrigger value="compare"       className="text-xs text-slate-500">⚖ Before/After (4B)</TabsTrigger>
+                <TabsTrigger value="phase4c"       className="text-xs text-slate-500">🔬 4C Expiry</TabsTrigger>
+                <TabsTrigger value="phase4d"       className="text-xs text-slate-500">⚡ 4D Correction</TabsTrigger>
+                <TabsTrigger value="phase4e"       className="text-xs text-slate-500">📐 4E Size</TabsTrigger>
+                <TabsTrigger value="phase4e2"      className="text-xs text-slate-500">🧾 4E Accounting</TabsTrigger>
+              </TabsList>
+              <TabsContent value="legacy_report"><PaperReport24h /></TabsContent>
+              <TabsContent value="compare"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4BeforeAfterPanel /></div></TabsContent>
+              <TabsContent value="phase4c"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4CExpiryDiagnosticPanel /></div></TabsContent>
+              <TabsContent value="phase4d"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4DApplyCorrectionPanel /></div></TabsContent>
+              <TabsContent value="phase4e"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4EPositionSizeDiagnosticPanel /></div></TabsContent>
+              <TabsContent value="phase4e2"><div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5"><Phase4ECleanAccountingPanel /></div></TabsContent>
+            </Tabs>
           </TabsContent>
 
         </Tabs>

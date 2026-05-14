@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import SystemTrailStatusBar from '@/components/dashboard/SystemTrailStatusBar';
 
 const DECISION_CFG = {
   PAPER_SIGNAL_ONLY:    { badge: 'bg-emerald-900 text-emerald-200 border-emerald-600', label: '🟢 PAPER_SIGNAL', ring: 'border-emerald-600 bg-emerald-950/30' },
@@ -54,13 +55,27 @@ export default function SignalDashboard() {
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 lg:p-6">
       <div className="max-w-7xl mx-auto space-y-5">
 
+        {/* ── SYSTEM TRAIL — Diagnostic Notice ─────────────────── */}
+        <div className="bg-amber-950/30 border-2 border-amber-700 rounded-xl px-5 py-3 text-xs">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">⚠️</span>
+            <span className="text-amber-400 font-black uppercase tracking-widest">READ-ONLY DATA DIAGNOSTICS ONLY — NOT ACTIVE TRADING DECISION</span>
+          </div>
+          <div className="text-amber-300/80">
+            This page shows Phase 3 / multi-pair OKX signal data for <strong>diagnostic purposes only</strong>.
+            The active trading engine is <span className="font-mono text-white">PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</span> running on <span className="font-mono text-cyan-400">phase4FBTCOnlyPaperMode</span>.
+            Go to <strong>Phase 4F Paper Trading Dashboard</strong> for the live engine state.
+          </div>
+        </div>
+        <SystemTrailStatusBar />
+
         {/* ── Header ── */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
-              OKX_ONLY_INTRADAY_TRADING_ENGINE
+            <div className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-1">
+              🗄 LEGACY DIAGNOSTIC — NOT ACTIVE TRADING DECISION
             </div>
-            <h1 className="text-2xl font-black text-white">Phase 3 — OKX-Only Read-Only Signal Engine</h1>
+            <h1 className="text-2xl font-black text-slate-400">Phase 3 — OKX-Only Read-Only Signal <span className="text-amber-500">[Archive]</span></h1>
             <div className="flex flex-wrap gap-3 mt-2 text-xs">
               <span className="text-red-400 font-bold">Kill Switch: ACTIVE</span>
               <span className="text-slate-500">·</span>
