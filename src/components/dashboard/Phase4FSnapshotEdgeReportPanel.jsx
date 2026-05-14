@@ -72,12 +72,12 @@ export default function Phase4FSnapshotEdgeReportPanel() {
     setLoading(false);
   };
 
-  const s  = data?.snapshotStats || {};
-  const tl = data?.tradeLinkageStats || {};
-  const dec = data?.decision || {};
+  const s    = data?.snapshotStats || {};
+  const tl   = data?.tradeLinkageStats || {};
+  const dec  = data?.decision || {};
   const meta = data?.meta || {};
   const safe = data?.safety || {};
-  const st = STATUS_CONFIG[dec.status] || STATUS_CONFIG.COLLECTING_LINKAGE_DATA;
+  const st   = STATUS_CONFIG[dec.status] || STATUS_CONFIG.COLLECTING_LINKAGE_DATA;
 
   const pnlColor   = v => v > 0 ? 'text-emerald-400' : v < 0 ? 'text-red-400' : 'text-slate-400';
   const rateColor  = v => v >= 55 ? 'text-emerald-400' : v >= 45 ? 'text-yellow-400' : 'text-red-400';
@@ -109,6 +109,13 @@ export default function Phase4FSnapshotEdgeReportPanel() {
         <span className="bg-slate-800 border border-slate-700 text-slate-400 rounded-lg px-3 py-1">realTradeAllowed: false</span>
         <span className="bg-slate-800 border border-slate-700 text-slate-400 rounded-lg px-3 py-1">noOKXOrderEndpointCalled: true</span>
         <span className="bg-purple-950/40 border border-purple-700 text-purple-400 rounded-lg px-3 py-1 font-bold">📊 PHASE_4F_SNAPSHOT_EDGE_REPORT</span>
+        <span className="bg-cyan-950/40 border border-cyan-700 text-cyan-400 rounded-lg px-3 py-1 font-bold">🔍 filterMode: PHASE_4F_ONLY</span>
+      </div>
+
+      {/* Phase 4F filter notice */}
+      <div className="bg-cyan-950/20 border border-cyan-800 rounded-xl px-4 py-3 text-xs">
+        <span className="text-cyan-400 font-black">Phase 4F-only data. Legacy BTC trades excluded.</span>
+        <span className="text-cyan-300/70 ml-2">Only trades created after Phase 4F activation are analyzed. Old BTC trades visible only in Archive / Legacy.</span>
       </div>
 
       {error && (
@@ -132,24 +139,37 @@ export default function Phase4FSnapshotEdgeReportPanel() {
                 <div className="text-slate-300 text-sm mt-1">{dec.statusReason}</div>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
               <div className="bg-slate-900/40 rounded-lg px-3 py-2">
                 <div className="text-slate-500 mb-0.5">Generated At</div>
                 <div className="text-white font-bold">{data.generatedAt ? new Date(data.generatedAt).toLocaleTimeString('de-DE') : '—'}</div>
+              </div>
+              <div className="bg-cyan-950/40 border border-cyan-800 rounded-lg px-3 py-2">
+                <div className="text-cyan-500 mb-0.5">Phase 4F Trades</div>
+                <div className="text-cyan-300 font-black">{data.includedPhase4FTrades ?? 0}</div>
+              </div>
+              <div className="bg-amber-950/30 border border-amber-800 rounded-lg px-3 py-2">
+                <div className="text-amber-500 mb-0.5">Legacy Excluded</div>
+                <div className="text-amber-400 font-black">{data.excludedLegacyBTCTrades ?? 0}</div>
+              </div>
+              <div className="bg-slate-900/40 rounded-lg px-3 py-2">
+                <div className="text-slate-500 mb-0.5">P4F Snapshots</div>
+                <div className="text-white font-bold">{data.includedPhase4FSnapshots ?? 0}</div>
               </div>
               <div className="bg-slate-900/40 rounded-lg px-3 py-2">
                 <div className="text-slate-500 mb-0.5">Snapshots (24h)</div>
                 <div className="text-white font-bold">{meta.totalSnapshotsAnalyzed24h}</div>
               </div>
               <div className="bg-slate-900/40 rounded-lg px-3 py-2">
-                <div className="text-slate-500 mb-0.5">Snapshots (7d)</div>
-                <div className="text-white font-bold">{meta.totalSnapshotsAnalyzed7d}</div>
-              </div>
-              <div className="bg-slate-900/40 rounded-lg px-3 py-2">
-                <div className="text-slate-500 mb-0.5">BTC Trades in DB</div>
-                <div className="text-white font-bold">{meta.totalBTCTradesInDB}</div>
+                <div className="text-slate-500 mb-0.5">All BTC in DB</div>
+                <div className="text-slate-400 font-bold">{meta.totalBTCTradesInDB}</div>
               </div>
             </div>
+            {data.phase4FActivationTimestamp && (
+              <div className="mt-2 text-xs text-cyan-600 font-mono">
+                Activation cutoff: {data.phase4FActivationTimestamp}
+              </div>
+            )}
           </div>
 
           {/* Snapshot Stats */}
