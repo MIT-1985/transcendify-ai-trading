@@ -268,6 +268,38 @@ Deno.serve(async (req) => {
 
     console.log(`[PHASE4F_WHY] score=${totalScore} alert=${alertLevel} intraday=${intradayDirection} tick=${tickDirection} blocking=${mainBlockingReason}`);
 
+    // ── Save snapshot for READY and HOT levels (read-only — no orders) ────────
+    const passedBarrierNames = Object.entries(barriers)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+
+    // Fire-and-forget snapshot save (non-blocking — do NOT await)
+    if (alertLevel === 'READY' || alertLevel === 'HOT') {
+      base44.asServiceRole.entities.SignalSnapshot.create({
+        pair:                    'BTC-USDT',
+        alertLevel,
+        totalScore,
+        requiredScore:           CFG.requiredScore,
+        lastPrice:               ticker.last,
+        rsi:                     rsi ?? null,
+        momentumPercent:         parseFloat(mom10.toFixed(4)),
+        buyPressurePercent:      parseFloat(buyPct.toFixed(2)),
+        tickScore,
+        passedBarriers:          passedBarrierNames,
+        failedBarriers:          failedBarrierNames,
+        recommendedAction,
+        timestamp:               new Date().toISOString(),
+        mode:                    PHASE,
+        realTradeAllowed:        false,
+        killSwitchActive:        true,
+        noOKXOrderEndpointCalled: true,
+      }).then(() => {
+        console.log(`[PHASE4F_WHY] ✅ Saved ${alertLevel} snapshot — score=${totalScore} price=${ticker.last}`);
+      }).catch(snapErr => {
+        console.error(`[PHASE4F_WHY] ⚠️ Snapshot save failed (non-fatal): ${snapErr.message}`);
+      });
+    }
+
     return Response.json({
       // ── Safety ────────────────────────────────────────────────────────
       realTradeAllowed:         REAL_TRADE_ALLOWED,

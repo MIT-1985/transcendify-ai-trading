@@ -1,0 +1,95 @@
+{
+  "name": "SignalSnapshot",
+  "type": "object",
+  "properties": {
+    "pair": {
+      "type": "string",
+      "description": "Trading pair (BTC-USDT)"
+    },
+    "alertLevel": {
+      "type": "string",
+      "enum": [
+        "COLD",
+        "WARM",
+        "HOT",
+        "READY"
+      ],
+      "description": "Alert level at snapshot time"
+    },
+    "totalScore": {
+      "type": "number",
+      "description": "Composite signal score"
+    },
+    "requiredScore": {
+      "type": "number",
+      "description": "Minimum score required for entry"
+    },
+    "lastPrice": {
+      "type": "number",
+      "description": "BTC-USDT price at snapshot"
+    },
+    "rsi": {
+      "type": "number",
+      "description": "RSI value at snapshot"
+    },
+    "momentumPercent": {
+      "type": "number",
+      "description": "10-candle momentum %"
+    },
+    "buyPressurePercent": {
+      "type": "number",
+      "description": "Buy side pressure % of recent trades"
+    },
+    "tickScore": {
+      "type": "number",
+      "description": "Tick confirmation score"
+    },
+    "passedBarriers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of barriers that passed"
+    },
+    "failedBarriers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of barriers that failed"
+    },
+    "recommendedAction": {
+      "type": "string",
+      "description": "Recommended action at snapshot time"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When snapshot was taken"
+    },
+    "mode": {
+      "type": "string",
+      "default": "PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE",
+      "description": "Trading mode"
+    },
+    "realTradeAllowed": {
+      "type": "boolean",
+      "default": false
+    },
+    "killSwitchActive": {
+      "type": "boolean",
+      "default": true
+    },
+    "noOKXOrderEndpointCalled": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "pair",
+    "alertLevel",
+    "totalScore",
+    "timestamp",
+    "mode"
+  ]
+}
