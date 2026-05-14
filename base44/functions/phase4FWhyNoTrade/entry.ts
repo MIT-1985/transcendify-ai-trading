@@ -50,7 +50,7 @@ async function fetchTicker() {
 
 async function fetchCandles() {
   try {
-    const r = await fetch('https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1m&limit=300', { signal: AbortSignal.timeout(6000) });
+    const r = await fetch('https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1m&limit=100', { signal: AbortSignal.timeout(8000) });
     const j = await r.json();
     return (j?.data || []).map(c => ({
       ts: Number(c[0]), open: parseFloat(c[1]), high: parseFloat(c[2]),
@@ -61,7 +61,7 @@ async function fetchCandles() {
 
 async function fetchTrades() {
   try {
-    const r = await fetch('https://www.okx.com/api/v5/market/trades?instId=BTC-USDT&limit=500', { signal: AbortSignal.timeout(6000) });
+    const r = await fetch('https://www.okx.com/api/v5/market/trades?instId=BTC-USDT&limit=200', { signal: AbortSignal.timeout(8000) });
     const j = await r.json();
     return (j?.data || []).map(t => ({ ts: Number(t.ts), price: parseFloat(t.px), size: parseFloat(t.sz), side: t.side }));
   } catch { return []; }
@@ -221,7 +221,52 @@ Deno.serve(async (req) => {
       ...(maxOpenBlocked   ? ['maxOpenTrades']      : []),
     ];
 
-    console.log(`[PHASE4F_WHY] score=${totalScore} intraday=${intradayDirection} tick=${tickDirection} blocking=${mainBlockingReason}`);
+    // ── Alert level ───────────────────────────────────────────────────────
+    let alertLevel;
+    let alertRecommendedAction;
+    let alertMessage;
+
+    if (allBarriersPass) {
+      alertLevel              = 'READY';
+      alertRecommendedAction  = 'PAPER_SIGNAL_ONLY';
+      alertMessage            = `🟢 BTC score ${totalScore}/75 — all barriers PASS. Paper signal ready. No real trading.`;
+    } else if (totalScore >= 70) {
+      alertLevel              = 'HOT';
+      alertRecommendedAction  = 'WATCH_CLOSELY';
+      alertMessage            = `🔥 BTC score ${totalScore}/75 — ${CFG.requiredScore - totalScore} points away. Barriers failing: ${failedBarrierNames.slice(0, 2).join(', ')}. Watch closely.`;
+    } else if (totalScore >= 60) {
+      alertLevel              = 'WARM';
+      alertRecommendedAction  = 'WATCH';
+      alertMessage            = `🟡 BTC score ${totalScore}/75 — warming up. Signal: ${intradayDirection}. Tick: ${tickDirection}. Keep watching.`;
+    } else {
+      alertLevel              = 'COLD';
+      alertRecommendedAction  = 'WAIT';
+      alertMessage            = `🔵 BTC score ${totalScore}/75 — market cold. Signal: ${intradayDirection}. Wait for BULLISH setup.`;
+    }
+
+    // ── Nearest barrier to pass ───────────────────────────────────────────
+    // Rank barriers by how close they are to passing (score-based heuristic)
+    const barrierProximity = [];
+    if (!barriers.scoreBarrier)         barrierProximity.push({ name: 'scoreBarrier',         missing: CFG.requiredScore - totalScore, hint: `Need ${CFG.requiredScore - totalScore} more points` });
+    if (!barriers.tickBarrier)          barrierProximity.push({ name: 'tickBarrier',           missing: CFG.minTickScore - tickScore,   hint: `Need tickScore ≥ ${CFG.minTickScore} (now ${tickScore})` });
+    if (!barriers.tpRealismBarrier)     barrierProximity.push({ name: 'tpRealismBarrier',      missing: 1,                              hint: `Need |momentum|×3 ≥ 1.3% or score ≥ 85` });
+    if (!barriers.intradayBarrier)      barrierProximity.push({ name: 'intradayBarrier',       missing: 2,                              hint: 'Need BULLISH or NEUTRAL signal' });
+    if (!barriers.momentumBarrier)      barrierProximity.push({ name: 'momentumBarrier',       missing: 1,                              hint: `Need |momentum| ≥ 0.03% (now ${Math.abs(mom10).toFixed(4)}%)` });
+    if (!barriers.grossProfitBarrier)   barrierProximity.push({ name: 'grossProfitBarrier',    missing: 1,                              hint: `Gross est ${grossEst.toFixed(4)} < floor ${CFG.grossProfitFloor}` });
+    if (!barriers.feeEfficiencyBarrier) barrierProximity.push({ name: 'feeEfficiencyBarrier',  missing: 1,                              hint: `Fee ratio ${(feeEffRatio*100).toFixed(1)}% > 30%` });
+    if (!barriers.spreadBarrier)        barrierProximity.push({ name: 'spreadBarrier',         missing: 1,                              hint: `Spread ${ticker.spreadPct.toFixed(4)}% > 0.05%` });
+
+    const nearestBarrierToPass = barrierProximity.length > 0
+      ? barrierProximity.sort((a, b) => a.missing - b.missing)[0]
+      : null;
+
+    // ── What's needed estimates ───────────────────────────────────────────
+    // How much momentum % needed for tpRealismBarrier: |mom| * 3 >= 1.3 → |mom| >= 0.4333
+    const estimatedNeededMomentumPercent = parseFloat((CFG.tpPercent / 3).toFixed(4));
+    // Tick score needed: ≥ minTickScore (25 = buyPct ≥ 65%)
+    const estimatedNeededTickScore = CFG.minTickScore;
+
+    console.log(`[PHASE4F_WHY] score=${totalScore} alert=${alertLevel} intraday=${intradayDirection} tick=${tickDirection} blocking=${mainBlockingReason}`);
 
     return Response.json({
       // ── Safety ────────────────────────────────────────────────────────
@@ -292,6 +337,14 @@ Deno.serve(async (req) => {
       failedBarriers:     failedBarrierNames,
       mainBlockingReason,
       recommendedAction,
+
+      // ── Alert level ───────────────────────────────────────────────────────
+      alertLevel,
+      alertRecommendedAction,
+      alertMessage,
+      nearestBarrierToPass,
+      estimatedNeededMomentumPercent,
+      estimatedNeededTickScore,
 
       // ── Data collection status ────────────────────────────────────────
       dataCollection: {

@@ -15,6 +15,7 @@ import Phase4FBTCOnlyPanel from '@/components/dashboard/Phase4FBTCOnlyPanel';
 import Phase4FReportPanel from '@/components/dashboard/Phase4FReportPanel';
 import Phase4FAutomationVerifyPanel from '@/components/dashboard/Phase4FAutomationVerifyPanel';
 import Phase4FWhyNoTradePanel from '@/components/dashboard/Phase4FWhyNoTradePanel';
+import Phase4FAlertWidget from '@/components/dashboard/Phase4FAlertWidget';
 
 export default function PaperTradingDashboard() {
   const { user } = useAuth();
@@ -293,6 +294,7 @@ export default function PaperTradingDashboard() {
             <TabsTrigger value="phase4f_report"  className="text-xs">📊 4F Report</TabsTrigger>
             <TabsTrigger value="phase4f_verify"  className="text-xs">✅ 4F Verify</TabsTrigger>
             <TabsTrigger value="phase4f_why"     className="text-xs">🔎 4F Why?</TabsTrigger>
+            <TabsTrigger value="phase4f_alert"   className="text-xs">🚨 4F Alert</TabsTrigger>
             <TabsTrigger value="diag"            className="text-xs">🔎 Diagnostic</TabsTrigger>
           </TabsList>
 
@@ -517,6 +519,13 @@ export default function PaperTradingDashboard() {
           <TabsContent value="phase4f_why" className="mt-4">
             <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
               <Phase4FWhyNoTradePanel />
+            </div>
+          </TabsContent>
+
+          {/* PHASE 4F ALERT */}
+          <TabsContent value="phase4f_alert" className="mt-4">
+            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
+              <Phase4FAlertWidget />
             </div>
           </TabsContent>
 
