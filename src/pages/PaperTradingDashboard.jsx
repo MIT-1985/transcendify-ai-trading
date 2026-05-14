@@ -21,6 +21,7 @@ import Phase4FSnapshotLinkagePanel from '@/components/dashboard/Phase4FSnapshotL
 import Phase4FSnapshotEdgeReportPanel from '@/components/dashboard/Phase4FSnapshotEdgeReportPanel';
 import Phase4FSnapshotEdgeDashboard from '@/components/dashboard/Phase4FSnapshotEdgeDashboard';
 import Phase5UnlockGuardPanel from '@/components/dashboard/Phase5UnlockGuardPanel';
+import Phase5ManualRealTradePreparedPanel from '@/components/dashboard/Phase5ManualRealTradePreparedPanel';
 import Phase4FWeeklyExportPanel from '@/components/dashboard/Phase4FWeeklyExportPanel';
 import Phase4FDashboardVerificationPanel from '@/components/dashboard/Phase4FDashboardVerificationPanel';
 import RealTradingHardBlockerPanel from '@/components/dashboard/RealTradingHardBlockerPanel';
@@ -314,6 +315,7 @@ export default function PaperTradingDashboard() {
             <TabsTrigger value="phase4f_edge"    className="text-xs">📊 Edge Report</TabsTrigger>
             <TabsTrigger value="phase4f_snap_edge" className="text-xs">📊 Snapshot Edge</TabsTrigger>
             <TabsTrigger value="phase5_guard"    className="text-xs">🔒 Phase 5 Guard</TabsTrigger>
+            <TabsTrigger value="phase5_prepared" className="text-xs font-bold text-red-300">🔴 Phase 5 Prepared</TabsTrigger>
             <TabsTrigger value="weekly_export"   className="text-xs">📤 Weekly Export</TabsTrigger>
             <TabsTrigger value="phase4f_btc"     className="text-xs">🚀 Phase 4F Run</TabsTrigger>
             <TabsTrigger value="diag"            className="text-xs">🔎 Diagnostic</TabsTrigger>
@@ -528,6 +530,13 @@ export default function PaperTradingDashboard() {
           <TabsContent value="phase5_guard" className="mt-4">
             <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
               <Phase5UnlockGuardPanel />
+            </div>
+          </TabsContent>
+
+          {/* PHASE 5 PREPARED — LOCKED */}
+          <TabsContent value="phase5_prepared" className="mt-4">
+            <div className="bg-slate-900/70 border border-red-900 rounded-xl p-5">
+              <Phase5ManualRealTradePreparedPanel />
             </div>
           </TabsContent>
 
