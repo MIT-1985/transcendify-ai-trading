@@ -330,6 +330,49 @@ Deno.serve(async (req) => {
             const openedAt   = new Date().toISOString();
             const expiresAt  = new Date(now + MAX_HOLD_MS).toISOString();
 
+            // ── Look up latest READY SignalSnapshot within last 10 min ──────
+            // Snapshot is audit metadata only — all barriers already validated above
+            const SNAPSHOT_WINDOW_MS = 10 * 60 * 1000;
+            const snapshotWindowStart = new Date(now - SNAPSHOT_WINDOW_MS).toISOString();
+            let snapshotLink = {
+              signalSnapshotId:          null,
+              signalSnapshotScore:       null,
+              signalSnapshotMomentum:    null,
+              signalSnapshotBuyPressure: null,
+              signalSnapshotAlertLevel:  null,
+              signalSnapshotAgeMs:       null,
+            };
+
+            try {
+              const recentSnapshots = await base44.entities.SignalSnapshot.filter(
+                { pair: 'BTC-USDT', alertLevel: 'READY' },
+                '-timestamp',
+                20
+              );
+              // Find the most recent one within the 10-min window
+              const matchingSnap = recentSnapshots.find(s => {
+                const snapTime = s.timestamp || s.created_date;
+                return snapTime && snapTime >= snapshotWindowStart;
+              });
+
+              if (matchingSnap) {
+                const snapTs = new Date(matchingSnap.timestamp || matchingSnap.created_date).getTime();
+                snapshotLink = {
+                  signalSnapshotId:          matchingSnap.id,
+                  signalSnapshotScore:       matchingSnap.totalScore ?? null,
+                  signalSnapshotMomentum:    matchingSnap.momentumPercent ?? null,
+                  signalSnapshotBuyPressure: matchingSnap.buyPressurePercent ?? null,
+                  signalSnapshotAlertLevel:  matchingSnap.alertLevel ?? null,
+                  signalSnapshotAgeMs:       now - snapTs,
+                };
+                console.log(`[PHASE4F] 📸 Linked READY snapshot id=${matchingSnap.id} age=${snapshotLink.signalSnapshotAgeMs}ms score=${matchingSnap.totalScore}`);
+              } else {
+                console.log(`[PHASE4F] ℹ️ No READY snapshot within last 10 min — proceeding without link (barriers verified live)`);
+              }
+            } catch (snapLookupErr) {
+              console.error(`[PHASE4F] ⚠️ Snapshot lookup failed (non-fatal): ${snapLookupErr.message}`);
+            }
+
             const paperTrade = await base44.entities.PaperTrade.create({
               instId:         'BTC-USDT',
               side:           'buy',
@@ -355,10 +398,12 @@ Deno.serve(async (req) => {
               reason,
               phase:          PHASE,
               engineMode:     'PHASE_4F_BTC_ONLY_ECONOMIC',
+              // ── Snapshot linkage (audit metadata) ────────────────────────
+              ...snapshotLink,
             });
 
-            console.log(`[PHASE4F] PAPER_BUY BTC-USDT entry=${entry} tp=${tpPrice} sl=${slPrice} expiresAt=${expiresAt} score=${score}`);
-            newEntries.push({ instId: 'BTC-USDT', entryPrice: entry, tpPrice, slPrice, expiresAt, score, id: paperTrade.id });
+            console.log(`[PHASE4F] PAPER_BUY BTC-USDT entry=${entry} tp=${tpPrice} sl=${slPrice} expiresAt=${expiresAt} score=${score} snapshotLinked=${!!snapshotLink.signalSnapshotId}`);
+            newEntries.push({ instId: 'BTC-USDT', entryPrice: entry, tpPrice, slPrice, expiresAt, score, id: paperTrade.id, snapshotLinked: !!snapshotLink.signalSnapshotId, snapshotId: snapshotLink.signalSnapshotId });
           }
         }
       }
@@ -378,6 +423,16 @@ Deno.serve(async (req) => {
     const tp24h    = closed24h.filter(t => t.status === 'CLOSED_TP').length;
     const sl24h    = closed24h.filter(t => t.status === 'CLOSED_SL').length;
     const exp24h   = closed24h.filter(t => t.status === 'EXPIRED').length;
+
+    // Snapshot linkage analysis
+    const withSnap    = closed24h.filter(t => !!t.signalSnapshotId);
+    const withoutSnap = closed24h.filter(t => !t.signalSnapshotId);
+    const snapWins    = withSnap.filter(t => (t.netPnL || t.netPnLUSDT || 0) > 0).length;
+    const noSnapWins  = withoutSnap.filter(t => (t.netPnL || t.netPnLUSDT || 0) > 0).length;
+    const snapNet     = withSnap.reduce((s, t) => s + (t.netPnL || t.netPnLUSDT || 0), 0);
+    const noSnapNet   = withoutSnap.reduce((s, t) => s + (t.netPnL || t.netPnLUSDT || 0), 0);
+    const snapWR      = withSnap.length > 0 ? snapWins / withSnap.length * 100 : null;
+    const noSnapWR    = withoutSnap.length > 0 ? noSnapWins / withoutSnap.length * 100 : null;
 
     // ── Step 4: Clean accounting snapshot ─────────────────────────────────
     const cleanTrades = await base44.entities.VerifiedTrade.list('-buyTime', 500);
@@ -446,6 +501,15 @@ Deno.serve(async (req) => {
         fees:           parseFloat(fees24h.toFixed(6)),
         netPnL:         parseFloat(net24h.toFixed(6)),
         note:           'Phase 4F trades only (phase=PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE)',
+        // Snapshot linkage stats
+        snapshotLinkage: {
+          tradesWithSnapshot:    withSnap.length,
+          tradesWithoutSnapshot: withoutSnap.length,
+          snapshotLinkedWinRate: snapWR !== null ? parseFloat(snapWR.toFixed(2)) : null,
+          snapshotLinkedNetPnL:  parseFloat(snapNet.toFixed(6)),
+          unlinkedWinRate:       noSnapWR !== null ? parseFloat(noSnapWR.toFixed(2)) : null,
+          unlinkedNetPnL:        parseFloat(noSnapNet.toFixed(6)),
+        },
       },
 
       // ── BTC verified trade history snapshot ──────────────────────────────

@@ -17,6 +17,7 @@ import Phase4FAutomationVerifyPanel from '@/components/dashboard/Phase4FAutomati
 import Phase4FWhyNoTradePanel from '@/components/dashboard/Phase4FWhyNoTradePanel';
 import Phase4FAlertWidget from '@/components/dashboard/Phase4FAlertWidget';
 import Phase4FSnapshotPanel from '@/components/dashboard/Phase4FSnapshotPanel';
+import Phase4FSnapshotLinkagePanel from '@/components/dashboard/Phase4FSnapshotLinkagePanel';
 
 export default function PaperTradingDashboard() {
   const { user } = useAuth();
@@ -297,6 +298,7 @@ export default function PaperTradingDashboard() {
             <TabsTrigger value="phase4f_why"     className="text-xs">🔎 4F Why?</TabsTrigger>
             <TabsTrigger value="phase4f_alert"    className="text-xs">🚨 4F Alert</TabsTrigger>
             <TabsTrigger value="phase4f_snap"    className="text-xs">📸 4F Snapshots</TabsTrigger>
+            <TabsTrigger value="phase4f_link"    className="text-xs">🔗 4F Linkage</TabsTrigger>
             <TabsTrigger value="diag"            className="text-xs">🔎 Diagnostic</TabsTrigger>
           </TabsList>
 
@@ -323,6 +325,11 @@ export default function PaperTradingDashboard() {
                         <th className="text-right px-2 py-2">Size</th>
                         <th className="text-left px-2 py-2">Signal</th>
                         <th className="text-right px-2 py-2">Score</th>
+                        <th className="text-left px-2 py-2">Snap</th>
+                        <th className="text-right px-2 py-2">Snap Score</th>
+                        <th className="text-right px-2 py-2">Snap Mom</th>
+                        <th className="text-right px-2 py-2">Snap BuyP</th>
+                        <th className="text-right px-2 py-2">Snap Age</th>
                         <th className="text-left px-2 py-2">Opened</th>
                         <th className="text-left px-2 py-2">Expires</th>
                       </tr>
@@ -339,6 +346,19 @@ export default function PaperTradingDashboard() {
                             <span className={`font-bold ${t.intradaySignal === 'BULLISH' ? 'text-emerald-400' : 'text-yellow-400'}`}>{t.intradaySignal}</span>
                           </td>
                           <td className="px-2 py-2 text-right text-cyan-400">{t.signalScore || t.entryScore}</td>
+                          <td className="px-2 py-2">
+                            {t.signalSnapshotId
+                              ? <span className="text-xs bg-emerald-900/30 border border-emerald-700/40 text-emerald-400 px-1.5 py-0.5 rounded-full font-semibold">📸 Linked</span>
+                              : <span className="text-xs text-slate-600">⬜</span>}
+                          </td>
+                          <td className="px-2 py-2 text-right text-slate-300">{t.signalSnapshotScore ?? '—'}</td>
+                          <td className="px-2 py-2 text-right">
+                            {t.signalSnapshotMomentum != null
+                              ? <span className={t.signalSnapshotMomentum > 0 ? 'text-emerald-400' : 'text-red-400'}>{t.signalSnapshotMomentum.toFixed(3)}%</span>
+                              : <span className="text-slate-600">—</span>}
+                          </td>
+                          <td className="px-2 py-2 text-right text-slate-300">{t.signalSnapshotBuyPressure != null ? `${t.signalSnapshotBuyPressure.toFixed(1)}%` : '—'}</td>
+                          <td className="px-2 py-2 text-right text-slate-500">{t.signalSnapshotAgeMs != null ? `${(t.signalSnapshotAgeMs / 60000).toFixed(1)}m` : '—'}</td>
                           <td className="px-2 py-2 text-slate-400">{t.openedAt ? new Date(t.openedAt).toLocaleTimeString('de-DE') : '—'}</td>
                           <td className="px-2 py-2 text-orange-400">{t.expiresAt ? new Date(t.expiresAt).toLocaleTimeString('de-DE') : '—'}</td>
                         </tr>
@@ -367,6 +387,11 @@ export default function PaperTradingDashboard() {
                         <th className="text-right px-2 py-2">Exit</th>
                         <th className="text-right px-2 py-2">GrossPnL</th>
                         <th className="text-right px-2 py-2">NetPnL</th>
+                        <th className="text-left px-2 py-2">Snap</th>
+                        <th className="text-right px-2 py-2">Snap Score</th>
+                        <th className="text-right px-2 py-2">Snap Mom</th>
+                        <th className="text-right px-2 py-2">Snap BuyP</th>
+                        <th className="text-right px-2 py-2">Snap Age</th>
                         <th className="text-right px-2 py-2">Held</th>
                         <th className="text-left px-2 py-2">Closed</th>
                       </tr>
@@ -379,8 +404,8 @@ export default function PaperTradingDashboard() {
                             <td className="px-2 py-2 font-black text-white">{t.instId}</td>
                             <td className="px-2 py-2">
                               <span className={`font-bold text-xs px-1.5 py-0.5 rounded ${
-                                t.status === 'closed_tp' ? 'text-emerald-300 bg-emerald-950/50 border border-emerald-800' :
-                                t.status === 'closed_sl' ? 'text-red-300 bg-red-950/50 border border-red-800' :
+                                t.status === 'CLOSED_TP' ? 'text-emerald-300 bg-emerald-950/50 border border-emerald-800' :
+                                t.status === 'CLOSED_SL' ? 'text-red-300 bg-red-950/50 border border-red-800' :
                                 'text-slate-300 bg-slate-800/50 border border-slate-700'
                               }`}>{t.status}</span>
                             </td>
@@ -388,6 +413,19 @@ export default function PaperTradingDashboard() {
                             <td className="px-2 py-2 text-right text-slate-400">${t.exitPrice?.toLocaleString()}</td>
                             <td className={`px-2 py-2 text-right font-bold ${(t.grossPnL||t.grossPnLUSDT||0)>=0?'text-emerald-400':'text-red-400'}`}>{(t.grossPnL||t.grossPnLUSDT||0)>=0?'+':''}{(t.grossPnL||t.grossPnLUSDT||0).toFixed(4)}</td>
                             <td className={`px-2 py-2 text-right font-black ${net>=0?'text-emerald-400':'text-red-400'}`}>{net>=0?'+':''}{net.toFixed(4)}</td>
+                            <td className="px-2 py-2">
+                              {t.signalSnapshotId
+                                ? <span className="text-xs bg-emerald-900/30 border border-emerald-700/40 text-emerald-400 px-1.5 py-0.5 rounded-full font-semibold">📸 Linked</span>
+                                : <span className="text-xs text-slate-600">⬜</span>}
+                            </td>
+                            <td className="px-2 py-2 text-right text-slate-300">{t.signalSnapshotScore ?? '—'}</td>
+                            <td className="px-2 py-2 text-right">
+                              {t.signalSnapshotMomentum != null
+                                ? <span className={t.signalSnapshotMomentum > 0 ? 'text-emerald-400' : 'text-red-400'}>{t.signalSnapshotMomentum.toFixed(3)}%</span>
+                                : <span className="text-slate-600">—</span>}
+                            </td>
+                            <td className="px-2 py-2 text-right text-slate-300">{t.signalSnapshotBuyPressure != null ? `${t.signalSnapshotBuyPressure.toFixed(1)}%` : '—'}</td>
+                            <td className="px-2 py-2 text-right text-slate-500">{t.signalSnapshotAgeMs != null ? `${(t.signalSnapshotAgeMs / 60000).toFixed(1)}m` : '—'}</td>
                             <td className="px-2 py-2 text-right text-slate-500">{t.holdingMs ? `${Math.round(t.holdingMs/1000)}s` : '—'}</td>
                             <td className="px-2 py-2 text-slate-400">{t.closedAt ? new Date(t.closedAt).toLocaleTimeString('de-DE') : '—'}</td>
                           </tr>
@@ -535,6 +573,13 @@ export default function PaperTradingDashboard() {
           <TabsContent value="phase4f_snap" className="mt-4">
             <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
               <Phase4FSnapshotPanel />
+            </div>
+          </TabsContent>
+
+          {/* PHASE 4F SNAPSHOT LINKAGE */}
+          <TabsContent value="phase4f_link" className="mt-4">
+            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
+              <Phase4FSnapshotLinkagePanel />
             </div>
           </TabsContent>
 

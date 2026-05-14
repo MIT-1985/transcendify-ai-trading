@@ -113,7 +113,7 @@
     "expiresAt": {
       "type": "string",
       "format": "date-time",
-      "description": "Auto-expiry time (openedAt + 15 minutes)"
+      "description": "Auto-expiry time (openedAt + 60 minutes for 4F)"
     },
     "closedAt": {
       "type": "string",
@@ -150,6 +150,30 @@
     "engineMode": {
       "type": "string",
       "default": "OKX_ONLY_INTRADAY_PLUS_TRADES_CONFIRMATION"
+    },
+    "signalSnapshotId": {
+      "type": "string",
+      "description": "ID of the linked READY SignalSnapshot (null if none found within 10 min)"
+    },
+    "signalSnapshotScore": {
+      "type": "number",
+      "description": "totalScore from the linked SignalSnapshot"
+    },
+    "signalSnapshotMomentum": {
+      "type": "number",
+      "description": "momentumPercent from the linked SignalSnapshot"
+    },
+    "signalSnapshotBuyPressure": {
+      "type": "number",
+      "description": "buyPressurePercent from the linked SignalSnapshot"
+    },
+    "signalSnapshotAlertLevel": {
+      "type": "string",
+      "description": "alertLevel from the linked SignalSnapshot (should always be READY)"
+    },
+    "signalSnapshotAgeMs": {
+      "type": "number",
+      "description": "Age of the snapshot in ms at the time the trade was opened"
     }
   },
   "required": [
