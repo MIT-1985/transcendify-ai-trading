@@ -23,6 +23,7 @@ import Phase4FSnapshotEdgeDashboard from '@/components/dashboard/Phase4FSnapshot
 import Phase5UnlockGuardPanel from '@/components/dashboard/Phase5UnlockGuardPanel';
 import Phase4FWeeklyExportPanel from '@/components/dashboard/Phase4FWeeklyExportPanel';
 import Phase4FDashboardVerificationPanel from '@/components/dashboard/Phase4FDashboardVerificationPanel';
+import RealTradingHardBlockerPanel from '@/components/dashboard/RealTradingHardBlockerPanel';
 
 // ── Phase 4F active constants ──────────────────────────────────────────────
 const P4F = {
@@ -296,6 +297,7 @@ export default function PaperTradingDashboard() {
         {/* ── Tabs ─────────────────────────────────────────────── */}
         <Tabs defaultValue="open" className="w-full">
           <TabsList className="flex flex-wrap gap-1 bg-slate-900/50 border border-slate-700 rounded-xl p-1 h-auto">
+            <TabsTrigger value="hard_blocker"     className="text-xs font-bold text-red-300">🛑 Hard Blocker</TabsTrigger>
             <TabsTrigger value="verify_final"    className="text-xs font-bold text-cyan-300">🔬 Final Verify</TabsTrigger>
             <TabsTrigger value="open"            className="text-xs">📂 Open ({openTrades.length})</TabsTrigger>
             <TabsTrigger value="closed"          className="text-xs">✅ Closed</TabsTrigger>
@@ -318,6 +320,13 @@ export default function PaperTradingDashboard() {
             <TabsTrigger value="phase4e"         className="text-xs text-slate-500">📐 4E Size</TabsTrigger>
             <TabsTrigger value="phase4e2"        className="text-xs text-slate-500">🧾 4E Acct</TabsTrigger>
           </TabsList>
+
+          {/* REAL TRADING HARD BLOCKER */}
+          <TabsContent value="hard_blocker" className="mt-4">
+            <div className="bg-slate-900/70 border border-red-800 rounded-xl p-5">
+              <RealTradingHardBlockerPanel />
+            </div>
+          </TabsContent>
 
           {/* FINAL VERIFICATION */}
           <TabsContent value="verify_final" className="mt-4">
