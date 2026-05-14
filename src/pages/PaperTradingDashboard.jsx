@@ -20,6 +20,7 @@ import Phase4FSnapshotPanel from '@/components/dashboard/Phase4FSnapshotPanel';
 import Phase4FSnapshotLinkagePanel from '@/components/dashboard/Phase4FSnapshotLinkagePanel';
 import Phase4FSnapshotEdgeReportPanel from '@/components/dashboard/Phase4FSnapshotEdgeReportPanel';
 import Phase4FSnapshotEdgeDashboard from '@/components/dashboard/Phase4FSnapshotEdgeDashboard';
+import Phase5UnlockGuardPanel from '@/components/dashboard/Phase5UnlockGuardPanel';
 
 export default function PaperTradingDashboard() {
   const { user } = useAuth();
@@ -303,6 +304,7 @@ export default function PaperTradingDashboard() {
             <TabsTrigger value="phase4f_link"    className="text-xs">🔗 4F Linkage</TabsTrigger>
             <TabsTrigger value="phase4f_edge"    className="text-xs">📊 4F Edge Report</TabsTrigger>
             <TabsTrigger value="phase4f_snap_edge" className="text-xs">📊 4F Snapshot Edge</TabsTrigger>
+            <TabsTrigger value="phase5_guard"    className="text-xs">🔒 Phase 5 Guard</TabsTrigger>
             <TabsTrigger value="diag"            className="text-xs">🔎 Diagnostic</TabsTrigger>
           </TabsList>
 
@@ -598,6 +600,13 @@ export default function PaperTradingDashboard() {
           <TabsContent value="phase4f_snap_edge" className="mt-4">
             <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
               <Phase4FSnapshotEdgeDashboard />
+            </div>
+          </TabsContent>
+
+          {/* PHASE 5 UNLOCK GUARD */}
+          <TabsContent value="phase5_guard" className="mt-4">
+            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
+              <Phase5UnlockGuardPanel />
             </div>
           </TabsContent>
 
