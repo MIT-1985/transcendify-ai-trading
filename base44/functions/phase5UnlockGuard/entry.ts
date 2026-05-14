@@ -84,16 +84,25 @@ Deno.serve(async (req) => {
     if (duplicateTradesDetected) break;
   }
 
-  // Suspect trades: any trade with no signalSnapshotId among closed trades
+  // Suspect trades: only Phase 4F BTC-only trades without snapshot linkage
+  // Legacy trades (no mode field or different mode) are EXCLUDED from evidence
+  const PHASE_4F_MODE = 'PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE';
+  let includedPhase4FTrades = 0;
+  let excludedLegacyBTCTrades = 0;
+  let suspectPhase4FTrades = 0;
   try {
-    const recent = await base44.entities.PaperTrade.list('-closedAt', 50);
+    const recent = await base44.entities.PaperTrade.filter({ instId: 'BTC-USDT' }, '-closedAt', 200);
     const closed = recent.filter(t => t.status !== 'OPEN');
-    if (closed.length > 0) {
-      const unlinkedClosed = closed.filter(t => !t.signalSnapshotId);
-      suspectTrades = unlinkedClosed.length;
-    }
+    const phase4FOnly = closed.filter(t => t.mode === PHASE_4F_MODE);
+    const legacyOnly  = closed.filter(t => t.mode !== PHASE_4F_MODE);
+    includedPhase4FTrades  = phase4FOnly.length;
+    excludedLegacyBTCTrades = legacyOnly.length;
+    // Suspect = Phase 4F trades with no snapshot linkage
+    suspectPhase4FTrades = phase4FOnly.filter(t => !t.signalSnapshotId).length;
+    suspectTrades = suspectPhase4FTrades;
   } catch (_) {}
-  const suspectTradesDetected = suspectTrades > 0;
+  // If no Phase 4F trades yet, no suspects by definition
+  const suspectTradesDetected = includedPhase4FTrades > 0 && suspectTrades > 0;
 
   // ── 4. Extract metrics from edge report ───────────────────
   const tl  = edgeData?.tradeLinkageStats  || {};
@@ -178,7 +187,9 @@ Deno.serve(async (req) => {
       pass:      !suspectTradesDetected,
       actual:    suspectTradesDetected,
       required:  false,
-      note:      `${suspectTrades} closed trade(s) without snapshot linkage`,
+      note:      includedPhase4FTrades === 0
+        ? 'No Phase 4F BTC-only trades yet — not applicable'
+        : `${suspectPhase4FTrades} Phase 4F closed trade(s) without snapshot linkage (${excludedLegacyBTCTrades} legacy excluded)`,
     },
     {
       id:        'snapshotEdgeStatus',
@@ -223,6 +234,12 @@ Deno.serve(async (req) => {
 
     reason,
 
+    // ── Phase 4F filter stats ────────────────────────────────
+    filterMode:              'PHASE_4F_ONLY',
+    includedPhase4FTrades,
+    excludedLegacyBTCTrades,
+    suspectPhase4FTrades,
+
     // ── Metrics snapshot ─────────────────────────────────────
     metrics: {
       linkedBTCTrades7d,
@@ -232,7 +249,7 @@ Deno.serve(async (req) => {
       snapshotEdgeStatus,
       duplicateTradesDetected,
       suspectTradesDetected,
-      suspectTradeCount: suspectTrades,
+      suspectTradeCount: suspectPhase4FTrades,
     },
 
     // ── Safety ───────────────────────────────────────────────
