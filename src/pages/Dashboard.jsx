@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from 'react-router-dom';
+import SystemTrailStatusBar from '@/components/dashboard/SystemTrailStatusBar';
 
 // ── Live P&L Clock ─────────────────────────────────────────────────────────────
 function PnLClock({ trades, balance }) {
@@ -185,6 +186,9 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 lg:p-6">
       <div className="max-w-7xl mx-auto space-y-5">
+
+        {/* ── SYSTEM TRAIL — Single Source of Truth ──────────── */}
+        <SystemTrailStatusBar />
 
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
