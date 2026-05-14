@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PaperReport24h from '@/components/dashboard/PaperReport24h';
 import Phase4OpportunityDiagnosticPanel from '@/components/dashboard/Phase4OpportunityDiagnosticPanel';
 import Phase4BeforeAfterPanel from '@/components/dashboard/Phase4BeforeAfterPanel';
+import Phase4CExpiryDiagnosticPanel from '@/components/dashboard/Phase4CExpiryDiagnosticPanel';
 
 export default function PaperTradingDashboard() {
   const { user } = useAuth();
@@ -270,13 +271,14 @@ export default function PaperTradingDashboard() {
 
         {/* Tabs */}
         <Tabs defaultValue="open" className="w-full">
-          <TabsList className="grid w-full grid-cols-7 bg-slate-900/50 border border-slate-700 rounded-xl p-1">
+          <TabsList className="grid w-full grid-cols-8 bg-slate-900/50 border border-slate-700 rounded-xl p-1">
             <TabsTrigger value="report"  className="text-xs">📋 24h Report</TabsTrigger>
             <TabsTrigger value="open"    className="text-xs">📂 Open ({openTrades.length})</TabsTrigger>
             <TabsTrigger value="closed"  className="text-xs">✅ Closed</TabsTrigger>
             <TabsTrigger value="scan"    className="text-xs">🔍 Last Scan</TabsTrigger>
             <TabsTrigger value="pairs"   className="text-xs">📈 By Pair</TabsTrigger>
             <TabsTrigger value="compare" className="text-xs">⚖ Before/After</TabsTrigger>
+            <TabsTrigger value="phase4c" className="text-xs">🔬 Phase 4C</TabsTrigger>
             <TabsTrigger value="diag"    className="text-xs">🔎 Diagnostic</TabsTrigger>
           </TabsList>
 
@@ -445,6 +447,13 @@ export default function PaperTradingDashboard() {
           <TabsContent value="compare" className="mt-4">
             <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
               <Phase4BeforeAfterPanel />
+            </div>
+          </TabsContent>
+
+          {/* PHASE 4C EXPIRY DIAGNOSTIC */}
+          <TabsContent value="phase4c" className="mt-4">
+            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
+              <Phase4CExpiryDiagnosticPanel />
             </div>
           </TabsContent>
 
