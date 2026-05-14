@@ -10,6 +10,7 @@ import Phase4BeforeAfterPanel from '@/components/dashboard/Phase4BeforeAfterPane
 import Phase4CExpiryDiagnosticPanel from '@/components/dashboard/Phase4CExpiryDiagnosticPanel';
 import Phase4DApplyCorrectionPanel from '@/components/dashboard/Phase4DApplyCorrectionPanel';
 import Phase4EPositionSizeDiagnosticPanel from '@/components/dashboard/Phase4EPositionSizeDiagnosticPanel';
+import Phase4ECleanAccountingPanel from '@/components/dashboard/Phase4ECleanAccountingPanel';
 
 export default function PaperTradingDashboard() {
   const { user } = useAuth();
@@ -282,7 +283,8 @@ export default function PaperTradingDashboard() {
             <TabsTrigger value="compare"  className="text-xs">⚖ Before/After</TabsTrigger>
             <TabsTrigger value="phase4c"  className="text-xs">🔬 Phase 4C</TabsTrigger>
             <TabsTrigger value="phase4d"  className="text-xs">⚡ Phase 4D</TabsTrigger>
-            <TabsTrigger value="phase4e"  className="text-xs">📐 Phase 4E</TabsTrigger>
+            <TabsTrigger value="phase4e"  className="text-xs">📐 4E Size</TabsTrigger>
+            <TabsTrigger value="phase4e2" className="text-xs">🧾 4E Accounting</TabsTrigger>
             <TabsTrigger value="diag"     className="text-xs">🔎 Diagnostic</TabsTrigger>
           </TabsList>
 
@@ -472,6 +474,13 @@ export default function PaperTradingDashboard() {
           <TabsContent value="phase4e" className="mt-4">
             <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
               <Phase4EPositionSizeDiagnosticPanel />
+            </div>
+          </TabsContent>
+
+          {/* PHASE 4E CLEAN ACCOUNTING */}
+          <TabsContent value="phase4e2" className="mt-4">
+            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5">
+              <Phase4ECleanAccountingPanel />
             </div>
           </TabsContent>
 
