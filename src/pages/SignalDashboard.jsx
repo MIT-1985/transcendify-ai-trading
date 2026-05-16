@@ -3,26 +3,37 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import SystemTrailStatusBar from '@/components/dashboard/SystemTrailStatusBar';
 
-const DECISION_CFG = {
-  PAPER_SIGNAL_ONLY:    { badge: 'bg-emerald-900 text-emerald-200 border-emerald-600', label: '🟢 PAPER_SIGNAL', ring: 'border-emerald-600 bg-emerald-950/30' },
-  WAIT:                 { badge: 'bg-yellow-900 text-yellow-200 border-yellow-700',    label: '🟡 WAIT',         ring: 'border-yellow-800 bg-yellow-950/20' },
-  WATCH:                { badge: 'bg-slate-800 text-slate-300 border-slate-600',       label: '👁 WATCH',         ring: 'border-slate-700 bg-slate-900/30' },
-  WAIT_DATA_UNAVAILABLE:{ badge: 'bg-red-950 text-red-400 border-red-800',            label: '⛔ NO_DATA',       ring: 'border-red-900 bg-red-950/20' },
+// ── Phase 4F alert level from score (BTC rules)
+function btcAlertLevel(score, allBarriersPass) {
+  if (score >= 75 && allBarriersPass) return 'READY_FOR_PAPER_SCAN';
+  if (score >= 70) return 'HOT';
+  if (score >= 60) return 'WARM';
+  return 'COLD';
+}
+
+const ALERT_STYLE = {
+  READY_FOR_PAPER_SCAN: { badge: 'bg-emerald-900/80 text-emerald-200 border-emerald-600', dot: 'bg-emerald-400' },
+  HOT:                  { badge: 'bg-orange-900/80 text-orange-200 border-orange-700',    dot: 'bg-orange-400' },
+  WARM:                 { badge: 'bg-yellow-900/80 text-yellow-200 border-yellow-700',    dot: 'bg-yellow-400' },
+  COLD:                 { badge: 'bg-slate-800 text-slate-400 border-slate-600',          dot: 'bg-slate-500' },
+  DISABLED:             { badge: 'bg-slate-900 text-slate-600 border-slate-700',          dot: 'bg-slate-700' },
 };
+
+const DISABLED_PAIRS = ['ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT'];
 
 export default function SignalDashboard() {
   const { user } = useAuth();
   const [lastScan, setLastScan] = useState(null);
-  const [activeTab, setActiveTab] = useState('pairs');
+  const [matrixOpen, setMatrixOpen] = useState(false);
 
-  // OKX-only Phase 3 validator
-  const { data: validatorData, isLoading: vLoading, refetch: vRefetch, isFetching: vFetching, error: vError } = useQuery({
-    queryKey: ['phase3-okx-validator', user?.email],
+  // System Trail (primary)
+  const { data: trailData, isLoading: tLoading, refetch: tRefetch, isFetching: tFetching } = useQuery({
+    queryKey: ['system-trail-signal-dash', user?.email],
     queryFn: async () => {
-      const res = await base44.functions.invoke('phase3ReadOnlySignalValidator', {});
+      const res = await base44.functions.invoke('systemTrailTradingState', {});
       setLastScan(new Date().toLocaleTimeString('de-DE'));
       return res.data;
     },
@@ -32,299 +43,280 @@ export default function SignalDashboard() {
     gcTime: 0,
   });
 
-  // OKX data access test
+  // Phase 3 validator (advanced diagnostics only)
+  const { data: validatorData, isLoading: vLoading, refetch: vRefetch, isFetching: vFetching } = useQuery({
+    queryKey: ['phase3-okx-validator', user?.email],
+    queryFn: async () => {
+      const res = await base44.functions.invoke('phase3ReadOnlySignalValidator', {});
+      return res.data;
+    },
+    enabled: !!user && matrixOpen,
+    staleTime: 30000,
+    refetchInterval: false,
+    gcTime: 0,
+  });
+
+  // OKX data access (advanced diagnostics only)
   const { data: accessData, isLoading: aLoading, refetch: aRefetch, isFetching: aFetching } = useQuery({
     queryKey: ['okx-only-access', user?.email],
     queryFn: async () => {
       const res = await base44.functions.invoke('testOKXOnlyDataAccess', {});
       return res.data;
     },
-    enabled: !!user,
+    enabled: !!user && matrixOpen,
     staleTime: 60000,
     refetchInterval: false,
     gcTime: 0,
   });
 
-  const pairs          = validatorData?.pairs || [];
-  const summary        = validatorData?.summary || {};
-  const paperPairs     = summary.paperSignalPairs || [];
-  const accessPairs    = accessData?.pairs || [];
-  const allAccessReady = accessData?.summary?.readyPairs?.length === 5;
+  const live    = trailData?.liveStatus || {};
+  const safety  = trailData?.safety || {};
+  const pairs   = validatorData?.pairs || [];
+  const accessPairs = accessData?.pairs || [];
+
+  const handleRescan = () => {
+    tRefetch();
+    if (matrixOpen) { vRefetch(); aRefetch(); }
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 lg:p-6">
-      <div className="max-w-7xl mx-auto space-y-5">
+      <div className="max-w-5xl mx-auto space-y-5">
 
-        {/* ── SYSTEM TRAIL — Diagnostic Notice ─────────────────── */}
-        <div className="bg-amber-950/30 border-2 border-amber-700 rounded-xl px-5 py-3 text-xs">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg">⚠️</span>
-            <span className="text-amber-400 font-black uppercase tracking-widest">READ-ONLY DATA DIAGNOSTICS ONLY — NOT ACTIVE TRADING DECISION</span>
+        {/* ── BIG DIAGNOSTIC BANNER ──────────────────────────────── */}
+        <div className="bg-amber-950/40 border-2 border-amber-600 rounded-2xl px-5 py-4">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-2xl">🔬</span>
+            <div className="font-black text-amber-400 uppercase tracking-widest text-sm">
+              DATA DIAGNOSTICS ONLY — NO TRADING DECISIONS MADE HERE
+            </div>
           </div>
-          <div className="text-amber-300/80">
-            This page shows Phase 3 / multi-pair OKX signal data for <strong>diagnostic purposes only</strong>.
-            The active trading engine is <span className="font-mono text-white">PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</span> running on <span className="font-mono text-cyan-400">phase4FBTCOnlyPaperMode</span>.
-            Go to <strong>Phase 4F Paper Trading Dashboard</strong> for the live engine state.
+          <div className="text-amber-300/80 text-xs leading-5">
+            This page shows OKX data health and Phase 3 read-only signal diagnostics.
+            It does not make trading decisions.
+            The active paper engine is <span className="font-mono text-cyan-400">PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE</span>.
+            Use <strong className="text-white">PaperTradingDashboard / System Trail</strong> for the active BTC paper engine.
           </div>
         </div>
+
+        {/* ── Header ─────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-black text-slate-300">Signal Dashboard <span className="text-slate-600 text-sm font-normal">[Diagnostics]</span></h1>
+            {lastScan && <div className="text-xs text-slate-500 mt-0.5">Last refresh: {lastScan}</div>}
+          </div>
+          <button
+            onClick={handleRescan}
+            disabled={tFetching || tLoading}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-slate-800 border border-slate-600 hover:bg-slate-700 disabled:opacity-50 transition-all"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${tFetching || tLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+
+        {/* ── Safety — shown ONCE only ────────────────────────────── */}
+        <div className="flex flex-wrap gap-3 text-xs">
+          <span className="bg-red-950/50 border border-red-700 text-red-400 font-bold px-3 py-1.5 rounded-lg">Real Trading: LOCKED</span>
+          <span className="bg-emerald-950/40 border border-emerald-700 text-emerald-400 font-bold px-3 py-1.5 rounded-lg">Paper Only: ACTIVE</span>
+          <span className="bg-slate-800 border border-slate-700 text-slate-400 px-3 py-1.5 rounded-lg font-mono">noOKXOrderEndpointCalled: true</span>
+        </div>
+
+        {/* ── PRIMARY: System Trail ───────────────────────────────── */}
+        <div className="bg-slate-900/70 border-2 border-cyan-700 rounded-2xl px-5 py-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="font-black text-cyan-400 text-sm uppercase tracking-wide">📡 System Trail — Active BTC Engine State</div>
+            <div className="text-xs text-slate-500 font-mono">systemTrailTradingState</div>
+          </div>
+
+          {tLoading ? (
+            <Skeleton className="h-24 bg-slate-800 rounded-xl" />
+          ) : trailData ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
+              <TrailKpi label="Active Mode"     value={trailData.activeMode?.replace('PHASE_4F_', '4F_') || '—'} color="text-cyan-400" />
+              <TrailKpi label="Active Pair"     value={trailData.activePair || 'BTC-USDT'}                        color="text-white" />
+              <TrailKpi label="Alert Level"     value={live.alertLevel || 'COLD'}
+                color={live.alertLevel === 'READY' ? 'text-emerald-400' : live.alertLevel === 'HOT' ? 'text-orange-400' : live.alertLevel === 'WARM' ? 'text-yellow-400' : 'text-slate-400'} />
+              <TrailKpi label="Score"           value={`${live.totalScore ?? '—'} / ${live.requiredScore ?? 75}`} color="text-white" />
+              <TrailKpi label="BTC Price"       value={live.lastPrice ? `$${live.lastPrice.toLocaleString()}` : '—'} color="text-white" />
+              <TrailKpi label="Action"          value={trailData.uiDecision?.buttonLabel || '—'}                  color="text-blue-400" />
+              <TrailKpi label="Blocking Reason" value={live.mainBlockingReason || '—'}                            color="text-red-400" />
+              <TrailKpi label="realTradingLocked" value={String(safety.realTradeAllowed === false ? 'true' : 'false')} color="text-emerald-400" />
+              <TrailKpi label="paperOnly"       value="true"                                                        color="text-emerald-400" />
+              <TrailKpi label="Open Trades"     value={`${live.openBTCTrades ?? 0} / 1`}                          color="text-yellow-400" />
+            </div>
+          ) : (
+            <div className="text-slate-500 text-sm text-center py-4">Click Refresh to load system trail.</div>
+          )}
+        </div>
+
+        {/* ── System Trail Status Bar component ──────────────────── */}
         <SystemTrailStatusBar />
 
-        {/* ── Header ── */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <div className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-1">
-              🗄 LEGACY DIAGNOSTIC — NOT ACTIVE TRADING DECISION
-            </div>
-            <h1 className="text-2xl font-black text-slate-400">Phase 3 — OKX-Only Read-Only Signal <span className="text-amber-500">[Archive]</span></h1>
-            <div className="flex flex-wrap gap-3 mt-2 text-xs">
-              <span className="text-red-400 font-bold">Kill Switch: ACTIVE</span>
-              <span className="text-slate-500">·</span>
-              <span className="text-red-400 font-bold">tradeAllowed: false</span>
-              <span className="text-slate-500">·</span>
-              <span className="text-emerald-400 font-bold">noOKXOrderEndpoint: true</span>
-              <span className="text-slate-500">·</span>
-              <span className="text-blue-400 font-bold">Polygon: REMOVED</span>
-              {lastScan && <><span className="text-slate-500">·</span><span className="text-slate-400">Last scan: {lastScan}</span></>}
-            </div>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <button
-              onClick={() => { vRefetch(); aRefetch(); }}
-              disabled={vFetching || vLoading || aFetching || aLoading}
-              className="px-5 py-2.5 text-xs font-bold rounded-xl bg-slate-800 border border-slate-600 hover:bg-slate-700 disabled:opacity-50 transition-all"
-            >
-              {(vFetching || vLoading) ? '⏳ Scanning…' : '🔄 Rescan Now'}
-            </button>
-          </div>
-        </div>
+        {/* ── ADVANCED: Data Diagnostics (collapsed by default) ──── */}
+        <div className="border border-slate-700 rounded-2xl overflow-hidden">
+          <button
+            onClick={() => setMatrixOpen(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-4 bg-slate-900/60 hover:bg-slate-800/60 transition-colors text-sm font-bold text-slate-400"
+          >
+            <span>⚙ Advanced Data Diagnostics — Phase 3 / Multi-Pair OKX Matrix</span>
+            {matrixOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
 
-        {/* ── Kill switch + mode banner ── */}
-        <div className="bg-red-950/40 border border-red-700 rounded-xl px-5 py-3 flex items-start gap-3">
-          <span className="text-lg mt-0.5">🛑</span>
-          <div className="text-xs text-red-300 leading-5">
-            <strong className="text-red-400">Kill Switch ACTIVE · tradeAllowed=false · safeToTradeNow=false</strong><br />
-            Engine mode: <span className="text-blue-300 font-mono">OKX_ONLY_INTRADAY_PLUS_TRADES_CONFIRMATION</span> — No Polygon dependency. No orders placed.
-          </div>
-        </div>
+          {matrixOpen && (
+            <div className="p-4 bg-slate-950/40 space-y-5">
 
-        {/* ── Phase 3 verdict banner ── */}
-        {validatorData && (
-          <div className={`rounded-xl border px-5 py-3 text-xs font-bold ${
-            validatorData.phase3Verdict === 'PHASE3_OKX_ONLY_VALIDATOR_OPERATIONAL'
-              ? 'bg-emerald-950/40 border-emerald-700 text-emerald-300'
-              : validatorData.phase3Verdict === 'PHASE3_OKX_ONLY_VALIDATOR_PARTIAL'
-                ? 'bg-yellow-950/40 border-yellow-700 text-yellow-300'
-                : 'bg-slate-900 border-slate-700 text-slate-400'
-          }`}>
-            Verdict: {validatorData.phase3Verdict} · OKX pairs ready: {summary.readyPairs?.length || 0}/{5}
-            {paperPairs.length > 0 && <span className="ml-3 text-emerald-400">📡 Paper signals: [{paperPairs.join(', ')}]</span>}
-          </div>
-        )}
-
-        {/* ── OKX Data Access Summary ── */}
-        {accessData && (
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
-            {accessPairs.map(p => (
-              <div key={p.pair} className={`rounded-xl border px-3 py-3 ${p.dataReady ? 'border-emerald-700 bg-emerald-950/20' : 'border-red-800 bg-red-950/20'}`}>
-                <div className="font-black text-sm text-white mb-1">{p.pair}</div>
-                <div className={`font-bold mb-1 ${p.dataReady ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {p.dataReady ? '✅ READY' : '❌ WAIT'}
-                </div>
-                <div className="text-slate-400 space-y-0.5">
-                  <div>Ticker: {p.tickerAvailable ? <span className="text-emerald-400">✓</span> : <span className="text-red-400">✗</span>}</div>
-                  <div>1m: {p.okx1mAvailable ? <span className="text-emerald-400">✓ {p.candlesCount}</span> : <span className="text-red-400">✗</span>}</div>
-                  <div>Trades: {p.okxTradesAvailable ? <span className="text-emerald-400">✓ {p.tradesCount}</span> : <span className="text-red-400">✗</span>}</div>
-                  {p.lastPrice && <div className="text-white font-mono">${p.lastPrice?.toLocaleString()}</div>}
-                </div>
+              {/* Note */}
+              <div className="bg-amber-950/30 border border-amber-700 rounded-xl px-4 py-3 text-xs text-amber-300">
+                ⚠ Use <strong className="text-white">PaperTradingDashboard / System Trail</strong> for the active BTC paper engine.
+                This matrix is Phase 3 multi-pair diagnostic data only — <strong>not the active trading signal</strong>.
               </div>
-            ))}
-            {aLoading && [1,2,3,4,5].map(i => <Skeleton key={i} className="h-28 bg-slate-800 rounded-xl" />)}
-          </div>
-        )}
 
-        {/* ── Error ── */}
-        {vError && (
-          <div className="bg-red-950/60 border border-red-600 rounded-xl p-4 text-red-300 text-sm">{vError.message}</div>
-        )}
+              {/* Rescan button for advanced section */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => { vRefetch(); aRefetch(); }}
+                  disabled={vFetching || aFetching || vLoading || aLoading}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-slate-800 border border-slate-600 hover:bg-slate-700 disabled:opacity-50 transition-all"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${(vFetching || aFetching) ? 'animate-spin' : ''}`} />
+                  Rescan Matrix
+                </button>
+              </div>
 
-        {/* ── Tabs ── */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-900/50 border border-slate-700 rounded-xl p-1">
-            <TabsTrigger value="pairs"   className="text-xs">📊 Signal Matrix</TabsTrigger>
-            <TabsTrigger value="detail"  className="text-xs">🔬 Pair Detail</TabsTrigger>
-            <TabsTrigger value="engine"  className="text-xs">🛡️ Engine Info</TabsTrigger>
-          </TabsList>
-
-          {/* SIGNAL MATRIX */}
-          <TabsContent value="pairs" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
-              <div className="text-sm font-bold text-slate-300 mb-4">OKX-Only Signal Matrix</div>
-              {vLoading ? (
-                <Skeleton className="h-64 bg-slate-800" />
-              ) : pairs.length === 0 ? (
-                <div className="text-center text-slate-400 py-10">No data — click Rescan.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="border-b border-slate-700">
-                      <tr className="text-slate-400 text-left">
-                        <th className="px-2 py-2">Pair</th>
-                        <th className="px-2 py-2">Data Mode</th>
-                        <th className="px-2 py-2 text-right">Price</th>
-                        <th className="px-2 py-2 text-right">Spread%</th>
-                        <th className="px-2 py-2">Intraday</th>
-                        <th className="px-2 py-2 text-right">I-Score</th>
-                        <th className="px-2 py-2">Tick</th>
-                        <th className="px-2 py-2">Fee OK</th>
-                        <th className="px-2 py-2 text-right font-bold">Score</th>
-                        <th className="px-2 py-2">Decision</th>
-                        <th className="px-2 py-2">Barriers</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pairs.map(p => {
-                        const dec = p.finalDecision?.recommendedAction || 'WATCH';
-                        const cfg = DECISION_CFG[dec] || DECISION_CFG.WATCH;
-                        const sc  = (p.score || 0) >= 65 ? 'text-emerald-400' : (p.score || 0) >= 50 ? 'text-yellow-400' : 'text-red-400';
-                        return (
-                          <tr key={p.pair} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
-                            <td className="px-2 py-2 font-black text-white">{p.pair}</td>
-                            <td className="px-2 py-2 text-slate-500 font-mono text-xs">
-                              {p.dataMode === 'OKX_ONLY_INTRADAY_PLUS_TRADES_CONFIRMATION'
-                                ? <span className="text-blue-400">OKX_ONLY</span>
-                                : <span className="text-red-400">NO_DATA</span>}
-                            </td>
-                            <td className="px-2 py-2 text-right text-slate-300">{p.lastPrice ? `$${p.lastPrice.toLocaleString()}` : '—'}</td>
-                            <td className={`px-2 py-2 text-right ${(p.spreadPct||0) < 0.03 ? 'text-emerald-400' : 'text-red-400'}`}>{p.spreadPct ? p.spreadPct.toFixed(4) + '%' : '—'}</td>
-                            <td className={`px-2 py-2 font-bold ${p.intradaySignal?.signal === 'BULLISH' ? 'text-emerald-400' : p.intradaySignal?.signal === 'NEUTRAL' ? 'text-yellow-400' : p.intradaySignal?.signal === 'BEARISH' ? 'text-red-400' : 'text-slate-500'}`}>{p.intradaySignal?.signal || '—'}</td>
-                            <td className="px-2 py-2 text-right text-blue-400">{p.intradaySignal?.score ?? '—'}</td>
-                            <td className={`px-2 py-2 font-bold ${p.tickConfirmation?.signal === 'BUY_PRESSURE' ? 'text-emerald-400' : p.tickConfirmation?.signal === 'SELL_PRESSURE' ? 'text-red-400' : 'text-yellow-400'}`}>{p.tickConfirmation?.signal || '—'}</td>
-                            <td className={`px-2 py-2 font-bold ${p.feesDiagnostic?.feeViable ? 'text-emerald-400' : 'text-red-400'}`}>{p.feesDiagnostic ? (p.feesDiagnostic.feeViable ? '✓' : '✗') : '—'}</td>
-                            <td className={`px-2 py-2 text-right font-black ${sc}`}>{p.score ?? '—'}</td>
-                            <td className="px-2 py-2">
-                              <span className={`px-2 py-0.5 rounded border text-xs font-bold ${cfg.badge}`}>{cfg.label}</span>
-                            </td>
-                            <td className="px-2 py-2">
-                              {p.barriers?.failedNames?.length > 0
-                                ? <span className="text-red-400 text-xs">{p.barriers.failedNames.slice(0,2).join(', ')}{p.barriers.failedNames.length > 2 ? ` +${p.barriers.failedNames.length - 2}` : ''}</span>
-                                : p.barriers?.allPass ? <span className="text-emerald-400 text-xs">ALL PASS</span> : <span className="text-slate-500 text-xs">—</span>
-                              }
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+              {/* OKX Data Access — renamed READY → DATA_READY */}
+              {(aLoading) ? (
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-28 bg-slate-800 rounded-xl" />)}
                 </div>
-              )}
-            </div>
-          </TabsContent>
+              ) : accessData ? (
+                <div>
+                  <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">OKX Data Health</div>
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+                    {accessData.pairs?.map(p => (
+                      <div key={p.pair} className={`rounded-xl border px-3 py-3 ${p.dataReady ? 'border-emerald-700 bg-emerald-950/20' : 'border-red-800 bg-red-950/20'}`}>
+                        <div className="font-black text-sm text-white mb-1">{p.pair}</div>
+                        <div className={`font-bold mb-1 ${p.dataReady ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {p.dataReady ? '✅ DATA_READY' : '❌ NO_DATA'}
+                        </div>
+                        <div className="text-slate-400 space-y-0.5">
+                          <div>Ticker: {p.tickerAvailable ? <span className="text-emerald-400">OK</span> : <span className="text-red-400">✗</span>}</div>
+                          <div>1m candles: {p.okx1mAvailable ? <span className="text-emerald-400">OK</span> : <span className="text-red-400">✗</span>}</div>
+                          <div>Trades: {p.okxTradesAvailable ? <span className="text-emerald-400">OK</span> : <span className="text-red-400">✗</span>}</div>
+                          {p.lastPrice && <div className="text-white font-mono">${p.lastPrice?.toLocaleString()}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
-          {/* PAIR DETAIL */}
-          <TabsContent value="detail" className="mt-4">
-            {vLoading ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-56 bg-slate-800 rounded-xl" />)}
+              {/* Signal Matrix */}
+              <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
+                <div className="text-sm font-bold text-slate-300 mb-1">OKX Signal Matrix <span className="text-slate-600 text-xs font-normal">[diagnostic only]</span></div>
+                <div className="text-xs text-amber-400 mb-4">
+                  ETH/SOL/DOGE/XRP are DISABLED in Phase 4F. BTC score uses Phase 4F thresholds (≥75 = READY_FOR_PAPER_SCAN).
+                </div>
+                {vLoading ? (
+                  <Skeleton className="h-64 bg-slate-800" />
+                ) : pairs.length === 0 ? (
+                  <div className="text-center text-slate-400 py-10">No data — click Rescan Matrix.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="border-b border-slate-700">
+                        <tr className="text-slate-400 text-left">
+                          <th className="px-2 py-2">Pair</th>
+                          <th className="px-2 py-2">Phase Status</th>
+                          <th className="px-2 py-2 text-right">Price</th>
+                          <th className="px-2 py-2">Intraday</th>
+                          <th className="px-2 py-2">Tick</th>
+                          <th className="px-2 py-2 text-right font-bold">Score</th>
+                          <th className="px-2 py-2">4F Signal Level</th>
+                          <th className="px-2 py-2">Decision [diag]</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pairs.map(p => {
+                          const isDisabled = DISABLED_PAIRS.includes(p.pair);
+                          const score = p.score ?? 0;
+                          const allPass = p.barriers?.allPass || false;
+                          const alertLvl = isDisabled ? 'DISABLED' : btcAlertLevel(score, allPass);
+                          const astyle = ALERT_STYLE[alertLvl] || ALERT_STYLE.COLD;
+                          const rawDecision = p.finalDecision?.recommendedAction || 'WATCH';
+                          const diagLabel = rawDecision === 'PAPER_SIGNAL_ONLY' ? 'DATA_ONLY_NOT_ACTIVE'
+                                          : rawDecision === 'WAIT'             ? 'DATA_ONLY_WAIT'
+                                          : rawDecision === 'WATCH'            ? 'DATA_ONLY_WATCH'
+                                          : 'DATA_ONLY_WAIT';
+                          const sc = score >= 70 ? 'text-emerald-400' : score >= 55 ? 'text-yellow-400' : 'text-red-400';
+                          return (
+                            <tr key={p.pair} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
+                              <td className="px-2 py-2 font-black text-white">{p.pair}</td>
+                              <td className="px-2 py-2">
+                                {isDisabled ? (
+                                  <span className="text-slate-600 font-mono text-xs">DISABLED_IN_PHASE_4F<br/><span className="text-slate-700">Diagnostic only</span></span>
+                                ) : (
+                                  <span className="text-blue-400 font-mono text-xs">ACTIVE_PAIR</span>
+                                )}
+                              </td>
+                              <td className="px-2 py-2 text-right text-slate-300">{p.lastPrice ? `$${p.lastPrice.toLocaleString()}` : '—'}</td>
+                              <td className={`px-2 py-2 font-bold ${p.intradaySignal?.signal === 'BULLISH' ? 'text-emerald-400' : p.intradaySignal?.signal === 'BEARISH' ? 'text-red-400' : 'text-yellow-400'}`}>{p.intradaySignal?.signal || '—'}</td>
+                              <td className={`px-2 py-2 font-bold ${p.tickConfirmation?.signal === 'BUY_PRESSURE' ? 'text-emerald-400' : p.tickConfirmation?.signal === 'SELL_PRESSURE' ? 'text-red-400' : 'text-yellow-400'}`}>{p.tickConfirmation?.signal || '—'}</td>
+                              <td className={`px-2 py-2 text-right font-black ${isDisabled ? 'text-slate-600' : sc}`}>{isDisabled ? '—' : (p.score ?? '—')}</td>
+                              <td className="px-2 py-2">
+                                <span className={`px-2 py-0.5 rounded border text-xs font-bold ${astyle.badge}`}>
+                                  <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${astyle.dot}`} />
+                                  {alertLvl}
+                                </span>
+                              </td>
+                              <td className="px-2 py-2">
+                                <span className="text-slate-500 text-xs font-mono">{diagLabel}</span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {pairs.map(p => <PairDetailCard key={p.pair} pair={p} />)}
-              </div>
-            )}
-          </TabsContent>
 
-          {/* ENGINE INFO */}
-          <TabsContent value="engine" className="mt-4">
-            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5 space-y-4">
-              <div className="text-sm font-bold text-slate-300">🛡️ OKX-Only Engine Architecture</div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+              {/* Engine info */}
+              <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4 text-xs space-y-2">
+                <div className="font-bold text-slate-400 mb-2">Engine Info</div>
                 {[
-                  { label: 'Engine',                    value: 'OKX_ONLY_INTRADAY_TRADING_ENGINE',                      color: 'text-white' },
-                  { label: 'Phase',                     value: 'PHASE_3_OKX_ONLY_READ_ONLY',                           color: 'text-blue-400' },
-                  { label: 'Polygon',                   value: 'REMOVED — no Polygon dependency',                       color: 'text-red-400' },
-                  { label: 'tradeAllowed',              value: 'false',                                                  color: 'text-red-400' },
-                  { label: 'safeToTradeNow',            value: 'false',                                                  color: 'text-red-400' },
-                  { label: 'killSwitchActive',          value: 'true',                                                   color: 'text-red-400' },
-                  { label: 'noOKXOrderEndpointCalled',  value: 'true',                                                   color: 'text-emerald-400' },
-                  { label: 'Data source 1',             value: 'OKX ticker (bid/ask/price)',                            color: 'text-slate-300' },
-                  { label: 'Data source 2',             value: 'OKX 1m candles (300 bars)',                             color: 'text-slate-300' },
-                  { label: 'Data source 3',             value: 'OKX latest trades (500)',                               color: 'text-slate-300' },
-                  { label: 'Signal logic',              value: 'Intraday×0.55 + Tick×0.30 + Fee×0.15',                 color: 'text-cyan-400' },
-                  { label: 'Pairs',                     value: 'BTC ETH SOL DOGE XRP',                                  color: 'text-blue-400' },
-                  { label: 'Min score to signal',       value: `${55}`,                                                  color: 'text-slate-300' },
-                  { label: 'Barrier count',             value: '6 (intraday, tick, fee, spread, score, not-bearish)',    color: 'text-slate-300' },
-                ].map(row => (
-                  <div key={row.label} className="flex items-start gap-3 bg-slate-800/30 rounded p-3 border border-slate-800">
-                    <div className="text-slate-500 w-48 shrink-0">{row.label}</div>
-                    <div className={`font-bold ${row.color}`}>{row.value}</div>
+                  { label: 'Active mode',               value: 'PHASE_4F_BTC_ONLY_ECONOMIC_PAPER_MODE', color: 'text-cyan-400' },
+                  { label: 'Phase 3 engine (this page)', value: 'OKX_ONLY_READ_ONLY — diagnostic archive', color: 'text-amber-400' },
+                  { label: 'tradeAllowed',               value: 'false',  color: 'text-red-400' },
+                  { label: 'noOKXOrderEndpointCalled',   value: 'true',   color: 'text-emerald-400' },
+                  { label: 'Polygon',                    value: 'REMOVED', color: 'text-red-400' },
+                ].map(r => (
+                  <div key={r.label} className="flex items-center gap-3 bg-slate-800/30 rounded p-2 border border-slate-800">
+                    <div className="text-slate-500 w-52 shrink-0">{r.label}</div>
+                    <div className={`font-bold ${r.color}`}>{r.value}</div>
                   </div>
                 ))}
               </div>
-              <div className="mt-4 bg-slate-800/30 rounded-xl p-4 border border-slate-700 text-xs text-slate-400">
-                <strong className="text-slate-300">Deprecated (read-only, no longer active):</strong><br />
-                testPolygonSecondMinuteAccess — feeAwarePolygonDecisionDryRun — polygonMarketData — polygonDailyCache
-              </div>
+
             </div>
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
+
+        {/* ── Footer verdict ─────────────────────────────────────── */}
+        <div className="text-center text-xs text-slate-700 pb-4">
+          signalDashboardSimplified: true · readyRenamedToDataReady: true · matrixCollapsedByDefault: true · disabledPairsMarkedDiagnosticOnly: true · systemTrailIsPrimary: true · tradingLogicChanged: false · realTradeAllowed: false · finalVerdict: SIGNAL_DASHBOARD_CLEANED
+        </div>
 
       </div>
     </div>
   );
 }
 
-// ── Pair detail card ──────────────────────────────────────────────────────────
-function PairDetailCard({ pair: p }) {
-  const dec = p.finalDecision?.recommendedAction || 'WATCH';
-  const cfg = DECISION_CFG[dec] || DECISION_CFG.WATCH;
-  const sc  = (p.score || 0) >= 65 ? 'text-emerald-400' : (p.score || 0) >= 50 ? 'text-yellow-400' : 'text-red-400';
-
+function TrailKpi({ label, value, color = 'text-white' }) {
   return (
-    <div className={`rounded-xl border-2 p-5 ${cfg.ring}`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-black text-lg text-white">{p.pair}</span>
-        <span className={`px-2 py-0.5 rounded border text-xs font-bold ${cfg.badge}`}>{cfg.label}</span>
-      </div>
-
-      {p.score != null && (
-        <div className={`text-4xl font-black ${sc} mb-3`}>
-          {p.score}<span className="text-lg text-slate-500">/100</span>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-        <InfoCell label="Data Mode"  value={p.dataMode === 'OKX_ONLY_INTRADAY_PLUS_TRADES_CONFIRMATION' ? 'OKX_ONLY' : 'NO_DATA'} ok={p.dataReady} />
-        <InfoCell label="Last Price" value={p.lastPrice ? `$${p.lastPrice.toLocaleString()}` : '—'} />
-        <InfoCell label="Intraday"   value={p.intradaySignal?.signal || '—'} ok={p.intradaySignal?.signal === 'BULLISH'} warn={p.intradaySignal?.signal === 'NEUTRAL'} />
-        <InfoCell label="I-Score"    value={p.intradaySignal?.score ?? '—'} ok={(p.intradaySignal?.score || 0) >= 65} />
-        <InfoCell label="Tick"       value={p.tickConfirmation?.signal || '—'} ok={p.tickConfirmation?.confirmed} />
-        <InfoCell label="Spread"     value={p.spreadPct ? p.spreadPct.toFixed(4) + '%' : '—'} ok={(p.spreadPct || 1) < 0.03} />
-        <InfoCell label="Fee Viable" value={p.feesDiagnostic?.feeViable ? 'YES' : 'NO'} ok={p.feesDiagnostic?.feeViable} />
-        <InfoCell label="Candles"    value={p.okx1mCandles || '—'} ok={(p.okx1mCandles || 0) >= 100} />
-      </div>
-
-      {p.barriers?.failedNames?.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {p.barriers.failedNames.map((b, i) => (
-            <span key={i} className="px-1.5 py-0.5 rounded bg-red-950/50 border border-red-800 text-red-300 text-xs">{b}</span>
-          ))}
-        </div>
-      )}
-      {p.barriers?.allPass && (
-        <div className="text-emerald-400 text-xs font-bold">✅ All {p.barriers.totalBarriers} barriers passed</div>
-      )}
-
-      <div className="mt-3 text-xs text-slate-600 font-mono">tradeAllowed: false · OKX_ONLY_READ_ONLY</div>
-    </div>
-  );
-}
-
-function InfoCell({ label, value, ok, warn }) {
-  const color = ok ? 'text-emerald-400' : warn ? 'text-yellow-400' : 'text-slate-300';
-  return (
-    <div className="bg-slate-900/50 rounded p-2 border border-slate-800">
-      <div className="text-slate-500 text-xs mb-0.5">{label}</div>
-      <div className={`font-bold text-xs ${color}`}>{value}</div>
+    <div className="bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-3 text-center">
+      <div className="text-slate-500 text-xs uppercase tracking-wide mb-1">{label}</div>
+      <div className={`font-black text-sm leading-tight ${color}`}>{value}</div>
     </div>
   );
 }
