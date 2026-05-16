@@ -18,6 +18,7 @@ import CleanDashboard from './components/dashboard/CleanDashboard';
 import OKXDataSync from './pages/OKXDataSync';
 import SignalDashboard from './pages/SignalDashboard';
 import PaperTradingDashboard from './pages/PaperTradingDashboard';
+import Phase5RealTestMode from './pages/Phase5RealTestMode';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -71,6 +72,11 @@ const AuthenticatedApp = () => {
       <Route path="/SignalDashboard" element={
         <LayoutWrapper currentPageName="SignalDashboard">
           <SignalDashboard />
+        </LayoutWrapper>
+      } />
+      <Route path="/Phase5RealTestMode" element={
+        <LayoutWrapper currentPageName="Phase5RealTestMode">
+          <Phase5RealTestMode />
         </LayoutWrapper>
       } />
       <Route path="/PaperTradingDashboard" element={
