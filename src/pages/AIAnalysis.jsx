@@ -42,17 +42,35 @@ export default function AIAnalysis() {
 
       // Get AI analysis
       const aiResponse = await base44.functions.invoke('aiTradingAnalysis', {
-        symbol: selectedSymbol,
-        currentPrice,
-        recentTrades: trades.slice(0, 20),
-        activeBotsCount: subscriptions.length
+        action: 'suggest_strategy',
+        data: {
+          symbol: selectedSymbol,
+          capital: 1000,
+          risk_tolerance: 'moderate'
+        }
       });
 
+      const d = aiResponse.data?.data || {};
+      const strat = d.recommended_strategy || {};
+      const perf  = d.expected_performance || {};
+      const params = d.parameters || {};
+
       setAnalysis({
-        ...aiResponse.data,
         currentPrice,
         priceChange,
-        timestamp: new Date()
+        timestamp: new Date(),
+        sentiment: strat.market_conditions?.toLowerCase().includes('bull') ? 'bullish'
+                 : strat.market_conditions?.toLowerCase().includes('bear') ? 'bearish' : 'neutral',
+        confidence: strat.confidence || 0.5,
+        recommendation: strat.strategy_type?.toUpperCase() || 'HOLD',
+        strength: perf.risk_level || 'Moderate',
+        analysis: strat.reasoning || strat.market_conditions || 'AI analysis complete.',
+        buySignals: d.alternatives?.filter((_, i) => i % 2 === 0).map(a => `${a.strategy}: ${a.when_to_use}`) || [],
+        sellSignals: d.alternatives?.filter((_, i) => i % 2 !== 0).map(a => `${a.strategy}: ${a.when_to_use}`) || [],
+        riskLevel: perf.risk_level || 'medium',
+        volatility: strat.market_conditions || 'Moderate',
+        suggestedStopLoss: params.stop_loss || 5,
+        risks: [],
       });
     } catch (error) {
       console.error('Analysis error:', error);
