@@ -11,6 +11,68 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 
+// ── Snapshot Charts ─────────────────────────────────────────────────────────
+function SnapshotCharts() {
+  const { data: snaps = [], isLoading } = useQuery({
+    queryKey: ['balance-snapshots'],
+    queryFn: () => base44.entities.BalanceSnapshot.list('-snapshotAt', 288), // last 24h at 5min intervals
+    staleTime: 60000, refetchInterval: 60000,
+  });
+
+  if (isLoading) return <Skeleton className="h-40 bg-slate-800 rounded-xl" />;
+
+  if (snaps.length < 2) return (
+    <div className="bg-slate-900/50 border border-slate-700 rounded-xl p-6 text-center text-slate-400 text-sm">
+      📊 Collecting data — charts will appear after a few snapshots.<br />
+      <span className="text-xs text-slate-500 mt-1 block">Snapshots are recorded every 5 minutes.</span>
+    </div>
+  );
+
+  const sorted = [...snaps].sort((a,b) => new Date(a.snapshotAt) - new Date(b.snapshotAt));
+  const chartData = sorted.map(s => ({
+    time: moment(s.snapshotAt).format('HH:mm'),
+    equity: parseFloat((s.totalEquityUSDT || 0).toFixed(2)),
+    paperPnL: parseFloat((s.paperNetPnL || 0).toFixed(4)),
+    fees: parseFloat((s.totalFees || 0).toFixed(4)),
+    btc: parseFloat((s.btcPrice || 0).toFixed(2)),
+  }));
+
+  const ChartWrap = ({ title, dataKey, color, formatter }) => (
+    <div className="bg-slate-900/50 border border-slate-700 rounded-xl p-4">
+      <div className="text-xs font-bold text-slate-400 mb-3">{title}</div>
+      <div className="h-36">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 2, right: 2, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id={`g-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={color} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+            <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} interval="preserveStartEnd" />
+            <YAxis domain={['auto','auto']} tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} width={48} tickFormatter={formatter} />
+            <Tooltip contentStyle={{ background: '#0f172a', border: `1px solid ${color}33`, borderRadius: 8, fontSize: 11 }} />
+            <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill={`url(#g-${dataKey})`} dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">📈 Historical Charts ({snaps.length} snapshots)</div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartWrap title="OKX Equity (USDT)" dataKey="equity" color="#10b981" formatter={v=>`$${v}`} />
+        <ChartWrap title="Paper Trade Net PnL (USDT)" dataKey="paperPnL" color="#06b6d4" formatter={v=>`${v}`} />
+        <ChartWrap title="Total Fees Paid (USDT)" dataKey="fees" color="#ef4444" formatter={v=>`${v}`} />
+        <ChartWrap title="BTC-USDT Price" dataKey="btc" color="#f59e0b" formatter={v=>`$${(v/1000).toFixed(1)}k`} />
+      </div>
+    </div>
+  );
+}
+
 const OKX_SYMBOLS = ['BTC-USDT','ETH-USDT','SOL-USDT','XRP-USDT','DOGE-USDT','BNB-USDT','ADA-USDT','LINK-USDT','AVAX-USDT','LTC-USDT'];
 
 const TIMEFRAMES = [
@@ -281,11 +343,12 @@ export default function OKXDashboard() {
 
         {/* Tabs */}
         <Tabs defaultValue="trades" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 bg-slate-900/50 border border-slate-700 rounded-xl p-1">
+          <TabsList className="grid w-full grid-cols-6 bg-slate-900/50 border border-slate-700 rounded-xl p-1">
             <TabsTrigger value="trades"  className="text-xs">📊 All Trades</TabsTrigger>
             <TabsTrigger value="robots"  className="text-xs">🤖 By Robot</TabsTrigger>
             <TabsTrigger value="ledger"  className="text-xs">📋 Ledger</TabsTrigger>
             <TabsTrigger value="market"  className="text-xs">📈 Market</TabsTrigger>
+            <TabsTrigger value="charts"  className="text-xs">📊 Charts</TabsTrigger>
             <TabsTrigger value="status"  className="text-xs">🔧 Robot Status</TabsTrigger>
           </TabsList>
 
@@ -420,6 +483,13 @@ export default function OKXDashboard() {
                 : tickers.map(t => <PriceCard key={t.instId||t.symbol} ticker={t} />)}
             </div>
             <OKXChart />
+          </TabsContent>
+
+          {/* ROBOT STATUS */}
+          {/* CHARTS */}
+          <TabsContent value="charts" className="mt-4 space-y-5">
+            <OKXChart />
+            <SnapshotCharts />
           </TabsContent>
 
           {/* ROBOT STATUS */}

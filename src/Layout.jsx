@@ -57,6 +57,7 @@ export default function Layout({ children, currentPageName }) {
     { nameKey: 'connectOKX', page: 'ConnectOKX', icon: Link2, fallback: 'Connect OKX' },
     { nameKey: 'okxDashboard', page: 'OKXDashboard', icon: Link2, fallback: 'OKX Dashboard' },
     { nameKey: 'signalDashboard', page: 'SignalDashboard', icon: Activity, fallback: '📡 Signal Dashboard' },
+    { nameKey: 'transactions', page: 'Transactions', icon: Activity, fallback: '📒 Transactions' },
     { nameKey: 'paperTrading', page: 'PaperTradingDashboard', icon: Activity, fallback: '📄 Phase 4 Paper Trading' },
     { nameKey: 'phase5Real', page: 'Phase5RealTestMode', icon: Activity, fallback: '🔴 Phase 5 Real Test Mode' },
     { nameKey: 'wallet', page: 'Wallet', icon: Users },

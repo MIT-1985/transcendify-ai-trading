@@ -1,0 +1,42 @@
+{
+  "name": "BalanceSnapshot",
+  "type": "object",
+  "properties": {
+    "totalEquityUSDT": {
+      "type": "number",
+      "description": "Total OKX equity in USDT"
+    },
+    "availableUSDT": {
+      "type": "number",
+      "description": "Available (free) USDT"
+    },
+    "frozenUSDT": {
+      "type": "number",
+      "description": "Frozen / in-order USDT"
+    },
+    "btcPrice": {
+      "type": "number",
+      "description": "BTC-USDT price at snapshot time"
+    },
+    "paperNetPnL": {
+      "type": "number",
+      "description": "Cumulative paper trade net PnL at time of snapshot"
+    },
+    "realNetPnL": {
+      "type": "number",
+      "description": "Cumulative real trade net PnL at time of snapshot"
+    },
+    "totalFees": {
+      "type": "number",
+      "description": "Total fees paid at snapshot time"
+    },
+    "snapshotAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Snapshot timestamp"
+    }
+  },
+  "required": [
+    "snapshotAt"
+  ]
+}
