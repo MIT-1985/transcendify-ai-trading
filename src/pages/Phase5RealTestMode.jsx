@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { AlertTriangle, ShieldOff, XCircle, CheckCircle2, RefreshCw, Lock } from 'lucide-react';
+import { AlertTriangle, ShieldOff, XCircle, CheckCircle2, RefreshCw, Lock, FlaskConical } from 'lucide-react';
+import Phase5PreflightPanel from '@/components/dashboard/Phase5PreflightPanel';
 
 // ── Constants (mirrored from backend — never change without review) ──
 const MAX_TEST_SIZE_USDT  = 10;
@@ -435,6 +436,18 @@ export default function Phase5RealTestMode() {
               <Lock className="w-4 h-4" />
               Kill Switch ON (always active)
             </button>
+          </div>
+        </div>
+
+        {/* ── Preflight Section ────────────────────────────── */}
+        <div className="border border-cyan-800/50 rounded-2xl overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-3 bg-cyan-950/20 border-b border-cyan-800/40">
+            <FlaskConical className="w-4 h-4 text-cyan-400" />
+            <span className="text-sm font-black text-cyan-400">Preflight Verification</span>
+            <span className="text-xs text-slate-500 ml-1">— read-only · no order placed</span>
+          </div>
+          <div className="p-4 bg-slate-950/30">
+            <Phase5PreflightPanel />
           </div>
         </div>
 
