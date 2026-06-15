@@ -16,25 +16,34 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
 
 // Priority order defines tiebreak; scoring picks the actual winner
-const ALLOWED_PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'DOGE-USDT', 'XRP-USDT'];
+// ── PHASE 5 LIVE — BTC-USDT ONLY ─────────────────────────────────────────────
+// Strategy: fee-aware scalping. Only enter if net profit after fees > threshold.
+// Polygon (hourly candles) + OKX (live ticker) for scoring.
+// TP = 1.3%, SL = 0.65%, size = 15 USDT. Auto-restart cycle on loss.
+const ALLOWED_PAIRS = ['BTC-USDT'];
 
-// Polygon tickers map
 const POLYGON_TICKER = {
   'BTC-USDT': 'X:BTCUSD',
-  'ETH-USDT': 'X:ETHUSD',
-  'SOL-USDT': 'X:SOLUSD',
-  'DOGE-USDT': 'X:DOGEUSD',
-  'XRP-USDT': 'X:XRPUSD',
 };
 
-const TRADE_AMOUNT_USDT = 20;     // fixed USDT per trade
-const MAX_POSITION_PCT = 0.30;    // never use more than 30% of freeUSDT in one trade
-const MIN_FREE_USDT = 15;         // minimum required free USDT to consider buying
-const MAX_SPREAD_PCT = 0.15;      // per pair; high-liq pairs typically <0.05%
-const TAKE_PROFIT_PCT = 2.0;
-const STOP_LOSS_PCT = -1.0;
-const MAX_POSITIONS = 2;          // max simultaneous open positions
-const MIN_SCORE_TO_BUY = 40;      // 0-100 composite score floor
+const TRADE_AMOUNT_USDT = 15;     // 15 USDT per trade
+const MAX_POSITION_PCT  = 0.15;   // max 15% of free USDT per trade (safety cap)
+const MIN_FREE_USDT     = 12;     // minimum free USDT required
+const MAX_SPREAD_PCT    = 0.05;   // max spread % allowed
+const TAKE_PROFIT_PCT   = 1.30;   // take profit %
+const STOP_LOSS_PCT     = -0.65;  // stop loss %
+const MAX_POSITIONS     = 1;      // only 1 position at a time
+const MIN_SCORE_TO_BUY  = 55;     // minimum score (0-100) to enter
+const OKX_TAKER_FEE     = 0.001;  // 0.1% taker fee
+
+// Fee-aware check: only enter if estimated net profit > 0
+function isFeeAwareProfitable(sizeUSDT, spreadPct) {
+  const gross   = sizeUSDT * (TAKE_PROFIT_PCT / 100);
+  const fees    = sizeUSDT * OKX_TAKER_FEE * 2;       // entry + exit
+  const spread  = sizeUSDT * (spreadPct / 100);
+  const net     = gross - fees - spread;
+  return { profitable: net > 0.001, gross, fees, spread, net };
+}
 
 // ─── OKX crypto/auth helpers ─────────────────────────────────────────────────
 async function deriveOkxKey() {
@@ -480,7 +489,14 @@ Deno.serve(async (req) => {
         console.log(`[R1] WAIT: ${reason}`);
         await saveLog(base44, 'WAIT', reason, commonData);
       } else {
-        // Capital safety: fixed amount, capped at 30% of freeUSDT
+        // Fee-aware profitability check — skip if fees eat the profit
+        const feeCheck = isFeeAwareProfitable(TRADE_AMOUNT_USDT, candidate.spreadPct);
+        if (!feeCheck.profitable) {
+          const reason = `FEE_BLOCK: net=${feeCheck.net.toFixed(4)} USDT not profitable after fees. gross=${feeCheck.gross.toFixed(4)} fees=${feeCheck.fees.toFixed(4)} spread=${feeCheck.spread.toFixed(4)}`;
+          console.log(`[R1] WAIT: ${reason}`);
+          await saveLog(base44, 'WAIT', reason, commonData);
+        } else {
+        // Capital safety: fixed amount, capped at 15% of freeUSDT
         const maxByPct = parseFloat((freeUsdt * MAX_POSITION_PCT).toFixed(2));
         const buyUsdtAmount = Math.min(TRADE_AMOUNT_USDT, maxByPct);
         const winReason = `Selected ${candidate.pair} — score=${candidate.score} (best eligible). ${candidate.decisionReason}`;
@@ -528,6 +544,7 @@ Deno.serve(async (req) => {
             };
           }
         }
+        } // end feeCheck profitable block
       }
     }
 
