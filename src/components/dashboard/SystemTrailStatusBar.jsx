@@ -74,16 +74,11 @@ export default function SystemTrailStatusBar({ onRunScan, isRunning }) {
         <span>Action: <span className="text-cyan-400 font-bold">{ls.recommendedAction ?? '—'}</span></span>
         <span>Blocking: <span className="text-orange-400 font-mono">{ls.mainBlockingReason ?? '—'}</span></span>
         {ls.phase5GuardStatus && <span>P5Guard: <span className="text-purple-400 font-bold text-xs">{ls.phase5GuardStatus === 'PAPER_EVIDENCE_READY_BUT_MANUAL_REVIEW_REQUIRED' ? '⚠ MANUAL_REVIEW' : ls.phase5GuardStatus}</span></span>}
-        <span>HardBlocker: <span className="text-red-400 font-bold">REAL_TRADING_BLOCKED</span></span>
+        <span>Mode: <span className="text-cyan-400 font-bold">{data?.activeMode ?? '—'}</span></span>
       </div>
 
-      {/* Safety badges */}
+      {/* Minimal status */}
       <div className="flex flex-wrap gap-2 mt-2">
-        <span className="bg-red-950/50 border border-red-700 text-red-400 font-bold px-1.5 py-0.5 rounded text-xs">🛑 Kill Switch ACTIVE</span>
-        <span className="bg-red-950/50 border border-red-700 text-red-400 font-bold px-1.5 py-0.5 rounded text-xs">realTradeAllowed: false</span>
-        <span className="bg-slate-800 border border-slate-600 text-emerald-400 font-bold px-1.5 py-0.5 rounded text-xs">noOKXOrderEndpoint: true</span>
-        <span className="bg-slate-800 border border-slate-600 text-yellow-400 font-bold px-1.5 py-0.5 rounded text-xs">PAPER ONLY</span>
-        <span className="bg-slate-800 border border-slate-600 text-cyan-400 font-bold px-1.5 py-0.5 rounded text-xs">finalVerdict: {data?.finalVerdict ?? 'SYSTEM_TRAIL_SINGLE_SOURCE_OF_TRUTH_ACTIVE'}</span>
         {isLoading && <span className="text-slate-500 italic">loading…</span>}
         {!isLoading && !data && <button onClick={() => refetch()} className="text-slate-400 hover:text-white underline text-xs">retry</button>}
       </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { AlertTriangle, ShieldOff, XCircle, CheckCircle2, RefreshCw, Lock, FlaskConical } from 'lucide-react';
+import { XCircle, CheckCircle2, RefreshCw, FlaskConical } from 'lucide-react';
 import Phase5PreflightPanel from '@/components/dashboard/Phase5PreflightPanel';
 
 // ── Constants (mirrored from backend — never change without review) ──
@@ -160,28 +160,13 @@ export default function Phase5RealTestMode() {
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 lg:p-6">
       <div className="max-w-4xl mx-auto space-y-5">
 
-        {/* ── CRITICAL WARNING BANNER ─────────────────────── */}
-        <div className="bg-red-950/60 border-2 border-red-600 rounded-2xl px-5 py-5">
-          <div className="flex items-center gap-3 mb-3">
-            <AlertTriangle className="w-6 h-6 text-red-400 shrink-0" />
-            <div className="font-black text-red-400 uppercase tracking-widest text-sm">
-              PHASE 5 — MANUAL REAL BTC TEST MODE
-            </div>
-          </div>
-          <div className="text-red-300/90 text-xs leading-6 space-y-1">
-            <div>• <strong>REAL MONEY</strong> — this places a real order on OKX. Not paper trading.</div>
-            <div>• Max 1 open trade at a time. No auto-repeat. BTC-USDT only.</div>
-            <div>• Test size: 5 USDT default / 10 USDT maximum.</div>
-            <div>• OKX API credentials must be set before any order is possible.</div>
-            <div>• Kill Switch remains active. Auto-trading remains OFF. Real trade requires manual confirmation.</div>
-          </div>
-        </div>
+
 
         {/* ── Header ─────────────────────────────────────── */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-black text-white">Phase 5 — Real BTC Test</h1>
-            <div className="text-xs text-slate-500 font-mono mt-0.5">MANUAL_CONFIRM_ONLY · BTC-USDT · OKX</div>
+            <h1 className="text-xl font-black text-white">🔴 BTC-USDT Live Trading — Сузана</h1>
+            <div className="text-xs text-slate-500 font-mono mt-0.5">OKX · BTC-USDT · MANUAL_CONFIRM · Real Funds</div>
           </div>
           <button
             onClick={() => { loadPrep(); loadOpenTrade(); }}
@@ -193,20 +178,7 @@ export default function Phase5RealTestMode() {
           </button>
         </div>
 
-        {/* ── Safety Status (shown once) ──────────────────── */}
-        <div className="bg-slate-900/70 border-2 border-red-800 rounded-2xl px-5 py-4">
-          <div className="text-sm font-black text-red-400 mb-3">🛡 Safety Status</div>
-          <div className="space-y-1">
-            <SafeRow label="Kill Switch"             value={killSwitchOn ? 'ACTIVE' : 'INACTIVE'}             ok={killSwitchOn} />
-            <SafeRow label="autoTradingAllowed"      value="false"                                             ok={true} />
-            <SafeRow label="manualConfirmRequired"   value="true"                                              ok={true} />
-            <SafeRow label="realTradeAllowed (default)" value="false"                                         ok={true} />
-            <SafeRow label="realTradeUnlockAllowed (default)" value="false"                                   ok={true} />
-            <SafeRow label="noOKXOrderEndpointCalled (auto)" value="true"                                     ok={true} />
-            <SafeRow label="Phase 5 Guard"           value={prepData?.phase5GuardStatus || '—'}               ok={phase5GuardOk} />
-            <SafeRow label="Hard Blocker"            value={prepData?.hardBlockerStatus || '—'}               ok={hardBlockerOk} />
-          </div>
-        </div>
+
 
         {/* ── Live BTC Signal Summary ─────────────────────── */}
         {prepData && (
@@ -408,36 +380,19 @@ export default function Phase5RealTestMode() {
           </div>
         )}
 
-        {/* ── Emergency Controls (always visible) ─────────── */}
-        <div className="bg-slate-900/50 border border-slate-700 rounded-2xl px-5 py-4">
-          <div className="text-xs font-black text-slate-400 uppercase tracking-wide mb-3">🚨 Emergency Controls</div>
+        {/* ── Emergency Controls ───────────────────────────── */}
+        {openTrade?.hasOpenTrade && (
           <div className="flex flex-wrap gap-3">
-            {openTrade?.hasOpenTrade && (
-              <button
-                onClick={handleEmergencyClose}
-                disabled={actionLoading}
-                className="flex items-center gap-2 px-4 py-2.5 text-xs font-black rounded-xl bg-red-800/50 border border-red-500 text-red-300 hover:bg-red-700/60 disabled:opacity-50 transition-all"
-              >
-                <XCircle className="w-4 h-4" />
-                Emergency Close Position
-              </button>
-            )}
             <button
-              disabled
-              className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl bg-slate-800 border border-slate-600 text-slate-500 cursor-not-allowed opacity-60"
+              onClick={handleEmergencyClose}
+              disabled={actionLoading}
+              className="flex items-center gap-2 px-4 py-2.5 text-xs font-black rounded-xl bg-red-800/50 border border-red-500 text-red-300 hover:bg-red-700/60 disabled:opacity-50 transition-all"
             >
-              <ShieldOff className="w-4 h-4" />
-              Disable Real Trading (always off by default)
-            </button>
-            <button
-              disabled
-              className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl bg-red-950/50 border border-red-800 text-red-600 cursor-not-allowed opacity-60"
-            >
-              <Lock className="w-4 h-4" />
-              Kill Switch ON (always active)
+              <XCircle className="w-4 h-4" />
+              Emergency Close Position
             </button>
           </div>
-        </div>
+        )}
 
         {/* ── Preflight Section ────────────────────────────── */}
         <div className="border border-cyan-800/50 rounded-2xl overflow-hidden">
@@ -451,10 +406,7 @@ export default function Phase5RealTestMode() {
           </div>
         </div>
 
-        {/* ── Footer verdict ───────────────────────────────── */}
-        <div className="text-center text-xs text-slate-700 pb-4">
-          realTestModePrepared: true · realTradeExecuted: false · autoTradingAllowed: false · manualConfirmRequired: true · maxRealTestSizeUSDT: 10 · finalVerdict: PHASE_5_MANUAL_REAL_TEST_PREPARED_NOT_EXECUTED
-        </div>
+
 
       </div>
     </div>

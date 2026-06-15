@@ -203,23 +203,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Kill switch banners */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="bg-red-950/60 border-2 border-red-600 rounded-xl px-5 py-3 flex items-center gap-3">
-            <span className="text-xl">🛑</span>
-            <div>
-              <div className="text-sm font-black text-red-400 uppercase tracking-widest">KILL SWITCH ACTIVE</div>
-              <div className="text-xs text-red-300 mt-0.5">No BUY/SELL orders · PAUSED_KILL_SWITCH</div>
-            </div>
-          </div>
-          <div className="bg-emerald-950/40 border-2 border-emerald-700 rounded-xl px-5 py-3 flex items-center gap-3">
-            <span className="text-xl">👁</span>
-            <div>
-              <div className="text-sm font-black text-emerald-400 uppercase tracking-widest">READ MODE ACTIVE</div>
-              <div className="text-xs text-emerald-300 mt-0.5">OKX_ONLY_ENGINE · Phase 4 Paper Trading active</div>
-            </div>
-          </div>
-        </div>
+
 
         {/* Global P&L Clock */}
         {loadTrades ? <Skeleton className="h-36 bg-slate-800 rounded-2xl" /> : <PnLClock trades={allTrades} balance={balance} />}
@@ -319,42 +303,21 @@ export default function Dashboard() {
 
           {/* SYSTEM */}
           <TabsContent value="system" className="mt-4">
-            <div className="space-y-4">
-              {/* Robot 1 Status */}
-              <div className="bg-slate-900/60 border border-blue-800 rounded-xl p-5">
-                <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-4">🤖 Robot 1 — Last Execution</div>
-                {loadExec ? <Skeleton className="h-24 bg-slate-800" /> : !execLog.execution_time ? (
-                  <div className="text-slate-400 text-sm">No execution log.</div>
-                ) : (
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                    <StatTile label="Last Run"   value={new Date(execLog.execution_time).toLocaleTimeString('de-DE')} color="slate" />
-                    <StatTile label="Decision"   value={execLog.decision||'—'} color={execLog.decision==='BUY'?'emerald':execLog.decision==='SELL'?'red':'slate'} />
-                    <StatTile label="OKX Status" value={execLog.okx_status||'—'} color={execLog.okx_status==='OK'?'emerald':'red'} />
-                    <StatTile label="Polygon"    value={execLog.polygon_status||'—'} color={execLog.polygon_status==='OK'?'emerald':'yellow'} />
-                  </div>
-                )}
-                {execLog.reason && (
-                  <div className="mt-3 bg-slate-800/40 rounded-lg p-3 border border-slate-700 text-xs text-white">{execLog.reason}</div>
-                )}
-              </div>
-              {/* System flags */}
-              <div className="bg-red-950/20 border-2 border-red-700 rounded-xl p-5">
-                <div className="text-xs font-bold text-red-400 uppercase tracking-widest mb-4">🔒 System Safety Flags</div>
+            <div className="bg-slate-900/60 border border-blue-800 rounded-xl p-5">
+              <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-4">🤖 Last Execution Log</div>
+              {loadExec ? <Skeleton className="h-24 bg-slate-800" /> : !execLog.execution_time ? (
+                <div className="text-slate-400 text-sm">No execution log.</div>
+              ) : (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                  {[
-                    ['Kill Switch',      true,  'red',     'ACTIVE'],
-                    ['Trading Paused',   true,  'red',     'YES'],
-                    ['Read Mode',        true,  'emerald', 'ACTIVE'],
-                    ['noOrderEndpoint',  true,  'emerald', 'true'],
-                  ].map(([label, on, color, val]) => (
-                    <div key={label} className="bg-slate-900/70 rounded-xl p-4 border border-slate-700">
-                      <div className="text-xs text-slate-400 mb-1">{label}</div>
-                      <div className={`font-black text-${color}-400`}>{val}</div>
-                    </div>
-                  ))}
+                  <StatTile label="Last Run"   value={new Date(execLog.execution_time).toLocaleTimeString('de-DE')} color="slate" />
+                  <StatTile label="Decision"   value={execLog.decision||'—'} color={execLog.decision==='BUY'?'emerald':execLog.decision==='SELL'?'red':'slate'} />
+                  <StatTile label="OKX Status" value={execLog.okx_status||'—'} color={execLog.okx_status==='OK'?'emerald':'red'} />
+                  <StatTile label="Polygon"    value={execLog.polygon_status||'—'} color={execLog.polygon_status==='OK'?'emerald':'yellow'} />
                 </div>
-                <div className="mt-3 text-xs text-red-300 font-mono">PAUSED_KILL_SWITCH · No BUY/SELL orders will be placed</div>
-              </div>
+              )}
+              {execLog.reason && (
+                <div className="mt-3 bg-slate-800/40 rounded-lg p-3 border border-slate-700 text-xs text-white">{execLog.reason}</div>
+              )}
             </div>
           </TabsContent>
         </Tabs>

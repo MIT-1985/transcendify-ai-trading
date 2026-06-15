@@ -313,13 +313,7 @@ export default function OKXDashboard() {
           </div>
         </div>
 
-        {/* Kill Switch banner */}
-        <div className="bg-red-950/40 border border-red-700 rounded-xl px-5 py-2.5 flex items-center gap-3 text-xs">
-          <span className="text-red-400 font-black">🛑 KILL SWITCH ACTIVE</span>
-          <span className="text-slate-500">·</span>
-          <span className="text-red-300">No trading · Read mode · tradeAllowed=false</span>
-          <span className="ml-auto text-slate-500 font-mono">PAUSED_KILL_SWITCH</span>
-        </div>
+
 
         {/* P&L Clock */}
         <PnLClock trades={allTrades} balance={balance} />
