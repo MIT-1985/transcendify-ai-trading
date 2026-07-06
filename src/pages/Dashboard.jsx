@@ -308,24 +308,27 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { tick, connected } = useOkxWebSocket();
 
-  // OKX Live Balance — refresh every 5s
-  const { data: balance = {}, isLoading: loadBalance } = useQuery({
-    queryKey: ['dashboard-okx-balance', user?.email],
-    queryFn: async () => { const r = await base44.functions.invoke('okxLiveBalance', {}); return r.data || {}; },
+  // OKX ExchangeConnection — real balance from database
+  const { data: okxConn = {}, isLoading: loadBalance } = useQuery({
+    queryKey: ['dashboard-okx-connection', user?.email],
+    queryFn: async () => {
+      const conns = await base44.entities.ExchangeConnection.filter({ exchange: 'okx' });
+      return conns[0] || {};
+    },
     enabled: !!user, staleTime: 0, refetchInterval: 5000, gcTime: 0
   });
 
-  // All VerifiedTrades — refresh every 5s
+  // All VerifiedTrades — real P&L directly from entity
   const { data: allTrades = [], isLoading: loadTrades } = useQuery({
     queryKey: ['dashboard-all-trades', user?.email],
-    queryFn: async () => base44.asServiceRole.entities.VerifiedTrade.list(),
+    queryFn: async () => base44.entities.VerifiedTrade.list('-created_date', 200),
     enabled: !!user, staleTime: 0, refetchInterval: 5000, gcTime: 0
   });
 
   const totalPnL = allTrades.reduce((s, t) => s + (t.realizedPnL || 0), 0);
-  const equity = parseFloat(balance?.totalEquityUSDT || balance?.totalEquity || 0);
-  const available = parseFloat(balance?.availableUSDT || 0);
-  const frozen = parseFloat(balance?.frozenUSDT || 0);
+  const equity = parseFloat(okxConn?.balance_usdt || 0);
+  const available = parseFloat(okxConn?.balance_usdt || 0);
+  const frozen = 0;
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-4 lg:p-6">
