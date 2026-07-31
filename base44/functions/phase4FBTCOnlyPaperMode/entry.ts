@@ -178,10 +178,89 @@ function analyzeTickConfirmation(trades) {
   return { tickDirection, buyPressurePercent: parseFloat(buyPct.toFixed(2)), tickScore };
 }
 
-function calcCompositeScore(intraday, tick, netPnl) {
+// ── Polygon macro data (historical — entitled on current plan) ─────────────────
+// Daily aggregates + yesterday's minute aggregates are available on the current
+// plan. Real-time minute/second (today) returns 403 — we use historical only.
+const POLYGON_TICKER = 'X:BTCUSD';
+
+async function fetchPolygonDaily(apiKey) {
+  if (!apiKey) return [];
+  const to   = new Date().toISOString().split('T')[0];
+  const from = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+  try {
+    const r = await fetch(
+      `https://api.polygon.io/v2/aggs/ticker/${POLYGON_TICKER}/range/1/day/${from}/${to}?adjusted=true&sort=asc&limit=50&apiKey=${apiKey}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    const j = await r.json();
+    return (j?.results || []).map(b => ({ ts: b.t, close: b.c, open: b.o, high: b.h, low: b.l, vol: b.v }));
+  } catch { return []; }
+}
+
+async function fetchPolygonHistMinute(apiKey) {
+  if (!apiKey) return [];
+  // Yesterday's minute aggregates (historical = entitled; real-time today = 403)
+  const dayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  try {
+    const r = await fetch(
+      `https://api.polygon.io/v2/aggs/ticker/${POLYGON_TICKER}/range/1/minute/${dayStr}/${dayStr}?adjusted=true&sort=asc&limit=50000&apiKey=${apiKey}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    const j = await r.json();
+    return (j?.results || []).map(b => ({ ts: b.t, close: b.c, vol: b.v }));
+  } catch { return []; }
+}
+
+function analyzePolygonMacro(dailyBars, minuteBars) {
+  const dailyCloses = dailyBars.map(b => b.close);
+  let dailyDirection = 'NEUTRAL';
+  let dailyScore = 50;
+
+  if (dailyCloses.length >= 21) {
+    const emaF = calcEMA(dailyCloses, 9);
+    const emaS = calcEMA(dailyCloses, 21);
+    const rsi   = calcRSI(dailyCloses, 14);
+    const mom   = dailyCloses.length >= 10
+      ? (dailyCloses[dailyCloses.length - 1] - dailyCloses[dailyCloses.length - 10]) / dailyCloses[dailyCloses.length - 10] * 100
+      : 0;
+    const cross   = emaF > emaS ? 1 : -1;
+    const rsiBull = rsi > 55 ? 1 : rsi < 45 ? -1 : 0;
+    const momBull = mom > 0.5 ? 1 : mom < -0.5 ? -1 : 0;
+    const vote    = cross + rsiBull + momBull;
+    dailyDirection = vote >= 2 ? 'BULLISH' : vote <= -2 ? 'BEARISH' : 'NEUTRAL';
+    if (dailyDirection === 'BULLISH') dailyScore = 78;
+    if (dailyDirection === 'BEARISH') dailyScore = 22;
+  }
+
+  let minuteMomentum = 0;
+  if (minuteBars.length >= 30) {
+    const last = minuteBars.slice(-120);
+    minuteMomentum = (last[last.length - 1].close - last[0].close) / last[0].close * 100;
+  }
+  const minuteDir      = minuteMomentum > 0.1 ? 'BULLISH' : minuteMomentum < -0.1 ? 'BEARISH' : 'NEUTRAL';
+  const macroConfirmed = dailyDirection !== 'NEUTRAL' && minuteDir === dailyDirection;
+
+  return {
+    available:           dailyBars.length > 0,
+    dailyDirection,
+    dailyScore,
+    minuteMomentum:       parseFloat(minuteMomentum.toFixed(4)),
+    minuteDirection:      minuteDir,
+    macroConfirmed,
+    dailyBars:           dailyBars.length,
+    minuteBars:          minuteBars.length,
+  };
+}
+
+function calcCompositeScore(intraday, tick, netPnl, polygon) {
   const intS  = intraday.score;
   const tickS = tick.tickDirection === 'BUY_PRESSURE' ? 75 : tick.tickDirection === 'NEUTRAL' ? 50 : 20;
   const feeS  = netPnl >= REQUIRED_NET ? 70 : netPnl >= 0 ? 40 : 10;
+  // Blend OKX real-time (intraday + tick) + Polygon historical macro + fee economics
+  if (polygon && polygon.available) {
+    return Math.round(intS * 0.40 + tickS * 0.25 + polygon.dailyScore * 0.20 + feeS * 0.15);
+  }
+  // Fallback: OKX-only (original weights) when Polygon unavailable
   return Math.round(intS * 0.50 + tickS * 0.30 + feeS * 0.20);
 }
 
@@ -201,7 +280,7 @@ function calcPnL(entry, exit, spreadPct, tp) {
   };
 }
 
-function checkBarriers4F(intraday, tick, spreadPct, score) {
+function checkBarriers4F(intraday, tick, spreadPct, score, polygon) {
   const grossProfit     = K_SIZE * (NEW.tpPercent / 100);
   const fees            = K_SIZE * OKX_TAKER_FEE * 2;
   const spreadCost      = K_SIZE * (spreadPct / 100);
@@ -222,6 +301,8 @@ function checkBarriers4F(intraday, tick, spreadPct, score) {
     scoreBarrier:         score >= NEW.requiredScore,
     momentumBarrier:      Math.abs(intraday.momentum) >= 0.03,
     tpRealismBarrier:     tpRealismPass,
+    // Polygon macro confirmation — NEUTRAL daily does not block (no-op when unavailable)
+    polygonMacroBarrier:  !polygon || polygon.dailyDirection === 'NEUTRAL' || polygon.macroConfirmed,
   };
 }
 
@@ -299,26 +380,29 @@ Deno.serve(async (req) => {
       if (btcOpen) {
         scanResults.push({ instId: 'BTC-USDT', action: 'SKIP_OPEN_POSITION', reason: 'DUPLICATE_PROTECTION', openTradeId: btcOpen.id });
       } else {
-        const [ticker, candles, trades] = await Promise.all([
+        const polyKey = Deno.env.get('POLYGON_API_KEY');
+        const [ticker, candles, trades, polyDaily, polyMinute] = await Promise.all([
           fetchTicker('BTC-USDT'), fetchCandles('BTC-USDT'), fetchTrades('BTC-USDT'),
+          fetchPolygonDaily(polyKey), fetchPolygonHistMinute(polyKey),
         ]);
 
         if (!ticker || candles.length < 30 || trades.length < 10) {
-          scanResults.push({ instId: 'BTC-USDT', action: 'SKIP_NO_DATA', reason: `ticker=${!!ticker} candles=${candles.length} trades=${trades.length}` });
+          scanResults.push({ instId: 'BTC-USDT', action: 'SKIP_NO_DATA', reason: `ticker=${!!ticker} candles=${candles.length} trades=${trades.length} polygonDaily=${polyDaily.length}` });
         } else {
           const intraday  = analyzeIntraday(candles, ticker);
           const tick      = analyzeTickConfirmation(trades);
+          const polygon   = analyzePolygonMacro(polyDaily, polyMinute);
           const roughNet  = K_SIZE * (NEW.tpPercent / 100) - K_SIZE * OKX_TAKER_FEE * 2 - K_SIZE * (ticker.spreadPct / 100);
-          const score     = calcCompositeScore(intraday, tick, roughNet);
-          const barriers  = checkBarriers4F(intraday, tick, ticker.spreadPct, score);
+          const score     = calcCompositeScore(intraday, tick, roughNet, polygon);
+          const barriers  = checkBarriers4F(intraday, tick, ticker.spreadPct, score, polygon);
           const allPass   = Object.values(barriers).every(Boolean);
 
           const failedBarriers = Object.entries(barriers).filter(([, v]) => !v).map(([k]) => k);
           const reason = allPass
-            ? `ALL_BARRIERS_PASS score=${score} intraday=${intraday.direction} tick=${tick.tickDirection} tp=${NEW.tpPercent}%`
-            : `BARRIERS_FAILED: ${failedBarriers.join(',')} | score=${score} intraday=${intraday.direction} tick=${tick.tickDirection}`;
+            ? `ALL_BARRIERS_PASS score=${score} intraday=${intraday.direction} tick=${tick.tickDirection} polyDaily=${polygon.dailyDirection} macroOK=${polygon.macroConfirmed} tp=${NEW.tpPercent}%`
+            : `BARRIERS_FAILED: ${failedBarriers.join(',')} | score=${score} intraday=${intraday.direction} tick=${tick.tickDirection} polyDaily=${polygon.dailyDirection} macroOK=${polygon.macroConfirmed}`;
 
-          scanResults.push({ instId: 'BTC-USDT', action: allPass ? 'PAPER_BUY' : 'NO_SIGNAL', score, intraday: intraday.direction, tick: tick.tickDirection, barriers, allPass, reason });
+          scanResults.push({ instId: 'BTC-USDT', action: allPass ? 'PAPER_BUY' : 'NO_SIGNAL', score, intraday: intraday.direction, tick: tick.tickDirection, polygonDaily: polygon.dailyDirection, polygonMacroConfirmed: polygon.macroConfirmed, polygonDailyBars: polygon.dailyBars, polygonMinuteBars: polygon.minuteBars, barriers, allPass, reason });
 
           if (allPass) {
             const entry      = ticker.ask;
