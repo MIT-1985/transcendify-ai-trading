@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from 'react-router-dom';
+import DiscordTradeNotifier from '@/components/dashboard/DiscordTradeNotifier';
 
 // ── OKX WebSocket — real-time BTC-USDT tick data ──────────────────────────────
 function useOkxWebSocket() {
@@ -348,6 +349,9 @@ export default function Dashboard() {
             <Link to="/Transactions" className="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-700/30 border border-slate-700 hover:bg-slate-700/50 text-slate-300 transition-all">📒 Trades</Link>
           </div>
         </div>
+
+        {/* Discord notifications */}
+        <DiscordTradeNotifier />
 
         {/* Growing profit + live signal */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
