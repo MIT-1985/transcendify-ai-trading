@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { buildMicroSignal } from '../../shared/microMarketData.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -12,6 +13,75 @@ Deno.serve(async (req) => {
     const { action, data } = await req.json();
 
     switch (action) {
+      // ── Micro real-trade signal: OKX 1s candles + tick (ms) + Polygon macro,
+      //    fed to the LLM for a real BUY/SELL/WAIT decision + TP/SL sizing.
+      case 'micro_real_signal': {
+        const instId = (data && data.instId) || 'BTC-USDT';
+        const capitalUSDT = (data && data.capitalUSDT) || 15;
+        const polyKey = Deno.env.get('POLYGON_API_KEY');
+
+        const micro = await buildMicroSignal(instId, polyKey);
+
+        if (!micro.ready) {
+          return Response.json({
+            success: false,
+            instId,
+            reason: micro.reason,
+            micro,
+          });
+        }
+
+        const prompt = `You are a micro-scalping crypto trader deciding a REAL BTC-USDT trade RIGHT NOW using sub-second data.
+
+Pair: ${instId}
+Composite score (0-100): ${micro.compositeScore}
+Micro tick direction (ms): ${micro.micro.tickDirection}
+Micro buy pressure %: ${micro.micro.buyPressurePercent}
+Micro momentum % (tick drift): ${micro.micro.microMomentumPct}
+1s momentum (last 10s): ${micro.momentum10s}%
+1s volume momentum %: ${micro.volumeMomentum}
+EMA9 vs EMA21: ${micro.emaFast} / ${micro.emaSlow} (${micro.emaFast > micro.emaSlow ? 'bullish' : 'bearish'})
+RSI(14): ${micro.rsi}
+Spread %: ${micro.spreadPct}
+Last price: ${micro.lastPrice}
+Polygon daily macro direction: ${micro.polygonMacro.dailyDirection}
+Polygon minute momentum %: ${micro.polygonMacro.minuteMomentum}
+Polygon macro confirmed: ${micro.polygonMacro.macroConfirmed}
+Capital per trade: ${capitalUSDT} USDT
+Taker fee: 0.1% each side
+
+Decide NOW (this is real money, fees matter):
+1. action: "BUY" | "SELL" | "WAIT"
+2. take_profit_percent (realistic after 0.2% round-trip fees)
+3. stop_loss_percent (1:2 risk/reward)
+4. confidence (0-100)
+5. one-line reasoning
+
+Be conservative — WAIT unless micro tick + intraday + macro all align.`;
+
+        const response = await base44.integrations.Core.InvokeLLM({
+          prompt,
+          response_json_schema: {
+            type: 'object',
+            properties: {
+              action: { type: 'string' },
+              take_profit_percent: { type: 'number' },
+              stop_loss_percent: { type: 'number' },
+              confidence: { type: 'number' },
+              reasoning: { type: 'string' },
+            },
+          },
+        });
+
+        return Response.json({
+          success: true,
+          instId,
+          source: micro.source,
+          micro,
+          aiDecision: response,
+        });
+      }
+
       case 'optimize_parameters': {
         const { symbol, strategy, capital, historical_data } = data;
         

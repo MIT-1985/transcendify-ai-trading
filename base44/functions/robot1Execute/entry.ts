@@ -11,6 +11,7 @@
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { fetchOkxTrades, analyzeMicroTick } from '../../shared/microMarketData.ts';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
@@ -121,8 +122,8 @@ async function fetchOkxCandles(instId) {
 
 // ─── Score a single pair (0-100) ──────────────────────────────────────────────
 // Returns { score, signal, trend, momentum, volRatio, volatilityPct, spreadPct, polygonPrice, detail, decisionReason }
-function scorePair(pair, ticker, candles) {
-  if (!ticker) return { pair, score: 0, signal: null, trend: 'N/A', momentum: 0, volRatio: 0, volatilityPct: 0, spreadPct: 99, polygonPrice: null, detail: 'no_ticker', decisionReason: 'No ticker data available' };
+function scorePair(pair, ticker, candles, micro) {
+  if (!ticker) return { pair, score: 0, signal: null, trend: 'N/A', momentum: 0, volRatio: 0, volatilityPct: 0, spreadPct: 99, polygonPrice: null, detail: 'no_ticker', decisionReason: 'No ticker data available', tickDirection: 'NEUTRAL', buyPressurePercent: 50, microMomentumPct: 0 };
 
   const bid = parseFloat(ticker.bidPx || 0);
   const ask = parseFloat(ticker.askPx || 0);
@@ -184,10 +185,18 @@ function scorePair(pair, ticker, candles) {
 
   // Spread (30) already computed above
 
-  const score = Math.round(trendScore + momentumScore + volumeScore + volatilityScore + spreadScore);
+  // ── Micro-tick (ms) confirmation layer ──────────────────────────────────────
+  const tickDir = micro?.tickDirection || 'NEUTRAL';
+  const buyPct = micro?.buyPressurePercent ?? 50;
+  const microMomPct = micro?.microMomentumPct ?? 0;
+  // Tick bonus: BUY_PRESSURE adds up to 8 pts, SELL_PRESSURE subtracts
+  const tickBonus = tickDir === 'BUY_PRESSURE' ? 8 : tickDir === 'SELL_PRESSURE' ? -8 : 0;
 
-  const signal = isUp && momentum > 0.3 && volRatio > 1.1 && volatilityPct < 2.0 && bullish ? 'BUY' :
-                 !isUp && momentum < -0.3 ? 'SELL' : null;
+  const score = Math.round(trendScore + momentumScore + volumeScore + volatilityScore + spreadScore + tickBonus);
+
+  // BUY requires micro buy-pressure confirmation (tick ms); SELL on tick sell-pressure
+  const signal = isUp && momentum > 0.3 && volRatio > 1.1 && volatilityPct < 2.0 && bullish && tickDir === 'BUY_PRESSURE' ? 'BUY' :
+                 (!isUp && momentum < -0.3) || tickDir === 'SELL_PRESSURE' ? 'SELL' : null;
 
   const reasons = [];
   if (isUp) reasons.push(`trend UP`); else reasons.push(`trend DOWN`);
@@ -408,20 +417,26 @@ Deno.serve(async (req) => {
 
     console.log(`[R1] Positions open: ${activeCount}/${MAX_POSITIONS} | freeUSDT=${freeUsdt.toFixed(2)}`);
 
-    // ── 3. Fetch OKX hourly candles for all pairs in parallel ─────────────────
+    // ── 3. Fetch OKX 1s candles + tick (ms) for all pairs in parallel ────────
     const okxCandles = {};
+    const okxMicro = {};
     const candleResults = await Promise.all(
-      ALLOWED_PAIRS.map(pair =>
-        fetchOkxCandles(pair)
-          .then(c => ({ pair, candles: c }))
-          .catch(() => ({ pair, candles: null }))
-      )
+      ALLOWED_PAIRS.map(async pair => {
+        const [candles, trades] = await Promise.all([
+          fetchOkxCandles(pair).catch(() => null),
+          fetchOkxTrades(pair).catch(() => []),
+        ]);
+        return { pair, candles, micro: analyzeMicroTick(trades) };
+      })
     );
-    for (const { pair, candles } of candleResults) okxCandles[pair] = candles;
+    for (const { pair, candles, micro } of candleResults) {
+      okxCandles[pair] = candles;
+      okxMicro[pair] = micro;
+    }
 
     // ── 4. Score all pairs ────────────────────────────────────────────────────
     const pairScores = ALLOWED_PAIRS.map(pair =>
-      scorePair(pair, tickerMap[pair], okxCandles[pair])
+      scorePair(pair, tickerMap[pair], okxCandles[pair], okxMicro[pair])
     );
     pairScores.sort((a, b) => b.score - a.score); // highest score first
     console.log(`[R1] Pair scores: ${pairScores.map(p => `${p.pair}=${p.score}`).join(', ')}`);
@@ -431,7 +446,11 @@ Deno.serve(async (req) => {
     const pairScoresForLog = pairScores.map(p => ({
       pair: p.pair, score: p.score, signal: p.signal, spread: p.spreadPct,
       trend: p.trend, momentum: p.momentum, volRatio: p.volRatio,
-      volatility: p.volatilityPct, decisionReason: p.decisionReason
+      volatility: p.volatilityPct,
+      tickDirection: p.tickDirection || 'NEUTRAL',
+      buyPressurePercent: p.buyPressurePercent ?? 50,
+      microMomentumPct: p.microMomentumPct ?? 0,
+      decisionReason: p.decisionReason
     }));
     const commonData = { freeUsdt, pairScores: pairScoresForLog, polygonStatus, okxStatus: 'OK' };
 
@@ -556,7 +575,11 @@ Deno.serve(async (req) => {
       pairScores: pairScores.map(p => ({
         pair: p.pair, score: p.score, signal: p.signal, spread: p.spreadPct,
         trend: p.trend, momentum: p.momentum, volRatio: p.volRatio,
-        volatility: p.volatilityPct, decision: activePairSetNow.has(p.pair) ? 'HOLDING' : p.score >= MIN_SCORE_TO_BUY ? 'ELIGIBLE' : 'WAIT'
+        volatility: p.volatilityPct,
+        tickDirection: p.tickDirection || 'NEUTRAL',
+        buyPressurePercent: p.buyPressurePercent ?? 50,
+        microMomentumPct: p.microMomentumPct ?? 0,
+        decision: activePairSetNow.has(p.pair) ? 'HOLDING' : p.score >= MIN_SCORE_TO_BUY ? 'ELIGIBLE' : 'WAIT'
       })),
       sells: sellResults,
       buy: buyResult,

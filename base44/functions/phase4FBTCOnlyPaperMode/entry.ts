@@ -28,6 +28,7 @@
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { analyzeMicroTick } from '../../shared/microMarketData.ts';
 
 // ── HARDCODED SAFETY ──────────────────────────────────────────────────────────
 const REAL_TRADE_ALLOWED        = false;
@@ -185,17 +186,7 @@ function analyzeIntraday(candles, ticker) {
   return { direction, score, emaFast, emaSlow, rsi, momentum: parseFloat(mom10.toFixed(4)), volumeMomentum: parseFloat(volMom.toFixed(2)), volatilityPct: parseFloat(volatility.toFixed(4)), spreadPct: ticker?.spreadPct || 0 };
 }
 
-function analyzeTickConfirmation(trades) {
-  if (trades.length < 10) return { tickDirection: 'NEUTRAL', buyPressurePercent: 50, tickScore: 10 };
-  const buyVol  = trades.filter(t => t.side === 'buy').reduce((s, t) => s + t.size, 0);
-  const sellVol = trades.filter(t => t.side === 'sell').reduce((s, t) => s + t.size, 0);
-  const total   = buyVol + sellVol;
-  const buyPct  = total > 0 ? buyVol / total * 100 : 50;
-  const drift   = trades.length > 1 ? (trades[0].price - trades[trades.length - 1].price) / trades[trades.length - 1].price * 100 : 0;
-  const tickDirection = buyPct >= 58 && drift > 0 ? 'BUY_PRESSURE' : (100 - buyPct) >= 58 && drift < 0 ? 'SELL_PRESSURE' : 'NEUTRAL';
-  const tickScore = buyPct >= 65 ? 25 : buyPct >= 55 ? 18 : buyPct >= 45 ? 10 : 5;
-  return { tickDirection, buyPressurePercent: parseFloat(buyPct.toFixed(2)), tickScore };
-}
+const analyzeTickConfirmation = (trades) => analyzeMicroTick(trades);
 
 // ── Polygon macro data (historical — entitled on current plan) ─────────────────
 // Daily aggregates + yesterday's minute aggregates are available on the current
