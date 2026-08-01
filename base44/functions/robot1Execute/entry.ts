@@ -18,13 +18,9 @@ const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
 // Priority order defines tiebreak; scoring picks the actual winner
 // ── PHASE 5 LIVE — BTC-USDT ONLY ─────────────────────────────────────────────
 // Strategy: fee-aware scalping. Only enter if net profit after fees > threshold.
-// Polygon (hourly candles) + OKX (live ticker) for scoring.
+// OKX public hourly candles (no key, confirmed-only) + OKX live ticker for scoring.
 // TP = 1.3%, SL = 0.65%, size = 15 USDT. Auto-restart cycle on loss.
 const ALLOWED_PAIRS = ['BTC-USDT'];
-
-const POLYGON_TICKER = {
-  'BTC-USDT': 'X:BTCUSD',
-};
 
 const TRADE_AMOUNT_USDT = 15;     // 15 USDT per trade
 const MAX_POSITION_PCT  = 0.15;   // max 15% of free USDT per trade (safety cap)
@@ -104,21 +100,26 @@ async function fetchAllTickers(apiKey, secret, passphrase) {
   return map;
 }
 
-// ─── Polygon candle fetch per pair ────────────────────────────────────────────
-async function fetchPolygonCandles(ticker) {
-  const apiKey = Deno.env.get('POLYGON_API_KEY');
-  if (!apiKey) return null;
-  const now = new Date();
-  const to = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const from = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  try {
-    const r = await fetch(`https://api.polygon.io/v2/aggs/ticker/${ticker}/range/1/hour/${from}/${to}?adjusted=true&sort=asc&limit=120&apiKey=${apiKey}`);
-    const d = await r.json();
-    if (!d.results || d.results.length < 5) return null;
-    return d.results;
-  } catch {
-    return null;
+// ─── OKX public hourly candles (no key, confirmed-only) ───────────────────────
+// Replaces stale Polygon range (was now-24h → day-old closes). OKX candles are
+// public, newest closed bar ~25 min old, confirmed-only.
+async function fetchOkxCandles(instId) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await fetch(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1H&limit=121`, { signal: AbortSignal.timeout(8000) });
+      const j = await r.json();
+      if (j?.data?.length) {
+        // OKX returns newest-first; reverse to oldest-first
+        const arr = j.data.slice().reverse();
+        // Drop the trailing incomplete (current) hour → confirmed-only
+        const nowHour = Math.floor(Date.now() / 3600000) * 3600000;
+        if (arr.length && Number(arr[arr.length - 1][0]) >= nowHour) arr.pop();
+        if (arr.length < 5) return null;
+        return arr.map(c => ({ o: parseFloat(c[1]), h: parseFloat(c[2]), l: parseFloat(c[3]), c: parseFloat(c[4]), v: parseFloat(c[5]), t: Number(c[0]) }));
+      }
+    } catch {}
   }
+  return null;
 }
 
 // ─── Score a single pair (0-100) ──────────────────────────────────────────────
@@ -410,20 +411,20 @@ Deno.serve(async (req) => {
 
     console.log(`[R1] Positions open: ${activeCount}/${MAX_POSITIONS} | freeUSDT=${freeUsdt.toFixed(2)}`);
 
-    // ── 3. Fetch Polygon candles for all pairs in parallel ────────────────────
-    const polygonCandles = {};
+    // ── 3. Fetch OKX hourly candles for all pairs in parallel ─────────────────
+    const okxCandles = {};
     const candleResults = await Promise.all(
       ALLOWED_PAIRS.map(pair =>
-        fetchPolygonCandles(POLYGON_TICKER[pair])
+        fetchOkxCandles(pair)
           .then(c => ({ pair, candles: c }))
           .catch(() => ({ pair, candles: null }))
       )
     );
-    for (const { pair, candles } of candleResults) polygonCandles[pair] = candles;
+    for (const { pair, candles } of candleResults) okxCandles[pair] = candles;
 
     // ── 4. Score all pairs ────────────────────────────────────────────────────
     const pairScores = ALLOWED_PAIRS.map(pair =>
-      scorePair(pair, tickerMap[pair], polygonCandles[pair])
+      scorePair(pair, tickerMap[pair], okxCandles[pair])
     );
     pairScores.sort((a, b) => b.score - a.score); // highest score first
     console.log(`[R1] Pair scores: ${pairScores.map(p => `${p.pair}=${p.score}`).join(', ')}`);
