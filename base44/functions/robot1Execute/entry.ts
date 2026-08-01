@@ -100,20 +100,17 @@ async function fetchAllTickers(apiKey, secret, passphrase) {
   return map;
 }
 
-// ─── OKX public hourly candles (no key, confirmed-only) ───────────────────────
-// Replaces stale Polygon range (was now-24h → day-old closes). OKX candles are
-// public, newest closed bar ~25 min old, confirmed-only.
+// ─── OKX public second candles (no key, confirmed-only) ──────────────────────
+// 1s bars for sub-minute momentum/volume scoring. Drop the current incomplete second.
 async function fetchOkxCandles(instId) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const r = await fetch(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1H&limit=121`, { signal: AbortSignal.timeout(8000) });
+      const r = await fetch(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1s&limit=300`, { signal: AbortSignal.timeout(8000) });
       const j = await r.json();
       if (j?.data?.length) {
-        // OKX returns newest-first; reverse to oldest-first
         const arr = j.data.slice().reverse();
-        // Drop the trailing incomplete (current) hour → confirmed-only
-        const nowHour = Math.floor(Date.now() / 3600000) * 3600000;
-        if (arr.length && Number(arr[arr.length - 1][0]) >= nowHour) arr.pop();
+        const nowSec = Math.floor(Date.now() / 1000) * 1000;
+        if (arr.length && Number(arr[arr.length - 1][0]) >= nowSec) arr.pop();
         if (arr.length < 5) return null;
         return arr.map(c => ({ o: parseFloat(c[1]), h: parseFloat(c[2]), l: parseFloat(c[3]), c: parseFloat(c[4]), v: parseFloat(c[5]), t: Number(c[0]) }));
       }

@@ -101,9 +101,9 @@ async function fetchCandles(instId) {
     ts: Number(c[0]), open: parseFloat(c[1]), high: parseFloat(c[2]),
     low: parseFloat(c[3]), close: parseFloat(c[4]), vol: parseFloat(c[5]),
   })).reverse();
-  // Primary endpoint with one retry
+  // Primary endpoint with one retry — 1s (second-level) bars
   for (const url of [
-    `https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1m&limit=300`,
+    `https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1s&limit=300`,
   ]) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
@@ -115,7 +115,7 @@ async function fetchCandles(instId) {
   }
   // Fallback: history-candles (older, max 100/req)
   try {
-    const r = await fetch(`https://www.okx.com/api/v5/market/history-candles?instId=${instId}&bar=1m&limit=100`, { signal: AbortSignal.timeout(8000) });
+    const r = await fetch(`https://www.okx.com/api/v5/market/history-candles?instId=${instId}&bar=1s&limit=100`, { signal: AbortSignal.timeout(8000) });
     const j = await r.json();
     if (j?.data?.length) return parse(j);
   } catch {}
