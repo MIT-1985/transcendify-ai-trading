@@ -80,27 +80,46 @@ const RSI_PERIOD     = 14;
 
 // ── OKX public market data (read-only) ───────────────────────────────────────
 async function fetchTicker(instId) {
-  try {
-    const r = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`, { signal: AbortSignal.timeout(6000) });
-    const j = await r.json();
-    const d = j?.data?.[0];
-    if (!d) return null;
-    const bid = parseFloat(d.bidPx || d.last);
-    const ask = parseFloat(d.askPx || d.last);
-    const mid = (bid + ask) / 2;
-    return { last: parseFloat(d.last), bid, ask, spreadPct: mid > 0 ? (ask - bid) / mid * 100 : 0 };
-  } catch { return null; }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`, { signal: AbortSignal.timeout(8000) });
+      const j = await r.json();
+      const d = j?.data?.[0];
+      if (d) {
+        const bid = parseFloat(d.bidPx || d.last);
+        const ask = parseFloat(d.askPx || d.last);
+        const mid = (bid + ask) / 2;
+        return { last: parseFloat(d.last), bid, ask, spreadPct: mid > 0 ? (ask - bid) / mid * 100 : 0 };
+      }
+    } catch {}
+  }
+  return null;
 }
 
 async function fetchCandles(instId) {
+  const parse = (j) => (j?.data || []).map(c => ({
+    ts: Number(c[0]), open: parseFloat(c[1]), high: parseFloat(c[2]),
+    low: parseFloat(c[3]), close: parseFloat(c[4]), vol: parseFloat(c[5]),
+  })).reverse();
+  // Primary endpoint with one retry
+  for (const url of [
+    `https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1m&limit=300`,
+  ]) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        const j = await r.json();
+        if (j?.data?.length) return parse(j);
+      } catch {}
+    }
+  }
+  // Fallback: history-candles (older, max 100/req)
   try {
-    const r = await fetch(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1m&limit=300`, { signal: AbortSignal.timeout(6000) });
+    const r = await fetch(`https://www.okx.com/api/v5/market/history-candles?instId=${instId}&bar=1m&limit=100`, { signal: AbortSignal.timeout(8000) });
     const j = await r.json();
-    return (j?.data || []).map(c => ({
-      ts: Number(c[0]), open: parseFloat(c[1]), high: parseFloat(c[2]),
-      low: parseFloat(c[3]), close: parseFloat(c[4]), vol: parseFloat(c[5]),
-    })).reverse();
-  } catch { return []; }
+    if (j?.data?.length) return parse(j);
+  } catch {}
+  return [];
 }
 
 async function fetchTrades(instId) {
