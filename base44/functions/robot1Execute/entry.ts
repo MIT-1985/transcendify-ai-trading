@@ -11,7 +11,7 @@
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-import { fetchOkxTrades, analyzeMicroTick } from '../../shared/microMarketData.ts';
+import { fetchOkxTrades, fetchOkxTicker, analyzeMicroTick } from '../../shared/microMarketData.ts';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SUZANA_EMAIL = 'nikitasuziface77@gmail.com';
@@ -86,15 +86,16 @@ async function okxRequest(apiKey, secret, passphrase, method, path, bodyStr = ''
   return res.json();
 }
 
-// ─── Fetch OKX tickers for all pairs in one call ──────────────────────────────
-async function fetchAllTickers(apiKey, secret, passphrase) {
-  // OKX supports comma-separated tickers or we fetch individually in parallel
+// ─── Fetch OKX tickers for all pairs (PUBLIC endpoint — no auth needed) ───────
+// Ticker data is public; using the authenticated endpoint added a signing step
+// that failed intermittently → empty tickerMap → score=0 / "no_ticker".
+// Now uses the shared public fetchOkxTicker (3-retry + backoff).
+async function fetchAllTickers() {
   const results = await Promise.all(
-    ALLOWED_PAIRS.map(pair =>
-      okxRequest(apiKey, secret, passphrase, 'GET', `/api/v5/market/ticker?instId=${pair}`)
-        .then(r => ({ pair, ticker: r.data?.[0] || null }))
-        .catch(() => ({ pair, ticker: null }))
-    )
+    ALLOWED_PAIRS.map(async pair => {
+      const t = await fetchOkxTicker(pair);
+      return { pair, ticker: t };
+    })
   );
   const map = {};
   for (const { pair, ticker } of results) map[pair] = ticker;
@@ -403,9 +404,9 @@ Deno.serve(async (req) => {
       decryptOkx(conn.encryption_iv)
     ]);
 
-    // ── 2. Fetch all tickers + balance + active positions in parallel ──────────
+    // ── 2. Fetch all tickers (public) + balance (auth) + active positions ──────
     const [tickerMap, balRes, allActivePositions] = await Promise.all([
-      fetchAllTickers(apiKey, apiSecret, passphrase),
+      fetchAllTickers(),
       okxRequest(apiKey, apiSecret, passphrase, 'GET', '/api/v5/account/balance'),
       getAllActivePositions(base44)
     ]);

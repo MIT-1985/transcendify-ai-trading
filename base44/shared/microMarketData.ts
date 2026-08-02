@@ -30,6 +30,8 @@ export async function fetchOkxTicker(instId) {
         return { last: parseFloat(d.last), bid, ask, spreadPct: mid > 0 ? (ask - bid) / mid * 100 : 0 };
       }
     } catch {}
+    // Brief backoff between retries for transient OKX blips
+    if (attempt < 2) await new Promise(r => setTimeout(r, 250));
   }
   return null;
 }
@@ -55,7 +57,7 @@ export async function fetchOkxCandles1s(instId) {
 }
 
 export async function fetchOkxTrades(instId, limit = 500) {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const r = await fetch(`https://www.okx.com/api/v5/market/trades?instId=${instId}&limit=${limit}`, { signal: AbortSignal.timeout(6000) });
       const j = await r.json();
@@ -63,6 +65,7 @@ export async function fetchOkxTrades(instId, limit = 500) {
         return j.data.map(t => ({ ts: Number(t.ts), price: parseFloat(t.px), size: parseFloat(t.sz), side: t.side }));
       }
     } catch {}
+    if (attempt < 2) await new Promise(r => setTimeout(r, 250));
   }
   return [];
 }
