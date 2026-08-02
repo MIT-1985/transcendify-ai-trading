@@ -1,331 +1,226 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
-import { createPageUrl } from '@/utils';
-import { 
-  Bot, 
-  PlayCircle, 
-  PauseCircle, 
-  StopCircle, 
-  Eye,
-  TrendingUp,
-  TrendingDown,
+import {
+  Bot,
+  ShieldCheck,
+  ShieldAlert,
+  Lock,
   Activity,
-  DollarSign,
-  BarChart3,
-  Copy,
-  Trash2
+  TrendingUp,
+  Cpu,
+  Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import CloneBotModal from '@/components/bots/CloneBotModal';
+
+// ── Robot status card (one per real robot) ─────────────────────────────────────
+function RobotCard({ robot }) {
+  const { name, phase, status, statusColor, icon: Icon, metrics, locked, linkTo } = robot;
+  return (
+    <Card className="bg-slate-900 border-slate-800">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Icon className="w-5 h-5 text-blue-400" />
+            {name}
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            {locked && (
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded">
+                <Lock className="w-3 h-3" /> LOCKED
+              </span>
+            )}
+            <Badge className={statusColor} variant="outline">{status}</Badge>
+          </div>
+        </div>
+        <div className="text-sm text-slate-400">{phase}</div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          {metrics.map((m) => (
+            <div key={m.label} className="bg-slate-800/50 rounded-lg p-3">
+              <div className="text-xs text-slate-400 mb-1">{m.label}</div>
+              <div className={`text-lg font-bold ${m.color || 'text-white'}`}>{m.value}</div>
+            </div>
+          ))}
+        </div>
+        {linkTo && (
+          <Link to={linkTo} className="block">
+            <span className="text-sm text-blue-400 hover:text-blue-300 hover:underline">
+              Открыть детайли →
+            </span>
+          </Link>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function BotDashboard() {
-  const queryClient = useQueryClient();
-  const [selectedBots, setSelectedBots] = useState(new Set());
-  const [cloneModal, setCloneModal] = useState({ open: false, subscription: null, botInfo: null });
-
-  const { data: user } = useQuery({
-    queryKey: ['user'],
-    queryFn: () => base44.auth.me()
-  });
-
-  const { data: subscriptions = [], isLoading } = useQuery({
-    queryKey: ['userSubscriptions', user?.email],
+  // ── System trail = single source of truth for both robots ────────────────
+  const { data: trail = {}, isLoading } = useQuery({
+    queryKey: ['bot-dashboard-system-trail'],
     queryFn: async () => {
-      const [byCreator, byEmail] = await Promise.all([
-        base44.entities.UserSubscription.filter({ created_by: user?.email }),
-        base44.entities.UserSubscription.filter({ user_email: user?.email })
-      ]);
-      const all = [...byCreator, ...byEmail];
-      const seen = new Set();
-      return all.filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
+      const res = await base44.functions.invoke('systemTrailTradingState', {});
+      return res.data || {};
     },
-    enabled: !!user,
-    staleTime: 15000,
-    retry: false
+    refetchInterval: 15000,
+    staleTime: 10000,
   });
 
-  const { data: bots = [] } = useQuery({
-    queryKey: ['tradingBots'],
-    queryFn: () => base44.entities.TradingBot.list()
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }) => {
-      await base44.entities.UserSubscription.update(id, { status });
+  // ── Phase 5 open trade + preflight ────────────────────────────────────────
+  const { data: phase5Open = {} } = useQuery({
+    queryKey: ['bot-dashboard-phase5-open'],
+    queryFn: async () => {
+      const res = await base44.functions.invoke('phase5GetOpenTrade', {});
+      return res.data || {};
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userSubscriptions'] });
-      toast.success('Bot status updated');
-    }
+    refetchInterval: 15000,
+    staleTime: 10000,
   });
 
+  const live = trail.liveStatus || {};
+  const safety = trail.safety || {};
+  const config = trail.config || {};
+  const lastPrice = live.lastPrice || 0;
+  const totalScore = live.totalScore || 0;
+  const requiredScore = live.requiredScore || 75;
+  const openTrades = live.openBTCTrades || 0;
 
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id) => {
-      await base44.entities.UserSubscription.delete(id);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userSubscriptions'] });
-      toast.success('Bot deleted');
-    }
-  });
-
-  const getBotInfo = (botId) => {
-    return bots.find(b => b.id === botId) || {};
+  // ── Robot 1: Phase 4F (paper, active) ─────────────────────────────────────
+  const robot4F = {
+    name: 'Robot 1 — Paper Trading',
+    phase: 'PHASE 4F · BTC-USDT only · Economic paper mode',
+    status: openTrades > 0 ? 'OPEN POSITION' : 'SCANNING',
+    statusColor: openTrades > 0
+      ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    icon: Bot,
+    locked: false,
+    linkTo: '/PaperTradingDashboard',
+    metrics: [
+      { label: 'BTC цена', value: lastPrice ? `$${lastPrice.toLocaleString('en-US', { maximumFractionDigits: 1 })}` : '—' },
+      { label: 'Сигнал', value: live.alertLevel || 'COLD' },
+      { label: 'Score', value: `${totalScore}/${requiredScore}`, color: totalScore >= requiredScore ? 'text-emerald-400' : 'text-slate-300' },
+      { label: 'Отворени', value: String(openTrades) },
+    ],
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      active: 'bg-green-500/20 text-green-300 border-green-500/30',
-      paused: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-      expired: 'bg-red-500/20 text-red-300 border-red-500/30',
-      cancelled: 'bg-slate-500/20 text-slate-300 border-slate-500/30'
-    };
-    return colors[status] || colors.cancelled;
+  // ── Robot 2: Phase 5 (real test, locked) ───────────────────────────────────
+  const robot5 = {
+    name: 'Robot 2 — Real Test (Phase 5)',
+    phase: 'PHASE 5 · Manual confirm · BTC-USDT',
+    status: phase5Open.hasOpenTrade ? 'OPEN TRADE' : (safety.realTradeAllowed ? 'READY' : 'BLOCKED'),
+    statusColor: phase5Open.hasOpenTrade
+      ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+      : safety.realTradeAllowed
+        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+        : 'bg-red-500/20 text-red-300 border-red-500/30',
+    icon: Cpu,
+    locked: !safety.realTradeAllowed,
+    linkTo: '/Phase5RealTestMode',
+    metrics: [
+      { label: 'Guard', value: trail.phase5GuardStatus || 'LOCKED', color: (trail.phase5GuardStatus || 'LOCKED') === 'LOCKED' ? 'text-amber-400' : 'text-emerald-400' },
+      { label: 'Open trades', value: String(phase5Open.openCount || 0) },
+      { label: 'Max size', value: `$${config.maxOpenTrades ? 10 : 10}` },
+      { label: 'TP/SL', value: `+${config.tpPercent || 1.3}% / -${config.slPercent || 0.65}%` },
+    ],
   };
 
-  const calculateROI = (subscription) => {
-    if (!subscription.capital_allocated || subscription.capital_allocated === 0) return 0;
-    return ((subscription.total_profit || 0) / subscription.capital_allocated) * 100;
-  };
-
-  const totalProfit = subscriptions.reduce((sum, s) => sum + (s.total_profit || 0), 0);
-  const totalTrades = subscriptions.reduce((sum, s) => sum + (s.total_trades || 0), 0);
-  const activeCount = subscriptions.filter(s => s.status === 'active').length;
-  const totalCapital = subscriptions.reduce((sum, s) => sum + (s.capital_allocated || 0), 0);
+  // ── Kill switch banner ────────────────────────────────────────────────────
+  const killActive = safety.killSwitchActive;
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0A0A0F] text-white flex items-center justify-center">
-        <div className="text-slate-400">Loading bot dashboard...</div>
+        <div className="text-slate-400">Зареждане на роботи…</div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white p-6">
-      <div className="max-w-[1800px] mx-auto">
+      <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
-        <div className="mb-6">
+        <div>
           <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
             <Bot className="w-8 h-8 text-blue-400" />
-            Bot Dashboard
+            Търговски роботи
           </h1>
           <p className="text-slate-400">
-            Manage and monitor all your trading bots
+            Реални роботи · Phase 4F (paper) + Phase 5 (real test, locked)
           </p>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <Card className="bg-slate-900 border-slate-800">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-slate-400 mb-1">Active Bots</div>
-                  <div className="text-2xl font-bold text-white">{activeCount}</div>
-                </div>
-                <Activity className="w-10 h-10 text-green-400 opacity-20" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900 border-slate-800">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-slate-400 mb-1">Total Profit</div>
-                  <div className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    ${totalProfit.toFixed(2)}
-                  </div>
-                </div>
-                {totalProfit >= 0 ? (
-                  <TrendingUp className="w-10 h-10 text-green-400 opacity-20" />
-                ) : (
-                  <TrendingDown className="w-10 h-10 text-red-400 opacity-20" />
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900 border-slate-800">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-slate-400 mb-1">Total Trades</div>
-                  <div className="text-2xl font-bold text-white">{totalTrades}</div>
-                </div>
-                <BarChart3 className="w-10 h-10 text-blue-400 opacity-20" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900 border-slate-800">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-slate-400 mb-1">Total Capital</div>
-                  <div className="text-2xl font-bold text-white">${totalCapital.toLocaleString()}</div>
-                </div>
-                <DollarSign className="w-10 h-10 text-purple-400 opacity-20" />
-              </div>
-            </CardContent>
-          </Card>
+        {/* Safety banner */}
+        <div className={`rounded-xl border-2 p-4 flex items-center gap-3 ${
+          killActive
+            ? 'border-emerald-600 bg-emerald-950/30'
+            : 'border-red-600 bg-red-950/30'
+        }`}>
+          {killActive ? (
+            <ShieldCheck className="w-6 h-6 text-emerald-400 flex-shrink-0" />
+          ) : (
+            <ShieldAlert className="w-6 h-6 text-red-400 flex-shrink-0" />
+          )}
+          <div className="flex-1">
+            <div className="font-bold text-sm">
+              {killActive ? 'Kill Switch Активен — безопасност гарантирана' : '⚠️ Kill Switch ИЗКЛЮЧЕН'}
+            </div>
+            <div className="text-xs text-slate-400">
+              {killActive
+                ? `Реална търговия блокирана · ${live.mainBlockingReason || 'чака сигнал'}`
+                : 'ВНИМАНИЕ: реални поръчки са разрешени'}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-slate-400">Активен режим</div>
+            <div className="text-sm font-bold text-white">{trail.activeMode || 'PHASE_4F'}</div>
+          </div>
         </div>
 
-        {/* Bots Grid */}
-        {subscriptions.length === 0 ? (
-          <Card className="bg-slate-900 border-slate-800">
-            <CardContent className="py-12 text-center">
-              <Bot className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400 mb-4">No bots configured yet</p>
-              <Link to={createPageUrl('Bots')}>
-                <Button className="bg-blue-600 hover:bg-blue-500">
-                  Subscribe to a Bot
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {subscriptions.map(subscription => {
-              const botInfo = getBotInfo(subscription.bot_id);
-              const roi = calculateROI(subscription);
-              const runtime = subscription.start_date 
-                ? Math.floor((new Date() - new Date(subscription.start_date)) / (1000 * 60 * 60 * 24))
-                : 0;
+        {/* Robots grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <RobotCard robot={robot4F} />
+          <RobotCard robot={robot5} />
+        </div>
 
-              return (
-                <Card key={subscription.id} className="bg-slate-900 border-slate-800 hover:border-slate-700 transition-colors">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Bot className="w-5 h-5 text-blue-400" />
-                        {botInfo.name || 'Bot'}
-                      </CardTitle>
-                      <Badge className={getStatusColor(subscription.status)} variant="outline">
-                        {subscription.status}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-slate-400">
-                      {botInfo.strategy} • {subscription.trading_pairs?.join(', ') || 'N/A'}
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="space-y-4">
-                    {/* Metrics */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-slate-800/50 rounded-lg p-3">
-                        <div className="text-xs text-slate-400 mb-1">Profit/Loss</div>
-                        <div className={`text-lg font-bold ${(subscription.total_profit || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          ${(subscription.total_profit || 0).toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="bg-slate-800/50 rounded-lg p-3">
-                        <div className="text-xs text-slate-400 mb-1">ROI</div>
-                        <div className={`text-lg font-bold ${roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {roi.toFixed(2)}%
-                        </div>
-                      </div>
-                      <div className="bg-slate-800/50 rounded-lg p-3">
-                        <div className="text-xs text-slate-400 mb-1">Trades</div>
-                        <div className="text-lg font-bold text-white">{subscription.total_trades || 0}</div>
-                      </div>
-                      <div className="bg-slate-800/50 rounded-lg p-3">
-                        <div className="text-xs text-slate-400 mb-1">Capital</div>
-                        <div className="text-lg font-bold text-white">${(subscription.capital_allocated || 0).toLocaleString()}</div>
-                      </div>
-                    </div>
-
-                    {runtime > 0 && (
-                      <div className="text-xs text-slate-400 text-center">
-                        Running for {runtime} day{runtime !== 1 ? 's' : ''}
-                      </div>
-                    )}
-
-                    {/* Controls */}
-                    <div className="flex gap-2">
-                      {subscription.status === 'active' ? (
-                        <Button
-                          onClick={() => updateStatusMutation.mutate({ id: subscription.id, status: 'paused' })}
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/20"
-                        >
-                          <PauseCircle className="w-4 h-4 mr-1" />
-                          Pause
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={() => updateStatusMutation.mutate({ id: subscription.id, status: 'active' })}
-                          size="sm"
-                          className="flex-1 bg-green-600 hover:bg-green-500"
-                        >
-                          <PlayCircle className="w-4 h-4 mr-1" />
-                          Start
-                        </Button>
-                      )}
-                      
-                      <Link to={createPageUrl('BotRunner') + `?id=${subscription.id}`}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-blue-500/30 text-blue-300 hover:bg-blue-500/20"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </Link>
-                    </div>
-
-                    {/* Secondary Actions */}
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => setCloneModal({ 
-                          open: true, 
-                          subscription, 
-                          botInfo: getBotInfo(subscription.bot_id) 
-                        })}
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 border-slate-600 text-slate-300"
-                      >
-                        <Copy className="w-4 h-4 mr-1" />
-                        Clone
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to delete this bot?')) {
-                            deleteMutation.mutate(subscription.id);
-                          }
-                        }}
-                        size="sm"
-                        variant="outline"
-                        className="border-red-500/30 text-red-300 hover:bg-red-500/20"
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Clone Modal */}
-        <CloneBotModal
-          subscription={cloneModal.subscription}
-          botInfo={cloneModal.botInfo}
-          isOpen={cloneModal.open}
-          onClose={() => setCloneModal({ open: false, subscription: null, botInfo: null })}
-        />
+        {/* Live market snapshot */}
+        <Card className="bg-slate-900 border-slate-800">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="w-5 h-5 text-cyan-400" />
+              Пазарен статус (BTC-USDT)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-xs text-slate-400 mb-1">Цена</div>
+                <div className="text-lg font-bold text-white">
+                  {lastPrice ? `$${lastPrice.toLocaleString('en-US', { maximumFractionDigits: 1 })}` : '—'}
+                </div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-xs text-slate-400 mb-1">Alert</div>
+                <div className="text-lg font-bold text-white">{live.alertLevel || 'COLD'}</div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-xs text-slate-400 mb-1">Препоръка</div>
+                <div className={`text-lg font-bold ${live.recommendedAction === 'BUY' ? 'text-emerald-400' : 'text-slate-300'}`}>
+                  {live.recommendedAction || 'WAIT'}
+                </div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-xs text-slate-400 mb-1">Blocker</div>
+                <div className="text-sm font-bold text-slate-300">{live.mainBlockingReason || '—'}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
