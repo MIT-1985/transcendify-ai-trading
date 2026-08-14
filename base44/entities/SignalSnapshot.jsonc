@@ -83,6 +83,42 @@
     "noOKXOrderEndpointCalled": {
       "type": "boolean",
       "default": true
+    },
+    "claudeConfidence": {
+      "type": "number",
+      "description": "Claude signal confidence 0-100"
+    },
+    "claudeAction": {
+      "type": "string",
+      "enum": [
+        "BUY",
+        "SELL",
+        "WAIT"
+      ],
+      "description": "Claude-recommended action"
+    },
+    "claudeReasoning": {
+      "type": "string",
+      "description": "Claude reasoning for the signal"
+    },
+    "checklistPass": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Chart checklist items that passed (e.g. EMA trend bullish, RSI not overbought, MACD crossover, volume confirmed, BTC dominance, fear/greed)"
+    },
+    "claudePositionUSDT": {
+      "type": "number",
+      "description": "Claude-recommended position size in USDT"
+    },
+    "claudeTpPercent": {
+      "type": "number",
+      "description": "Claude-suggested take profit %"
+    },
+    "claudeSlPercent": {
+      "type": "number",
+      "description": "Claude-suggested stop loss %"
     }
   },
   "required": [

@@ -20,6 +20,7 @@ import SignalDashboard from './pages/SignalDashboard';
 import PaperTradingDashboard from './pages/PaperTradingDashboard';
 import Phase5RealTestMode from './pages/Phase5RealTestMode';
 import Transactions from './pages/Transactions';
+import ChartGuide from './pages/ChartGuide';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -78,6 +79,11 @@ const AuthenticatedApp = () => {
       <Route path="/Transactions" element={
         <LayoutWrapper currentPageName="Transactions">
           <Transactions />
+        </LayoutWrapper>
+      } />
+      <Route path="/ChartGuide" element={
+        <LayoutWrapper currentPageName="ChartGuide">
+          <ChartGuide />
         </LayoutWrapper>
       } />
       <Route path="/Phase5RealTestMode" element={

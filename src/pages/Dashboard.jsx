@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import DiscordTradeNotifier from '@/components/dashboard/DiscordTradeNotifier';
+import { ClaudeSignalIndicator, AutoManualToggle, TrokEpochPanel, FeeBreakdownRow } from '@/components/dashboard/ClaudeSignalPanel';
 
 // ── OKX WebSocket — real-time BTC-USDT tick data ──────────────────────────────
 function useOkxWebSocket() {
@@ -222,6 +223,70 @@ function ProfitTrail({ trades }) {
 export default function Dashboard() {
   const { user } = useAuth();
   const { tick, connected } = useOkxWebSocket();
+  const queryClient = useQueryClient();
+  const [autoMode, setAutoMode] = useState(() => localStorage.getItem('autoMode') === 'true');
+  const [executing, setExecuting] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
+
+  // ── Latest Claude signal ────────────────────────────────────────
+  const { data: claudeSignal, isLoading: loadingSignal } = useQuery({
+    queryKey: ['dashboard-claude-signal'],
+    queryFn: async () => {
+      const signals = await base44.entities.SignalSnapshot.list('-created_date', 10);
+      return signals.find(s => s.mode === 'CLAUDE_ENGINE') || null;
+    },
+    enabled: !!user, refetchInterval: 10000, staleTime: 5000,
+  });
+
+  // ── TROK constants ──────────────────────────────────────────────
+  const { data: trokConstants } = useQuery({
+    queryKey: ['dashboard-trok-constants'],
+    queryFn: async () => {
+      const list = await base44.entities.OptimizingConstants.list('-created_date', 10);
+      return list.filter(c => c.botId === 'robot1')[0] || list[0] || null;
+    },
+    enabled: !!user, refetchInterval: 30000, staleTime: 15000,
+  });
+
+  // ── Auto mode toggle ────────────────────────────────────────────
+  const handleToggleAuto = async () => {
+    const newVal = !autoMode;
+    setAutoMode(newVal);
+    localStorage.setItem('autoMode', String(newVal));
+    try {
+      await base44.functions.invoke('setAutoMode', { enabled: newVal });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-claude-signal'] });
+    } catch (e) {
+      // revert on error
+      setAutoMode(!newVal);
+      localStorage.setItem('autoMode', String(!newVal));
+    }
+  };
+
+  // ── Execute auto trade ──────────────────────────────────────────
+  const handleExecuteAuto = async () => {
+    setExecuting(true);
+    try {
+      await base44.functions.invoke('phase5AutoExecute', {});
+      queryClient.invalidateQueries({ queryKey: ['dashboard-all-trades'] });
+    } catch (e) {
+      // error shown via toast if available
+    } finally {
+      setExecuting(false);
+    }
+  };
+
+  // ── TROK optimize ───────────────────────────────────────────────
+  const handleTrokOptimize = async () => {
+    setOptimizing(true);
+    try {
+      await base44.functions.invoke('adaptiveConstantsEngine', { trokAutoOptimize: true });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-trok-constants'] });
+    } catch (e) {
+    } finally {
+      setOptimizing(false);
+    }
+  };
 
   // OKX ExchangeConnection — real balance from database
   const { data: okxConn = {}, isLoading: loadBalance } = useQuery({
@@ -261,6 +326,24 @@ export default function Dashboard() {
 
         {/* Discord notifications */}
         <DiscordTradeNotifier />
+
+        {/* Claude Signal + Auto/Manual + TROK */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ClaudeSignalIndicator
+            signal={claudeSignal}
+            loading={loadingSignal}
+            onExecute={handleExecuteAuto}
+            autoMode={autoMode}
+            executing={executing}
+          />
+          <div className="space-y-4">
+            <AutoManualToggle autoMode={autoMode} onToggle={handleToggleAuto} />
+            <TrokEpochPanel constants={trokConstants} onOptimize={handleTrokOptimize} optimizing={optimizing} />
+          </div>
+        </div>
+
+        {/* Fee breakdown */}
+        <FeeBreakdownRow signal={claudeSignal} available={available} />
 
         {/* Balance + Profit — the two focal points */}
         <BalanceProfitHero
