@@ -44,6 +44,7 @@ export default function Layout({ children, currentPageName }) {
     { nameKey: 'paperTrading', page: 'PaperTradingDashboard', icon: Activity, fallback: '📄 Phase 4 Paper Trading' },
     { nameKey: 'phase5Real', page: 'Phase5RealTestMode', icon: Activity, fallback: '🔴 Phase 5 Real Test Mode' },
     { nameKey: 'transactions', page: 'Transactions', icon: Activity, fallback: '📒 Transactions' },
+    { nameKey: 'polygonConsole', page: 'PolygonConsole', icon: Terminal, fallback: '🔌 Polygon Console' },
     { nameKey: 'connectOKX', page: 'ConnectOKX', icon: Link2, fallback: 'Connect OKX' },
     { nameKey: 'chartGuide', page: 'ChartGuide', icon: Brain, fallback: '📊 Chart Guide' },
   ];
