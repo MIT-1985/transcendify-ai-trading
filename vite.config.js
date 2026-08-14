@@ -1,16 +1,26 @@
-import base44 from "@base44/vite-plugin"
 import react from '@vitejs/plugin-react'
+import path from 'node:path'
 import { defineConfig } from 'vite'
 
-// https://vite.dev/config/
+// Обикновен Vite + React проект. Приставката на base44 я няма - тя вкарваше
+// техния SDK през @/entities и @/integrations и правеше проекта незапускаем без
+// техен акаунт. Псевдонимът "@" върши същата работа, но е част от Vite.
 export default defineConfig({
-  logLevel: 'error', // Suppress warnings, only show errors
-  plugins: [
-    base44({
-      // Support for legacy code that imports the base44 SDK with @/integrations, @/entities, etc.
-      // can be removed if the code has been updated to use the new SDK imports from @base44/sdk
-      legacySDKImports: process.env.BASE44_LEGACY_SDK_IMPORTS === 'true'
-    }),
-    react(),
-  ]
+  logLevel: 'error',
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(process.cwd(), 'src'),
+    },
+  },
+  server: {
+    proxy: {
+      // Интерфейсът вика двигателя на същия адрес - без CORS и без адрес,
+      // зашит в кода при пускане в браузър.
+      '/api': {
+        target: process.env.ENGINE_URL ?? 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+    },
+  },
 });

@@ -1,0 +1,27 @@
+{
+  "name": "transcendify-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Trading engine: Polygon market data, Claude decisions, OKX execution. No platform lock-in.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "cli": "tsx src/cli.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
+    "ccxt": "^4.4.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.2"
+  }
+}

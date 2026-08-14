@@ -1,5 +1,5 @@
 {
-  "name": "base44-app",
+  "name": "transcendify-ai-trading",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,11 +9,13 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "engine": "npm --prefix engine run start",
+    "engine:dev": "npm --prefix engine run dev",
+    "engine:test": "npm --prefix engine test",
+    "engine:cli": "npm --prefix engine run cli --"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.41",
-    "@base44/vite-plugin": "^1.0.30",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
     "@radix-ui/react-accordion": "^1.2.3",

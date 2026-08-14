@@ -28,4 +28,8 @@ dist-ssr
 *.sw?
 
 .env
-base44/.app.jsonc
+
+# двигател
+engine/node_modules
+engine/data
+engine/.env
