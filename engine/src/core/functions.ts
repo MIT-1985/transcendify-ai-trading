@@ -7,6 +7,7 @@ import type { TradingEngine } from './tradingEngine.ts';
 import { snapshot } from '../strategy/indicators.ts';
 import { invokeLegacy, legacyExists } from '../compat/legacyLoader.ts';
 import { GoogleImageClient } from '../ai/images.ts';
+import { GoogleVideoClient } from '../ai/video.ts';
 import { join } from 'node:path';
 
 /**
@@ -133,6 +134,36 @@ const native: Record<string, Handler> = {
         mimeType: image.mimeType,
         bytes: image.bytes,
       })),
+    };
+  },
+
+  /**
+   * Рисува видео. Трае минути - затова връща адрес чак когато е готово и НЕ
+   * бива да се вика от място, което чака отговор за секунди.
+   */
+  async generateVideo(payload, context) {
+    const prompt = String(payload.prompt ?? '').trim();
+    if (!prompt) throw new Error('нужна е подсказка (prompt)');
+
+    const client = new GoogleVideoClient();
+    if (!client.available) {
+      return { ok: false, reason: 'липсва GOOGLE_API_KEY (или GEMINI_API_KEY)' };
+    }
+
+    const saved = await client.generateToFile(
+      {
+        prompt,
+        model: payload.model as string | undefined,
+        aspectRatio: (payload.aspectRatio as '16:9' | '9:16') ?? '16:9',
+        personGeneration: (payload.personGeneration as 'dont_allow') ?? 'dont_allow',
+        imageBase64: payload.imageBase64 as string | undefined,
+      },
+      join(context.config.dataDir, 'videos')
+    );
+
+    return {
+      ok: true,
+      videos: saved.map((video) => ({ url: `/api/videos/${video.file}`, bytes: video.bytes })),
     };
   },
 

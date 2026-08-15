@@ -175,6 +175,22 @@ const server = createServer(async (request, response) => {
       return void createReadStream(file).pipe(response);
     }
 
+    // GET /api/videos/:file
+    if (segments[0] === 'api' && segments[1] === 'videos' && segments[2]) {
+      const name = segments[2];
+      if (!/^[A-Za-z0-9_-]+\.mp4$/.test(name)) {
+        return send(response, 400, { error: 'недопустимо име на файл' });
+      }
+      const file = join(config.dataDir, 'videos', name);
+      if (!existsSync(file)) return send(response, 404, { error: 'няма такова видео' });
+      response.writeHead(200, {
+        'content-type': 'video/mp4',
+        'access-control-allow-origin': '*',
+        'cache-control': 'public, max-age=31536000, immutable',
+      });
+      return void createReadStream(file).pipe(response);
+    }
+
     // POST /api/functions/:name
     if (segments[0] === 'api' && segments[1] === 'functions' && segments[2]) {
       const name = segments[2];

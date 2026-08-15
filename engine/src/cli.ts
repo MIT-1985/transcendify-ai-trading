@@ -6,6 +6,7 @@ import { ClaudeSignals } from './ai/claude.ts';
 import { TradingEngine } from './core/tradingEngine.ts';
 import { setDatabase } from './compat/base44Client.ts';
 import { GoogleImageClient } from './ai/images.ts';
+import { GoogleVideoClient } from './ai/video.ts';
 import { join } from 'node:path';
 
 /**
@@ -137,6 +138,25 @@ async function main(): Promise<void> {
       break;
     }
 
+    case 'video': {
+      const prompt = args.filter((a) => !a.startsWith('--')).join(' ');
+      if (!prompt) throw new Error('употреба: video "какво да нарисува" [--vertical]');
+
+      const client = new GoogleVideoClient();
+      if (!client.available) throw new Error('липсва GOOGLE_API_KEY в engine/.env');
+
+      console.log('видеото се генерира - трае няколко минути...');
+      const saved = await client.generateToFile(
+        { prompt, aspectRatio: args.includes('--vertical') ? '9:16' : '16:9' },
+        join(config.dataDir, 'videos'),
+        (elapsed) => console.log(`  ...${Math.round(elapsed / 1000)} секунди`)
+      );
+      for (const video of saved) {
+        console.log(`${video.path}  (${(video.bytes / 1024 / 1024).toFixed(1)} MB)`);
+      }
+      break;
+    }
+
     case 'close': {
       const [id, price] = args;
       if (!id || !price) throw new Error('употреба: close <id> <цена>');
@@ -154,6 +174,7 @@ async function main(): Promise<void> {
           '  state                    - накратко какво се е случило',
           '  close <id> <цена>        - ръчно затваряне и записване на резултата',
           '  image "подсказка" [--jpg] - рисува снимка и я записва като файл',
+          '  video "подсказка"         - прави видео с Veo (минути)',
         ].join('\n')
       );
   }
