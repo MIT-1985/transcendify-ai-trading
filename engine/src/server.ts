@@ -1,4 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createReadStream, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { loadConfig } from './config.ts';
 import { Database } from './store/db.ts';
 import { OkxClient } from './exchange/okxClient.ts';
@@ -13,7 +15,7 @@ import {
   setLlmInvoker,
 } from './compat/base44Client.ts';
 import { LlmGateway } from './ai/llm.ts';
-import { GoogleImageClient } from './ai/images.ts';
+import { GoogleImageClient, mimeForExtension } from './ai/images.ts';
 
 /**
  * Локалният сървър - това, което фронтендът вика вместо облака на платформата.
@@ -147,6 +149,30 @@ const server = createServer(async (request, response) => {
         await collection.delete(id);
         return send(response, 200, { ok: true });
       }
+    }
+
+    // GET /api/images/:file - отдава нарисуваното.
+    //
+    // Името се проверява със строг образец, а не само за "..": пътят идва от
+    // адрес, тоест от външния свят, и единственото безопасно допускане е, че
+    // всичко в него е враждебно, докато не се докаже обратното.
+    if (segments[0] === 'api' && segments[1] === 'images' && segments[2]) {
+      const name = segments[2];
+      if (!/^[A-Za-z0-9_-]+\.(png|jpg|jpeg|webp|bin)$/.test(name)) {
+        return send(response, 400, { error: 'недопустимо име на файл' });
+      }
+      const file = join(config.dataDir, 'images', name);
+      if (!existsSync(file)) return send(response, 404, { error: 'няма такава снимка' });
+
+      const extension = name.split('.').pop() ?? '';
+      response.writeHead(200, {
+        'content-type': mimeForExtension(extension),
+        'access-control-allow-origin': '*',
+        // Съдържанието на един файл никога не се мени - името носи време и
+        // случайна част, тоест кеширането е безопасно.
+        'cache-control': 'public, max-age=31536000, immutable',
+      });
+      return void createReadStream(file).pipe(response);
     }
 
     // POST /api/functions/:name

@@ -67,7 +67,14 @@ export class ClaudeSignals {
   constructor(config: EngineConfig, client?: Anthropic) {
     this.model = config.anthropic.model;
     this.effort = config.anthropic.effort;
-    this.client = client ?? (config.anthropic.apiKey ? new Anthropic({ apiKey: config.anthropic.apiKey }) : null);
+    // Същото като в LlmGateway: ANTHROPIC_BASE_URL пренасочва към препращащ
+    // сървър, без нищо друго да се променя.
+    const baseURL = process.env.ANTHROPIC_BASE_URL;
+    this.client =
+      client ??
+      (config.anthropic.apiKey
+        ? new Anthropic({ apiKey: config.anthropic.apiKey, ...(baseURL ? { baseURL } : {}) })
+        : null);
   }
 
   get available(): boolean {

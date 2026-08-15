@@ -5,6 +5,8 @@ import { PolygonClient } from './market/polygon.ts';
 import { ClaudeSignals } from './ai/claude.ts';
 import { TradingEngine } from './core/tradingEngine.ts';
 import { setDatabase } from './compat/base44Client.ts';
+import { GoogleImageClient } from './ai/images.ts';
+import { join } from 'node:path';
 
 /**
  * Команден ред - за да може всичко да се пусне и провери без интерфейс.
@@ -106,6 +108,35 @@ async function main(): Promise<void> {
       break;
     }
 
+    case 'image': {
+      // Най-краткият начин да се провери, че наистина излиза снимка, а не
+      // само успешен отговор: файл на диска, който се отваря.
+      const prompt = args.filter((a) => !a.startsWith('--')).join(' ');
+      if (!prompt) throw new Error('употреба: image "какво да нарисува" [--jpg] [--model=...]');
+
+      const format = args.includes('--jpg') ? 'jpg' : 'png';
+      const model = args.find((a) => a.startsWith('--model='))?.split('=')[1];
+
+      const client = new GoogleImageClient();
+      if (!client.available) {
+        throw new Error('липсва GOOGLE_API_KEY (или GEMINI_API_KEY) в engine/.env');
+      }
+
+      const directory = join(config.dataDir, 'images');
+      const saved = await client.generateToFiles({ prompt, format, model }, directory);
+      for (const image of saved) {
+        console.log(`${image.path}  (${image.mimeType}, ${(image.bytes / 1024).toFixed(0)} KB)`);
+      }
+      if (format === 'jpg' && saved.some((i) => i.mimeType !== 'image/jpeg')) {
+        console.log(
+          '\nБележка: поискан беше jpg, но моделът върна друг тип и файлът е записан ' +
+            'с истинското разширение. За гарантиран jpg използвай Imagen модел ' +
+            '(--model=imagen-4.0-generate-001).'
+        );
+      }
+      break;
+    }
+
     case 'close': {
       const [id, price] = args;
       if (!id || !price) throw new Error('употреба: close <id> <цена>');
@@ -122,6 +153,7 @@ async function main(): Promise<void> {
           '  reconcile                - сверява отворените позиции с борсата',
           '  state                    - накратко какво се е случило',
           '  close <id> <цена>        - ръчно затваряне и записване на резултата',
+          '  image "подсказка" [--jpg] - рисува снимка и я записва като файл',
         ].join('\n')
       );
   }

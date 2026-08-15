@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 /**
  * Генериране на изображения през Google Generative AI.
  *
@@ -11,12 +15,25 @@
  * файлове, е по-трудна за тестване и по-лесна за изненади с права.
  */
 
+export type ImageFormat = 'png' | 'jpg';
+
 export interface GenerateImageArgs {
   prompt: string;
   /** Модел на Google. Сменя се често - затова е настройка, не константа. */
   model?: string;
   /** Колко изображения. Не всички модели го спазват. */
   count?: number;
+  /**
+   * Желан формат.
+   *
+   * ЧЕСТНО ОГРАНИЧЕНИЕ: това е ЖЕЛАНИЕ, не гаранция. Моделите от рода на
+   * Imagen приемат формата в самата заявка и го спазват; тези през
+   * `generateContent` връщат каквото решат (на практика PNG). Затова записът
+   * на файла винаги следва ИСТИНСКИЯ тип от отговора - файл с разширение
+   * `.jpg`, който съдържа PNG, е по-лош от честното разширение, защото се
+   * чупи чак при отваряне.
+   */
+  format?: ImageFormat;
 }
 
 export interface GeneratedImage {
@@ -66,14 +83,29 @@ export class GoogleImageClient {
     }
 
     const model = args.model ?? this.defaultModel;
-    const url = `${this.baseUrl.replace(/\/$/, '')}/models/${model}:generateContent?key=${this.apiKey}`;
+
+    // Двете семейства на Google искат РАЗЛИЧНИ пътища и различни тела. Imagen
+    // приема и желания формат - затова само при него "jpg" наистина значи jpg.
+    const isImagen = model.toLowerCase().includes('imagen');
+    const method = isImagen ? 'predict' : 'generateContent';
+    const url = `${this.baseUrl.replace(/\/$/, '')}/models/${model}:${method}?key=${this.apiKey}`;
+
+    const body = isImagen
+      ? {
+          instances: [{ prompt: args.prompt }],
+          parameters: {
+            sampleCount: args.count ?? 1,
+            outputOptions: {
+              mimeType: args.format === 'jpg' ? 'image/jpeg' : 'image/png',
+            },
+          },
+        }
+      : { contents: [{ parts: [{ text: args.prompt }] }] };
 
     const response = await this.doFetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: args.prompt }] }],
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -129,5 +161,76 @@ export class GoogleImageClient {
       );
     }
     return out;
+  }
+
+  /**
+   * Генерира И ЗАПИСВА снимките като истински файлове.
+   *
+   * Досега клиентът връщаше само base64 и никъде не се превръщаше в снимка -
+   * тоест "генерирането работи" беше вярно на теория и безполезно на практика.
+   *
+   * Разширението следва ИСТИНСКИЯ тип от отговора, не пожеланието: `.jpg`
+   * файл със съдържание PNG се отваря само на половината програми и грешката
+   * идва дни по-късно, далеч от мястото, което я е причинило.
+   */
+  async generateToFiles(
+    args: GenerateImageArgs,
+    directory: string
+  ): Promise<SavedImage[]> {
+    const images = await this.generate(args);
+    await mkdir(directory, { recursive: true });
+
+    const saved: SavedImage[] = [];
+    for (const image of images) {
+      const extension = extensionFor(image.mimeType);
+      const name = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}.${extension}`;
+      const fullPath = join(directory, name);
+      await writeFile(fullPath, Buffer.from(image.base64, 'base64'));
+      saved.push({
+        file: name,
+        path: fullPath,
+        mimeType: image.mimeType,
+        bytes: Buffer.byteLength(image.base64, 'base64'),
+      });
+    }
+    return saved;
+  }
+}
+
+export interface SavedImage {
+  /** Само името - за сглобяване на адрес, без да се разкрива пътят на диска. */
+  file: string;
+  path: string;
+  mimeType: string;
+  bytes: number;
+}
+
+/** Разширението по истинския тип. Непознат тип се записва като .bin, не като .png. */
+export function extensionFor(mimeType: string): string {
+  switch (mimeType.toLowerCase()) {
+    case 'image/png':
+      return 'png';
+    case 'image/jpeg':
+    case 'image/jpg':
+      return 'jpg';
+    case 'image/webp':
+      return 'webp';
+    default:
+      return 'bin';
+  }
+}
+
+/** Типът по разширение - за отдаването на файла по HTTP. */
+export function mimeForExtension(extension: string): string {
+  switch (extension.toLowerCase()) {
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'webp':
+      return 'image/webp';
+    default:
+      return 'application/octet-stream';
   }
 }

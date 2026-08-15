@@ -6,6 +6,8 @@ import type { ClaudeSignals } from '../ai/claude.ts';
 import type { TradingEngine } from './tradingEngine.ts';
 import { snapshot } from '../strategy/indicators.ts';
 import { invokeLegacy, legacyExists } from '../compat/legacyLoader.ts';
+import { GoogleImageClient } from '../ai/images.ts';
+import { join } from 'node:path';
 
 /**
  * Рутерът на функциите - това, което фронтендът вика като `functions.invoke`.
@@ -97,6 +99,41 @@ const native: Record<string, Handler> = {
     const news = context.polygon.available ? await context.polygon.news(instId, 5).catch(() => []) : [];
     const decision = await context.claude.decide({ snapshot: snapshot(instId, candles), news });
     return { instId, decision };
+  },
+
+  /**
+   * Рисува снимка и я ЗАПИСВА като файл.
+   *
+   * Връща адрес, не base64: base64 в JSON отговор надува паметта и лога, а
+   * браузърът и без това иска адрес, за да я покаже.
+   */
+  async generateImage(payload, context) {
+    const prompt = String(payload.prompt ?? '').trim();
+    if (!prompt) throw new Error('нужна е подсказка (prompt)');
+
+    const client = new GoogleImageClient();
+    if (!client.available) {
+      return { ok: false, reason: 'липсва GOOGLE_API_KEY (или GEMINI_API_KEY)' };
+    }
+
+    const saved = await client.generateToFiles(
+      {
+        prompt,
+        model: payload.model as string | undefined,
+        format: (payload.format as 'png' | 'jpg') ?? 'png',
+        count: Number(payload.count ?? 1),
+      },
+      join(context.config.dataDir, 'images')
+    );
+
+    return {
+      ok: true,
+      images: saved.map((image) => ({
+        url: `/api/images/${image.file}`,
+        mimeType: image.mimeType,
+        bytes: image.bytes,
+      })),
+    };
   },
 
   /** Състоянието накратко - за таблото. */

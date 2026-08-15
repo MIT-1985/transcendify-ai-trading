@@ -31,6 +31,8 @@ export interface InvokeLlmArgs {
 
 export interface LlmProviders {
   anthropicApiKey?: string;
+  /** Адрес за Claude. Празно = официалният; за препращащ сървър се подава тук. */
+  anthropicBaseUrl?: string;
   /** Ключ за сървър по протокола на OpenAI (истинският OpenAI или препращащ). */
   openAiApiKey?: string;
   openAiBaseUrl?: string;
@@ -100,8 +102,15 @@ export class LlmGateway {
   private readonly doFetch: typeof fetch;
 
   constructor(config: EngineConfig, providers: LlmProviders = {}) {
+    // Claude може да върви и през препращащ сървър (OpenAPIs или собствен
+    // router): SDK-то приема адрес, тоест не се налага втора реализация на
+    // протокола. Без това целият Claude път беше зашит за api.anthropic.com.
     const anthropicKey = providers.anthropicApiKey ?? config.anthropic.apiKey;
-    this.anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : null;
+    const anthropicBaseUrl =
+      providers.anthropicBaseUrl ?? process.env.ANTHROPIC_BASE_URL ?? undefined;
+    this.anthropic = anthropicKey
+      ? new Anthropic({ apiKey: anthropicKey, ...(anthropicBaseUrl ? { baseURL: anthropicBaseUrl } : {}) })
+      : null;
     this.openAiKey = providers.openAiApiKey ?? process.env.OPENAI_API_KEY;
     this.openAiBaseUrl =
       providers.openAiBaseUrl ?? process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1';
