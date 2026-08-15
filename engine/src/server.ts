@@ -6,7 +6,14 @@ import { PolygonClient } from './market/polygon.ts';
 import { ClaudeSignals } from './ai/claude.ts';
 import { TradingEngine } from './core/tradingEngine.ts';
 import { hasFunction, invokeFunction, type FunctionContext } from './core/functions.ts';
-import { setDatabase, setFunctionInvoker, setLlmInvoker } from './compat/base44Client.ts';
+import {
+  setDatabase,
+  setFunctionInvoker,
+  setImageGenerator,
+  setLlmInvoker,
+} from './compat/base44Client.ts';
+import { LlmGateway } from './ai/llm.ts';
+import { GoogleImageClient } from './ai/images.ts';
 
 /**
  * Локалният сървър - това, което фронтендът вика вместо облака на платформата.
@@ -32,6 +39,8 @@ const okx = new OkxClient({
 const polygon = new PolygonClient({ apiKey: config.polygon.apiKey, baseUrl: config.polygon.baseUrl });
 const claude = new ClaudeSignals(config);
 const engine = new TradingEngine(config, db, okx, polygon, claude);
+const llm = new LlmGateway(config);
+const images_ = new GoogleImageClient();
 
 const context: FunctionContext = { config, db, okx, polygon, claude, engine };
 
@@ -40,14 +49,18 @@ setFunctionInvoker(async (name, payload) => {
   return result.body;
 });
 
-setLlmInvoker(async ({ prompt }) => {
-  // Старият InvokeLLM беше свободен текст. Тук се пренасочва към същия модел,
-  // но без структура - структурираните решения минават през ClaudeSignals.
-  const decision = await claude.decide({
-    snapshot: { instId: 'N/A', price: 0, atr: 0, atrPct: 0, rsi: 50, trend: 0, volumeRatio: 1, candles: [] },
-    news: [{ title: prompt, publishedUtc: new Date().toISOString(), publisher: 'prompt', url: '' }],
-  });
-  return decision;
+// InvokeLLM е ИСТИНСКО общо извикване на модел - Claude или GPT, по името,
+// което старият код подава. Първата версия тук пренасочваше всичко към
+// съветника за сделки, тоест функция, поискала константи, получаваше решение
+// "hold" и мълчаливо работеше с грешни числа.
+setLlmInvoker(async (args) => llm.invoke(args as never));
+
+// Генерирането на изображения минава през Google със същия ключ, който вече
+// се ползва за Gemini другаде. Върнатото е base64 - викащият решава какво
+// да го прави.
+setImageGenerator(async (args) => {
+  const images = await images_.generate(args as never);
+  return { images, count: images.length };
 });
 
 async function readBody(request: IncomingMessage): Promise<Record<string, unknown>> {
@@ -88,6 +101,7 @@ const server = createServer(async (request, response) => {
         okx: okx.authenticated,
         polygon: polygon.available,
         claude: claude.available,
+        images: images_.available,
       });
     }
 

@@ -76,11 +76,16 @@ export interface LocalBase44Client {
   };
   integrations: {
     Core: {
-      InvokeLLM(args: { prompt: string; response_json_schema?: unknown }): Promise<unknown>;
+      InvokeLLM(args: {
+        prompt: string;
+        model?: string;
+        response_json_schema?: Record<string, unknown>;
+        system?: string;
+      }): Promise<unknown>;
+      GenerateImage(args: { prompt: string; model?: string; count?: number }): Promise<unknown>;
       SendEmail(args: unknown): Promise<{ ok: false; reason: string }>;
       SendSMS(args: unknown): Promise<{ ok: false; reason: string }>;
       UploadFile(args: unknown): Promise<{ ok: false; reason: string }>;
-      GenerateImage(args: unknown): Promise<{ ok: false; reason: string }>;
       ExtractDataFromUploadedFile(args: unknown): Promise<{ ok: false; reason: string }>;
     };
   };
@@ -96,12 +101,14 @@ export function setFunctionInvoker(fn: (name: string, payload: unknown) => Promi
   functionInvoker = fn;
 }
 
-let llmInvoker: ((args: { prompt: string; response_json_schema?: unknown }) => Promise<unknown>) | null =
-  null;
-export function setLlmInvoker(
-  fn: (args: { prompt: string; response_json_schema?: unknown }) => Promise<unknown>
-): void {
+let llmInvoker: ((args: Record<string, unknown>) => Promise<unknown>) | null = null;
+export function setLlmInvoker(fn: (args: Record<string, unknown>) => Promise<unknown>): void {
   llmInvoker = fn;
+}
+
+let imageGenerator: ((args: Record<string, unknown>) => Promise<unknown>) | null = null;
+export function setImageGenerator(fn: (args: Record<string, unknown>) => Promise<unknown>): void {
+  imageGenerator = fn;
 }
 
 const notAvailable = (what: string) => async () => ({
@@ -135,12 +142,15 @@ export function createClient(): LocalBase44Client {
       Core: {
         async InvokeLLM(args) {
           if (!llmInvoker) throw new Error('няма настроен модел за InvokeLLM');
-          return llmInvoker(args);
+          return llmInvoker(args as unknown as Record<string, unknown>);
+        },
+        async GenerateImage(args) {
+          if (!imageGenerator) throw new Error('няма настроен доставчик за изображения');
+          return imageGenerator(args as Record<string, unknown>);
         },
         SendEmail: notAvailable('изпращането на поща'),
         SendSMS: notAvailable('изпращането на SMS'),
         UploadFile: notAvailable('качването на файлове'),
-        GenerateImage: notAvailable('генерирането на изображения'),
         ExtractDataFromUploadedFile: notAvailable('извличането на данни от файл'),
       },
     },
