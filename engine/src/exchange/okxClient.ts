@@ -157,6 +157,68 @@ export class OkxClient {
     return payload.data ?? [];
   }
 
+  // ---- проверка на ключа ---------------------------------------------------
+
+  /**
+   * Какво позволява ключът, според самата борса.
+   *
+   * Правата се питат OKX, а не се приемат на доверие от потребителя. Човек,
+   * който бърза, слага ключ с всички отметки - и оттам нататък обещанието
+   * "парите не могат да излязат" зависи от неговата дисциплина, а не от
+   * устройството на системата.
+   *
+   * `perm` идва като списък, разделен със запетаи: "read_only,trade" или
+   * с добавено "withdraw".
+   */
+  async permissions(): Promise<{ perms: string[]; canWithdraw: boolean; canTrade: boolean }> {
+    const rows = await this.request<{ perm?: string }>('GET', '/api/v5/account/config', {
+      auth: true,
+    });
+    const perms = (rows[0]?.perm ?? '')
+      .split(',')
+      .map((p) => p.trim().toLowerCase())
+      .filter(Boolean);
+    return {
+      perms,
+      canWithdraw: perms.includes('withdraw'),
+      canTrade: perms.includes('trade'),
+    };
+  }
+
+  /**
+   * Отказва ключ, с който може да се тегли.
+   *
+   * Вика се ВЕДНЪЖ при свързване, преди ключът да бъде запазен. Причината да
+   * е отказ, а не предупреждение: ключ с право на теглене превръща всеки
+   * пробив в кражба, а не в лоша търговия. Разликата между двете е разликата
+   * между неприятност и край на бизнеса.
+   *
+   * Ограничението по IP не се вижда през API-то - него го проверява само
+   * човек в настройките на борсата. Затова тук се връща и подсказка.
+   */
+  async assertSafeForTrading(): Promise<void> {
+    const { perms, canWithdraw, canTrade } = await this.permissions();
+
+    if (canWithdraw) {
+      throw new OkxError(
+        'Ключът позволява ТЕГЛЕНЕ. Създай нов ключ само с право на търговия - ' +
+          'иначе при пробив парите могат да бъдат изнесени, а не само изтъргувани.',
+        'KEY_ALLOWS_WITHDRAW',
+        '/api/v5/account/config',
+        { perms }
+      );
+    }
+
+    if (!canTrade) {
+      throw new OkxError(
+        'Ключът е само за четене и не може да подава поръчки.',
+        'KEY_READ_ONLY',
+        '/api/v5/account/config',
+        { perms }
+      );
+    }
+  }
+
   // ---- публични данни ------------------------------------------------------
 
   async ticker(instId: string): Promise<Ticker> {
