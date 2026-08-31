@@ -1,0 +1,93 @@
+Pattern / Catalyst,Typical Window (UTC),Observed Effect,Metric Signatures,Risk / Execution Rule,Notes
+Monday Asia close,07:00-09:00,Reduced liquidity before EU open,"Volume decline, spread widening",Reduce position sizes by 30%,Tokyo session wind-down - Monday
+Monday EU open,08:00-10:00,Volatility spike on fresh news,"Volume surge, directional moves","Increase monitoring, tighten stops",London session begins - Monday
+Monday US open,13:30-15:30,Highest volume and volatility,"Peak liquidity, trend continuation",Maximum position capacity,NY session prime time - Monday
+Tuesday Asia close,07:00-09:00,Reduced liquidity before EU open,"Volume decline, spread widening",Reduce position sizes by 30%,Tokyo session wind-down - Tuesday
+Tuesday EU open,08:00-10:00,Volatility spike on fresh news,"Volume surge, directional moves","Increase monitoring, tighten stops",London session begins - Tuesday
+Tuesday US open,13:30-15:30,Highest volume and volatility,"Peak liquidity, trend continuation",Maximum position capacity,NY session prime time - Tuesday
+Wednesday Asia close,07:00-09:00,Reduced liquidity before EU open,"Volume decline, spread widening",Reduce position sizes by 30%,Tokyo session wind-down - Wednesday
+Wednesday EU open,08:00-10:00,Volatility spike on fresh news,"Volume surge, directional moves","Increase monitoring, tighten stops",London session begins - Wednesday
+Wednesday US open,13:30-15:30,Highest volume and volatility,"Peak liquidity, trend continuation",Maximum position capacity,NY session prime time - Wednesday
+Thursday Asia close,07:00-09:00,Reduced liquidity before EU open,"Volume decline, spread widening",Reduce position sizes by 30%,Tokyo session wind-down - Thursday
+Thursday EU open,08:00-10:00,Volatility spike on fresh news,"Volume surge, directional moves","Increase monitoring, tighten stops",London session begins - Thursday
+Thursday US open,13:30-15:30,Highest volume and volatility,"Peak liquidity, trend continuation",Maximum position capacity,NY session prime time - Thursday
+Friday Asia close,07:00-09:00,Reduced liquidity before EU open,"Volume decline, spread widening",Reduce position sizes by 30%,Tokyo session wind-down - Friday
+Friday EU open,08:00-10:00,Volatility spike on fresh news,"Volume surge, directional moves","Increase monitoring, tighten stops",London session begins - Friday
+Friday US open,13:30-15:30,Highest volume and volatility,"Peak liquidity, trend continuation",Maximum position capacity,NY session prime time - Friday
+US CPI Release,13:30 first Tuesday of month,High volatility across all assets,"Volume spike 2-3x, increased correlation","Reduce leverage 2h before, expand after",Core inflation data
+US PPI Release,13:30 second Tuesday of month,Manufacturing price pressures impact,"Sector rotation, commodity sensitivity",Monitor supply chain assets,Producer price inflation
+FOMC Meeting,19:00 FOMC meeting days,Extreme volatility on rate decisions,"Bid-ask spreads widen 5x, volume surge",Minimum positions 1h before/after,Federal Reserve policy
+US NFP Release,13:30 first Friday of month,Employment data market reaction,"USD strength/weakness, rate expectations",Prepare for directional moves,Nonfarm payrolls
+US ISM Manufacturing,15:00 first business day,Manufacturing sentiment impact,Industrial asset sensitivity,Monitor economic cycle assets,Manufacturing PMI
+US Retail Sales,13:30 mid-month,Consumer spending strength signal,Consumer discretionary impact,Adjust consumer exposure,Economic activity indicator
+US GDP Release,13:30 quarterly,Broad economic growth assessment,Market-wide repricing,Review macro positioning,Economic growth rate
+ECB Rate Decision,12:45 ECB meeting days,European monetary policy impact,"EUR volatility, EU asset moves",Monitor EUR exposure,European Central Bank
+Bank of England Rate,12:00 BoE meeting days,UK monetary policy decision,"GBP volatility, UK asset sensitivity",Manage GBP exposure,UK interest rates
+Bank of Japan Policy,03:00 BoJ meeting days,Japanese monetary policy,JPY carry trade impacts,Monitor JPY funding positions,Yield curve control policy
+Weekend liquidity hole,Saturday 00:00 - Sunday 23:59,Severely reduced liquidity,Volume < 20% weekday average,Maximum 10% normal position size,Institutional absence
+US Holiday (Memorial Day),Memorial Day Monday,Reduced US participation,"Volume down 40%, EU/Asia more active",Reduce US-hours exposure,US market closure
+US Holiday (Independence Day),July 4th,Reduced US participation,"Volume down 40%, EU/Asia more active",Reduce US-hours exposure,US market closure
+US Holiday (Labor Day),Labor Day Monday,Reduced US participation,"Volume down 40%, EU/Asia more active",Reduce US-hours exposure,US market closure
+US Holiday (Thanksgiving),Thanksgiving Thursday-Friday,Minimal US trading activity,"Volume down 60%, thin books",Minimal positions only,Extended US holiday
+Christmas/New Year,December 25 - January 2,Global holiday reduced activity,"Volume down 70%, extreme illiquidity",Emergency positions only,Global holiday period
+Chinese New Year,Lunar New Year week,Reduced Asian participation,Asian volume down 50%,Reduce Asia-hours exposure,Major Asian holiday
+London Bank Holiday,UK Bank Holiday Mondays,Reduced European activity,EU volume down 30%,Monitor EU session closely,UK market closure
+Good Friday,Good Friday,Global market closures,Volume down 60%,Minimal trading activity,Christian holiday
+Easter Monday,Easter Monday,European market closures,EU volume down 50%,Reduced European exposure,European holiday
+Funding 00:00 UTC,00:00 UTC ± 15 minutes,Perp-spot basis convergence pressure,"Funding rate realization, basis trades",Monitor perp positions for funding costs,8-hour funding cycle
+Funding 08:00 UTC,08:00 UTC ± 15 minutes,Perp-spot basis convergence pressure,"Funding rate realization, basis trades",Monitor perp positions for funding costs,8-hour funding cycle
+Funding 16:00 UTC,16:00 UTC ± 15 minutes,Perp-spot basis convergence pressure,"Funding rate realization, basis trades",Monitor perp positions for funding costs,8-hour funding cycle
+Weekly options expiry,Fridays 08:00 UTC,Gamma unwind effects,Increased volatility near strikes,Monitor large gamma positions,Weekly BTC/ETH options
+Monthly options expiry,Last Friday 08:00 UTC,Large gamma and vega unwind,Significant volatility around max pain,Reduce delta exposure near expiry,Monthly settlement
+Quarterly options expiry,Quarterly Friday 08:00 UTC,Institutional rebalancing,"Large flow impacts, vol surface shifts",Major position review required,Quarterly derivatives settlement
+Month-end rebalancing,Last 2 trading days of month,Institutional portfolio rebalancing,Flow-driven price moves,"Fade extreme moves, provide liquidity",Index and fund rebalancing
+Quarter-end rebalancing,Last 3 trading days of quarter,Major institutional rebalancing,Large systematic flows,Major liquidity provision opportunity,Quarterly institutional flows
+Year-end rebalancing,Last 5 trading days of year,Tax-loss selling and rebalancing,"Tax-driven flows, window dressing",Monitor for reversal opportunities,Year-end institutional activity
+USDT depeg watch,Continuous monitoring,Stablecoin price deviation from peg,Price moves >50bps from $1.00,"Halt trading, assess counterparty risk",USDT stability monitoring
+USDC depeg watch,Continuous monitoring,Stablecoin price deviation from peg,Price moves >50bps from $1.00,"Halt trading, assess counterparty risk",USDC stability monitoring
+DAI depeg watch,Continuous monitoring,Stablecoin price deviation from peg,Price moves >50bps from $1.00,"Halt trading, assess counterparty risk",DAI stability monitoring
+FRAX depeg watch,Continuous monitoring,Stablecoin price deviation from peg,Price moves >50bps from $1.00,"Halt trading, assess counterparty risk",FRAX stability monitoring
+TUSD depeg watch,Continuous monitoring,Stablecoin price deviation from peg,Price moves >50bps from $1.00,"Halt trading, assess counterparty risk",TUSD stability monitoring
+Long liquidation cascade,During market declines,Forced selling pressure accelerates decline,Volume spike with price decline continuation,"Short-term momentum, long-term fade",Leveraged long unwinding
+Short liquidation cascade,During market rallies,Forced covering accelerates rally,Volume spike with price rally continuation,"Momentum trade, monitor for exhaustion",Leveraged short covering
+Cross-asset liquidation,Correlated asset liquidations,Multi-asset forced selling/buying,High cross-asset correlation spike,Diversification temporarily ineffective,System-wide deleveraging
+Uniswap Token emission start,Protocol-specific dates,Increased protocol activity,"TVL increase, token price impact",Monitor for emission dilution,New incentive programs - Uniswap
+Uniswap Emission rate change,Governance proposal execution,Changed yield farming incentives,"TVL migration, yield changes",Reassess yield strategies,Tokenomics adjustments - Uniswap
+Uniswap Emission end/cliff,End of emission periods,Potential TVL exodus,"Sharp TVL decline, token selling",Exit before emission end,Incentive cliff effects - Uniswap
+Aave Token emission start,Protocol-specific dates,Increased protocol activity,"TVL increase, token price impact",Monitor for emission dilution,New incentive programs - Aave
+Aave Emission rate change,Governance proposal execution,Changed yield farming incentives,"TVL migration, yield changes",Reassess yield strategies,Tokenomics adjustments - Aave
+Aave Emission end/cliff,End of emission periods,Potential TVL exodus,"Sharp TVL decline, token selling",Exit before emission end,Incentive cliff effects - Aave
+Curve Token emission start,Protocol-specific dates,Increased protocol activity,"TVL increase, token price impact",Monitor for emission dilution,New incentive programs - Curve
+Curve Emission rate change,Governance proposal execution,Changed yield farming incentives,"TVL migration, yield changes",Reassess yield strategies,Tokenomics adjustments - Curve
+Curve Emission end/cliff,End of emission periods,Potential TVL exodus,"Sharp TVL decline, token selling",Exit before emission end,Incentive cliff effects - Curve
+Balancer Token emission start,Protocol-specific dates,Increased protocol activity,"TVL increase, token price impact",Monitor for emission dilution,New incentive programs - Balancer
+Balancer Emission rate change,Governance proposal execution,Changed yield farming incentives,"TVL migration, yield changes",Reassess yield strategies,Tokenomics adjustments - Balancer
+Balancer Emission end/cliff,End of emission periods,Potential TVL exodus,"Sharp TVL decline, token selling",Exit before emission end,Incentive cliff effects - Balancer
+GMX Token emission start,Protocol-specific dates,Increased protocol activity,"TVL increase, token price impact",Monitor for emission dilution,New incentive programs - GMX
+GMX Emission rate change,Governance proposal execution,Changed yield farming incentives,"TVL migration, yield changes",Reassess yield strategies,Tokenomics adjustments - GMX
+GMX Emission end/cliff,End of emission periods,Potential TVL exodus,"Sharp TVL decline, token selling",Exit before emission end,Incentive cliff effects - GMX
+Gains Token emission start,Protocol-specific dates,Increased protocol activity,"TVL increase, token price impact",Monitor for emission dilution,New incentive programs - Gains
+Gains Emission rate change,Governance proposal execution,Changed yield farming incentives,"TVL migration, yield changes",Reassess yield strategies,Tokenomics adjustments - Gains
+Gains Emission end/cliff,End of emission periods,Potential TVL exodus,"Sharp TVL decline, token selling",Exit before emission end,Incentive cliff effects - Gains
+Sushiswap Token emission start,Protocol-specific dates,Increased protocol activity,"TVL increase, token price impact",Monitor for emission dilution,New incentive programs - Sushiswap
+Sushiswap Emission rate change,Governance proposal execution,Changed yield farming incentives,"TVL migration, yield changes",Reassess yield strategies,Tokenomics adjustments - Sushiswap
+Sushiswap Emission end/cliff,End of emission periods,Potential TVL exodus,"Sharp TVL decline, token selling",Exit before emission end,Incentive cliff effects - Sushiswap
+QuickSwap Token emission start,Protocol-specific dates,Increased protocol activity,"TVL increase, token price impact",Monitor for emission dilution,New incentive programs - QuickSwap
+QuickSwap Emission rate change,Governance proposal execution,Changed yield farming incentives,"TVL migration, yield changes",Reassess yield strategies,Tokenomics adjustments - QuickSwap
+QuickSwap Emission end/cliff,End of emission periods,Potential TVL exodus,"Sharp TVL decline, token selling",Exit before emission end,Incentive cliff effects - QuickSwap
+Kyber Token emission start,Protocol-specific dates,Increased protocol activity,"TVL increase, token price impact",Monitor for emission dilution,New incentive programs - Kyber
+Kyber Emission rate change,Governance proposal execution,Changed yield farming incentives,"TVL migration, yield changes",Reassess yield strategies,Tokenomics adjustments - Kyber
+Kyber Emission end/cliff,End of emission periods,Potential TVL exodus,"Sharp TVL decline, token selling",Exit before emission end,Incentive cliff effects - Kyber
+Pendle Token emission start,Protocol-specific dates,Increased protocol activity,"TVL increase, token price impact",Monitor for emission dilution,New incentive programs - Pendle
+Pendle Emission rate change,Governance proposal execution,Changed yield farming incentives,"TVL migration, yield changes",Reassess yield strategies,Tokenomics adjustments - Pendle
+Pendle Emission end/cliff,End of emission periods,Potential TVL exodus,"Sharp TVL decline, token selling",Exit before emission end,Incentive cliff effects - Pendle
+European lunch break,11:30-13:00 UTC,Reduced European trading activity,"Volume decline, spread widening",Reduce position size 20%,EU trader lunch break
+US lunch break,17:00-18:30 UTC,Reduced US trading activity,Volume decline in US assets,Monitor for breakouts on low volume,US trader lunch break
+Asian morning ramp,00:00-02:00 UTC,Asian session momentum building,Gradual volume increase,Early trend identification opportunity,Asian session start
+Pre-market volatility,12:00-13:30 UTC weekdays,US pre-market news reactions,"Gap risk, low liquidity",Prepare for US open volatility,Before US equity open
+After-hours grinding,21:00-00:00 UTC,Low volume directional moves,Persistent but low volume trends,Small size trend following,US after-hours activity
+Weekend preparation,Friday 20:00-23:59 UTC,Position risk reduction,Reduced risk appetite,Minimize weekend gap exposure,Pre-weekend risk management
+Monday gap assessment,Monday 00:00-02:00 UTC,Weekend news gap reactions,Price gaps from weekend events,Assess gap fade opportunities,Weekend news processing
+Asia/Europe handover,06:00-08:00 UTC,Transition between major sessions,"Volume transition, direction confirmation",Monitor for trend continuation,Session transition period
+Europe/US handover,12:00-14:00 UTC,Peak overlap trading period,Maximum liquidity and volume,Optimal execution window,Peak global liquidity
+End of day positioning,21:00-22:00 UTC,Day trader position closing,Reversion tendency in short-term moves,Fade intraday extremes,EOD profit taking

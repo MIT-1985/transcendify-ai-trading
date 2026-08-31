@@ -1,0 +1,1430 @@
+Category,Name,Symbol,Definition,Units/Dimension,Bucket,Typical Value / Formula,Estimation / Source,Notes
+Technical Indicators,EMA period 2,α_2,EMA smoothing factor,dimensionless,E,0.666667,Definition α = 2/(2+1),Default; tunable
+Technical Indicators,EMA period 3,α_3,EMA smoothing factor,dimensionless,E,0.500000,Definition α = 2/(3+1),Default; tunable
+Technical Indicators,EMA period 4,α_4,EMA smoothing factor,dimensionless,E,0.400000,Definition α = 2/(4+1),Default; tunable
+Technical Indicators,EMA period 5,α_5,EMA smoothing factor,dimensionless,E,0.333333,Definition α = 2/(5+1),Default; tunable
+Technical Indicators,EMA period 6,α_6,EMA smoothing factor,dimensionless,E,0.285714,Definition α = 2/(6+1),Default; tunable
+Technical Indicators,EMA period 7,α_7,EMA smoothing factor,dimensionless,E,0.250000,Definition α = 2/(7+1),Default; tunable
+Technical Indicators,EMA period 8,α_8,EMA smoothing factor,dimensionless,E,0.222222,Definition α = 2/(8+1),Default; tunable
+Technical Indicators,EMA period 9,α_9,EMA smoothing factor,dimensionless,E,0.200000,Definition α = 2/(9+1),Default; tunable
+Technical Indicators,EMA period 10,α_10,EMA smoothing factor,dimensionless,E,0.181818,Definition α = 2/(10+1),Default; tunable
+Technical Indicators,EMA period 11,α_11,EMA smoothing factor,dimensionless,E,0.166667,Definition α = 2/(11+1),Default; tunable
+Technical Indicators,EMA period 12,α_12,EMA smoothing factor,dimensionless,E,0.153846,Definition α = 2/(12+1),Default; tunable
+Technical Indicators,EMA period 13,α_13,EMA smoothing factor,dimensionless,E,0.142857,Definition α = 2/(13+1),Default; tunable
+Technical Indicators,EMA period 14,α_14,EMA smoothing factor,dimensionless,E,0.133333,Definition α = 2/(14+1),Default; tunable
+Technical Indicators,EMA period 15,α_15,EMA smoothing factor,dimensionless,E,0.125000,Definition α = 2/(15+1),Default; tunable
+Technical Indicators,EMA period 16,α_16,EMA smoothing factor,dimensionless,E,0.117647,Definition α = 2/(16+1),Default; tunable
+Technical Indicators,EMA period 17,α_17,EMA smoothing factor,dimensionless,E,0.111111,Definition α = 2/(17+1),Default; tunable
+Technical Indicators,EMA period 18,α_18,EMA smoothing factor,dimensionless,E,0.105263,Definition α = 2/(18+1),Default; tunable
+Technical Indicators,EMA period 19,α_19,EMA smoothing factor,dimensionless,E,0.100000,Definition α = 2/(19+1),Default; tunable
+Technical Indicators,EMA period 20,α_20,EMA smoothing factor,dimensionless,E,0.095238,Definition α = 2/(20+1),Default; tunable
+Technical Indicators,EMA period 21,α_21,EMA smoothing factor,dimensionless,E,0.090909,Definition α = 2/(21+1),Default; tunable
+Technical Indicators,EMA period 22,α_22,EMA smoothing factor,dimensionless,E,0.086957,Definition α = 2/(22+1),Default; tunable
+Technical Indicators,EMA period 23,α_23,EMA smoothing factor,dimensionless,E,0.083333,Definition α = 2/(23+1),Default; tunable
+Technical Indicators,EMA period 24,α_24,EMA smoothing factor,dimensionless,E,0.080000,Definition α = 2/(24+1),Default; tunable
+Technical Indicators,EMA period 25,α_25,EMA smoothing factor,dimensionless,E,0.076923,Definition α = 2/(25+1),Default; tunable
+Technical Indicators,EMA period 26,α_26,EMA smoothing factor,dimensionless,E,0.074074,Definition α = 2/(26+1),Default; tunable
+Technical Indicators,EMA period 27,α_27,EMA smoothing factor,dimensionless,E,0.071429,Definition α = 2/(27+1),Default; tunable
+Technical Indicators,EMA period 28,α_28,EMA smoothing factor,dimensionless,E,0.068966,Definition α = 2/(28+1),Default; tunable
+Technical Indicators,EMA period 29,α_29,EMA smoothing factor,dimensionless,E,0.066667,Definition α = 2/(29+1),Default; tunable
+Technical Indicators,EMA period 30,α_30,EMA smoothing factor,dimensionless,E,0.064516,Definition α = 2/(30+1),Default; tunable
+Technical Indicators,EMA period 31,α_31,EMA smoothing factor,dimensionless,E,0.062500,Definition α = 2/(31+1),Default; tunable
+Technical Indicators,EMA period 32,α_32,EMA smoothing factor,dimensionless,E,0.060606,Definition α = 2/(32+1),Default; tunable
+Technical Indicators,EMA period 33,α_33,EMA smoothing factor,dimensionless,E,0.058824,Definition α = 2/(33+1),Default; tunable
+Technical Indicators,EMA period 34,α_34,EMA smoothing factor,dimensionless,E,0.057143,Definition α = 2/(34+1),Default; tunable
+Technical Indicators,EMA period 35,α_35,EMA smoothing factor,dimensionless,E,0.055556,Definition α = 2/(35+1),Default; tunable
+Technical Indicators,EMA period 36,α_36,EMA smoothing factor,dimensionless,E,0.054054,Definition α = 2/(36+1),Default; tunable
+Technical Indicators,EMA period 37,α_37,EMA smoothing factor,dimensionless,E,0.052632,Definition α = 2/(37+1),Default; tunable
+Technical Indicators,EMA period 38,α_38,EMA smoothing factor,dimensionless,E,0.051282,Definition α = 2/(38+1),Default; tunable
+Technical Indicators,EMA period 39,α_39,EMA smoothing factor,dimensionless,E,0.050000,Definition α = 2/(39+1),Default; tunable
+Technical Indicators,EMA period 40,α_40,EMA smoothing factor,dimensionless,E,0.048780,Definition α = 2/(40+1),Default; tunable
+Technical Indicators,EMA period 41,α_41,EMA smoothing factor,dimensionless,E,0.047619,Definition α = 2/(41+1),Default; tunable
+Technical Indicators,EMA period 42,α_42,EMA smoothing factor,dimensionless,E,0.046512,Definition α = 2/(42+1),Default; tunable
+Technical Indicators,EMA period 43,α_43,EMA smoothing factor,dimensionless,E,0.045455,Definition α = 2/(43+1),Default; tunable
+Technical Indicators,EMA period 44,α_44,EMA smoothing factor,dimensionless,E,0.044444,Definition α = 2/(44+1),Default; tunable
+Technical Indicators,EMA period 45,α_45,EMA smoothing factor,dimensionless,E,0.043478,Definition α = 2/(45+1),Default; tunable
+Technical Indicators,EMA period 46,α_46,EMA smoothing factor,dimensionless,E,0.042553,Definition α = 2/(46+1),Default; tunable
+Technical Indicators,EMA period 47,α_47,EMA smoothing factor,dimensionless,E,0.041667,Definition α = 2/(47+1),Default; tunable
+Technical Indicators,EMA period 48,α_48,EMA smoothing factor,dimensionless,E,0.040816,Definition α = 2/(48+1),Default; tunable
+Technical Indicators,EMA period 49,α_49,EMA smoothing factor,dimensionless,E,0.040000,Definition α = 2/(49+1),Default; tunable
+Technical Indicators,EMA period 50,α_50,EMA smoothing factor,dimensionless,E,0.039216,Definition α = 2/(50+1),Default; tunable
+Technical Indicators,EMA period 51,α_51,EMA smoothing factor,dimensionless,E,0.038462,Definition α = 2/(51+1),Default; tunable
+Technical Indicators,EMA period 52,α_52,EMA smoothing factor,dimensionless,E,0.037736,Definition α = 2/(52+1),Default; tunable
+Technical Indicators,EMA period 53,α_53,EMA smoothing factor,dimensionless,E,0.037037,Definition α = 2/(53+1),Default; tunable
+Technical Indicators,EMA period 54,α_54,EMA smoothing factor,dimensionless,E,0.036364,Definition α = 2/(54+1),Default; tunable
+Technical Indicators,EMA period 55,α_55,EMA smoothing factor,dimensionless,E,0.035714,Definition α = 2/(55+1),Default; tunable
+Technical Indicators,EMA period 56,α_56,EMA smoothing factor,dimensionless,E,0.035088,Definition α = 2/(56+1),Default; tunable
+Technical Indicators,EMA period 57,α_57,EMA smoothing factor,dimensionless,E,0.034483,Definition α = 2/(57+1),Default; tunable
+Technical Indicators,EMA period 58,α_58,EMA smoothing factor,dimensionless,E,0.033898,Definition α = 2/(58+1),Default; tunable
+Technical Indicators,EMA period 59,α_59,EMA smoothing factor,dimensionless,E,0.033333,Definition α = 2/(59+1),Default; tunable
+Technical Indicators,EMA period 60,α_60,EMA smoothing factor,dimensionless,E,0.032787,Definition α = 2/(60+1),Default; tunable
+Technical Indicators,EMA period 61,α_61,EMA smoothing factor,dimensionless,E,0.032258,Definition α = 2/(61+1),Default; tunable
+Technical Indicators,EMA period 62,α_62,EMA smoothing factor,dimensionless,E,0.031746,Definition α = 2/(62+1),Default; tunable
+Technical Indicators,EMA period 63,α_63,EMA smoothing factor,dimensionless,E,0.031250,Definition α = 2/(63+1),Default; tunable
+Technical Indicators,EMA period 64,α_64,EMA smoothing factor,dimensionless,E,0.030769,Definition α = 2/(64+1),Default; tunable
+Technical Indicators,EMA period 65,α_65,EMA smoothing factor,dimensionless,E,0.030303,Definition α = 2/(65+1),Default; tunable
+Technical Indicators,EMA period 66,α_66,EMA smoothing factor,dimensionless,E,0.029851,Definition α = 2/(66+1),Default; tunable
+Technical Indicators,EMA period 67,α_67,EMA smoothing factor,dimensionless,E,0.029412,Definition α = 2/(67+1),Default; tunable
+Technical Indicators,EMA period 68,α_68,EMA smoothing factor,dimensionless,E,0.028986,Definition α = 2/(68+1),Default; tunable
+Technical Indicators,EMA period 69,α_69,EMA smoothing factor,dimensionless,E,0.028571,Definition α = 2/(69+1),Default; tunable
+Technical Indicators,EMA period 70,α_70,EMA smoothing factor,dimensionless,E,0.028169,Definition α = 2/(70+1),Default; tunable
+Technical Indicators,EMA period 71,α_71,EMA smoothing factor,dimensionless,E,0.027778,Definition α = 2/(71+1),Default; tunable
+Technical Indicators,EMA period 72,α_72,EMA smoothing factor,dimensionless,E,0.027397,Definition α = 2/(72+1),Default; tunable
+Technical Indicators,EMA period 73,α_73,EMA smoothing factor,dimensionless,E,0.027027,Definition α = 2/(73+1),Default; tunable
+Technical Indicators,EMA period 74,α_74,EMA smoothing factor,dimensionless,E,0.026667,Definition α = 2/(74+1),Default; tunable
+Technical Indicators,EMA period 75,α_75,EMA smoothing factor,dimensionless,E,0.026316,Definition α = 2/(75+1),Default; tunable
+Technical Indicators,EMA period 76,α_76,EMA smoothing factor,dimensionless,E,0.025974,Definition α = 2/(76+1),Default; tunable
+Technical Indicators,EMA period 77,α_77,EMA smoothing factor,dimensionless,E,0.025641,Definition α = 2/(77+1),Default; tunable
+Technical Indicators,EMA period 78,α_78,EMA smoothing factor,dimensionless,E,0.025316,Definition α = 2/(78+1),Default; tunable
+Technical Indicators,EMA period 79,α_79,EMA smoothing factor,dimensionless,E,0.025000,Definition α = 2/(79+1),Default; tunable
+Technical Indicators,EMA period 80,α_80,EMA smoothing factor,dimensionless,E,0.024691,Definition α = 2/(80+1),Default; tunable
+Technical Indicators,EMA period 81,α_81,EMA smoothing factor,dimensionless,E,0.024390,Definition α = 2/(81+1),Default; tunable
+Technical Indicators,EMA period 82,α_82,EMA smoothing factor,dimensionless,E,0.024096,Definition α = 2/(82+1),Default; tunable
+Technical Indicators,EMA period 83,α_83,EMA smoothing factor,dimensionless,E,0.023810,Definition α = 2/(83+1),Default; tunable
+Technical Indicators,EMA period 84,α_84,EMA smoothing factor,dimensionless,E,0.023529,Definition α = 2/(84+1),Default; tunable
+Technical Indicators,EMA period 85,α_85,EMA smoothing factor,dimensionless,E,0.023256,Definition α = 2/(85+1),Default; tunable
+Technical Indicators,EMA period 86,α_86,EMA smoothing factor,dimensionless,E,0.022989,Definition α = 2/(86+1),Default; tunable
+Technical Indicators,EMA period 87,α_87,EMA smoothing factor,dimensionless,E,0.022727,Definition α = 2/(87+1),Default; tunable
+Technical Indicators,EMA period 88,α_88,EMA smoothing factor,dimensionless,E,0.022472,Definition α = 2/(88+1),Default; tunable
+Technical Indicators,EMA period 89,α_89,EMA smoothing factor,dimensionless,E,0.022222,Definition α = 2/(89+1),Default; tunable
+Technical Indicators,EMA period 90,α_90,EMA smoothing factor,dimensionless,E,0.021978,Definition α = 2/(90+1),Default; tunable
+Technical Indicators,EMA period 91,α_91,EMA smoothing factor,dimensionless,E,0.021739,Definition α = 2/(91+1),Default; tunable
+Technical Indicators,EMA period 92,α_92,EMA smoothing factor,dimensionless,E,0.021505,Definition α = 2/(92+1),Default; tunable
+Technical Indicators,EMA period 93,α_93,EMA smoothing factor,dimensionless,E,0.021277,Definition α = 2/(93+1),Default; tunable
+Technical Indicators,EMA period 94,α_94,EMA smoothing factor,dimensionless,E,0.021053,Definition α = 2/(94+1),Default; tunable
+Technical Indicators,EMA period 95,α_95,EMA smoothing factor,dimensionless,E,0.020833,Definition α = 2/(95+1),Default; tunable
+Technical Indicators,EMA period 96,α_96,EMA smoothing factor,dimensionless,E,0.020619,Definition α = 2/(96+1),Default; tunable
+Technical Indicators,EMA period 97,α_97,EMA smoothing factor,dimensionless,E,0.020408,Definition α = 2/(97+1),Default; tunable
+Technical Indicators,EMA period 98,α_98,EMA smoothing factor,dimensionless,E,0.020202,Definition α = 2/(98+1),Default; tunable
+Technical Indicators,EMA period 99,α_99,EMA smoothing factor,dimensionless,E,0.020000,Definition α = 2/(99+1),Default; tunable
+Technical Indicators,EMA period 100,α_100,EMA smoothing factor,dimensionless,E,0.019802,Definition α = 2/(100+1),Default; tunable
+Technical Indicators,EMA period 101,α_101,EMA smoothing factor,dimensionless,E,0.019608,Definition α = 2/(101+1),Default; tunable
+Technical Indicators,EMA period 102,α_102,EMA smoothing factor,dimensionless,E,0.019417,Definition α = 2/(102+1),Default; tunable
+Technical Indicators,EMA period 103,α_103,EMA smoothing factor,dimensionless,E,0.019231,Definition α = 2/(103+1),Default; tunable
+Technical Indicators,EMA period 104,α_104,EMA smoothing factor,dimensionless,E,0.019048,Definition α = 2/(104+1),Default; tunable
+Technical Indicators,EMA period 105,α_105,EMA smoothing factor,dimensionless,E,0.018868,Definition α = 2/(105+1),Default; tunable
+Technical Indicators,EMA period 106,α_106,EMA smoothing factor,dimensionless,E,0.018692,Definition α = 2/(106+1),Default; tunable
+Technical Indicators,EMA period 107,α_107,EMA smoothing factor,dimensionless,E,0.018519,Definition α = 2/(107+1),Default; tunable
+Technical Indicators,EMA period 108,α_108,EMA smoothing factor,dimensionless,E,0.018349,Definition α = 2/(108+1),Default; tunable
+Technical Indicators,EMA period 109,α_109,EMA smoothing factor,dimensionless,E,0.018182,Definition α = 2/(109+1),Default; tunable
+Technical Indicators,EMA period 110,α_110,EMA smoothing factor,dimensionless,E,0.018018,Definition α = 2/(110+1),Default; tunable
+Technical Indicators,EMA period 111,α_111,EMA smoothing factor,dimensionless,E,0.017857,Definition α = 2/(111+1),Default; tunable
+Technical Indicators,EMA period 112,α_112,EMA smoothing factor,dimensionless,E,0.017699,Definition α = 2/(112+1),Default; tunable
+Technical Indicators,EMA period 113,α_113,EMA smoothing factor,dimensionless,E,0.017544,Definition α = 2/(113+1),Default; tunable
+Technical Indicators,EMA period 114,α_114,EMA smoothing factor,dimensionless,E,0.017391,Definition α = 2/(114+1),Default; tunable
+Technical Indicators,EMA period 115,α_115,EMA smoothing factor,dimensionless,E,0.017241,Definition α = 2/(115+1),Default; tunable
+Technical Indicators,EMA period 116,α_116,EMA smoothing factor,dimensionless,E,0.017094,Definition α = 2/(116+1),Default; tunable
+Technical Indicators,EMA period 117,α_117,EMA smoothing factor,dimensionless,E,0.016949,Definition α = 2/(117+1),Default; tunable
+Technical Indicators,EMA period 118,α_118,EMA smoothing factor,dimensionless,E,0.016807,Definition α = 2/(118+1),Default; tunable
+Technical Indicators,EMA period 119,α_119,EMA smoothing factor,dimensionless,E,0.016667,Definition α = 2/(119+1),Default; tunable
+Technical Indicators,EMA period 120,α_120,EMA smoothing factor,dimensionless,E,0.016529,Definition α = 2/(120+1),Default; tunable
+Technical Indicators,EMA period 121,α_121,EMA smoothing factor,dimensionless,E,0.016393,Definition α = 2/(121+1),Default; tunable
+Technical Indicators,EMA period 122,α_122,EMA smoothing factor,dimensionless,E,0.016260,Definition α = 2/(122+1),Default; tunable
+Technical Indicators,EMA period 123,α_123,EMA smoothing factor,dimensionless,E,0.016129,Definition α = 2/(123+1),Default; tunable
+Technical Indicators,EMA period 124,α_124,EMA smoothing factor,dimensionless,E,0.016000,Definition α = 2/(124+1),Default; tunable
+Technical Indicators,EMA period 125,α_125,EMA smoothing factor,dimensionless,E,0.015873,Definition α = 2/(125+1),Default; tunable
+Technical Indicators,EMA period 126,α_126,EMA smoothing factor,dimensionless,E,0.015748,Definition α = 2/(126+1),Default; tunable
+Technical Indicators,EMA period 127,α_127,EMA smoothing factor,dimensionless,E,0.015625,Definition α = 2/(127+1),Default; tunable
+Technical Indicators,EMA period 128,α_128,EMA smoothing factor,dimensionless,E,0.015504,Definition α = 2/(128+1),Default; tunable
+Technical Indicators,EMA period 129,α_129,EMA smoothing factor,dimensionless,E,0.015385,Definition α = 2/(129+1),Default; tunable
+Technical Indicators,EMA period 130,α_130,EMA smoothing factor,dimensionless,E,0.015267,Definition α = 2/(130+1),Default; tunable
+Technical Indicators,EMA period 131,α_131,EMA smoothing factor,dimensionless,E,0.015152,Definition α = 2/(131+1),Default; tunable
+Technical Indicators,EMA period 132,α_132,EMA smoothing factor,dimensionless,E,0.015038,Definition α = 2/(132+1),Default; tunable
+Technical Indicators,EMA period 133,α_133,EMA smoothing factor,dimensionless,E,0.014925,Definition α = 2/(133+1),Default; tunable
+Technical Indicators,EMA period 134,α_134,EMA smoothing factor,dimensionless,E,0.014815,Definition α = 2/(134+1),Default; tunable
+Technical Indicators,EMA period 135,α_135,EMA smoothing factor,dimensionless,E,0.014706,Definition α = 2/(135+1),Default; tunable
+Technical Indicators,EMA period 136,α_136,EMA smoothing factor,dimensionless,E,0.014599,Definition α = 2/(136+1),Default; tunable
+Technical Indicators,EMA period 137,α_137,EMA smoothing factor,dimensionless,E,0.014493,Definition α = 2/(137+1),Default; tunable
+Technical Indicators,EMA period 138,α_138,EMA smoothing factor,dimensionless,E,0.014388,Definition α = 2/(138+1),Default; tunable
+Technical Indicators,EMA period 139,α_139,EMA smoothing factor,dimensionless,E,0.014286,Definition α = 2/(139+1),Default; tunable
+Technical Indicators,EMA period 140,α_140,EMA smoothing factor,dimensionless,E,0.014184,Definition α = 2/(140+1),Default; tunable
+Technical Indicators,EMA period 141,α_141,EMA smoothing factor,dimensionless,E,0.014085,Definition α = 2/(141+1),Default; tunable
+Technical Indicators,EMA period 142,α_142,EMA smoothing factor,dimensionless,E,0.013986,Definition α = 2/(142+1),Default; tunable
+Technical Indicators,EMA period 143,α_143,EMA smoothing factor,dimensionless,E,0.013889,Definition α = 2/(143+1),Default; tunable
+Technical Indicators,EMA period 144,α_144,EMA smoothing factor,dimensionless,E,0.013793,Definition α = 2/(144+1),Default; tunable
+Technical Indicators,EMA period 145,α_145,EMA smoothing factor,dimensionless,E,0.013699,Definition α = 2/(145+1),Default; tunable
+Technical Indicators,EMA period 146,α_146,EMA smoothing factor,dimensionless,E,0.013605,Definition α = 2/(146+1),Default; tunable
+Technical Indicators,EMA period 147,α_147,EMA smoothing factor,dimensionless,E,0.013514,Definition α = 2/(147+1),Default; tunable
+Technical Indicators,EMA period 148,α_148,EMA smoothing factor,dimensionless,E,0.013423,Definition α = 2/(148+1),Default; tunable
+Technical Indicators,EMA period 149,α_149,EMA smoothing factor,dimensionless,E,0.013333,Definition α = 2/(149+1),Default; tunable
+Technical Indicators,EMA period 150,α_150,EMA smoothing factor,dimensionless,E,0.013245,Definition α = 2/(150+1),Default; tunable
+Technical Indicators,EMA period 151,α_151,EMA smoothing factor,dimensionless,E,0.013158,Definition α = 2/(151+1),Default; tunable
+Technical Indicators,EMA period 152,α_152,EMA smoothing factor,dimensionless,E,0.013072,Definition α = 2/(152+1),Default; tunable
+Technical Indicators,EMA period 153,α_153,EMA smoothing factor,dimensionless,E,0.012987,Definition α = 2/(153+1),Default; tunable
+Technical Indicators,EMA period 154,α_154,EMA smoothing factor,dimensionless,E,0.012903,Definition α = 2/(154+1),Default; tunable
+Technical Indicators,EMA period 155,α_155,EMA smoothing factor,dimensionless,E,0.012821,Definition α = 2/(155+1),Default; tunable
+Technical Indicators,EMA period 156,α_156,EMA smoothing factor,dimensionless,E,0.012739,Definition α = 2/(156+1),Default; tunable
+Technical Indicators,EMA period 157,α_157,EMA smoothing factor,dimensionless,E,0.012658,Definition α = 2/(157+1),Default; tunable
+Technical Indicators,EMA period 158,α_158,EMA smoothing factor,dimensionless,E,0.012579,Definition α = 2/(158+1),Default; tunable
+Technical Indicators,EMA period 159,α_159,EMA smoothing factor,dimensionless,E,0.012500,Definition α = 2/(159+1),Default; tunable
+Technical Indicators,EMA period 160,α_160,EMA smoothing factor,dimensionless,E,0.012422,Definition α = 2/(160+1),Default; tunable
+Technical Indicators,EMA period 161,α_161,EMA smoothing factor,dimensionless,E,0.012346,Definition α = 2/(161+1),Default; tunable
+Technical Indicators,EMA period 162,α_162,EMA smoothing factor,dimensionless,E,0.012270,Definition α = 2/(162+1),Default; tunable
+Technical Indicators,EMA period 163,α_163,EMA smoothing factor,dimensionless,E,0.012195,Definition α = 2/(163+1),Default; tunable
+Technical Indicators,EMA period 164,α_164,EMA smoothing factor,dimensionless,E,0.012121,Definition α = 2/(164+1),Default; tunable
+Technical Indicators,EMA period 165,α_165,EMA smoothing factor,dimensionless,E,0.012048,Definition α = 2/(165+1),Default; tunable
+Technical Indicators,EMA period 166,α_166,EMA smoothing factor,dimensionless,E,0.011976,Definition α = 2/(166+1),Default; tunable
+Technical Indicators,EMA period 167,α_167,EMA smoothing factor,dimensionless,E,0.011905,Definition α = 2/(167+1),Default; tunable
+Technical Indicators,EMA period 168,α_168,EMA smoothing factor,dimensionless,E,0.011834,Definition α = 2/(168+1),Default; tunable
+Technical Indicators,EMA period 169,α_169,EMA smoothing factor,dimensionless,E,0.011765,Definition α = 2/(169+1),Default; tunable
+Technical Indicators,EMA period 170,α_170,EMA smoothing factor,dimensionless,E,0.011696,Definition α = 2/(170+1),Default; tunable
+Technical Indicators,EMA period 171,α_171,EMA smoothing factor,dimensionless,E,0.011628,Definition α = 2/(171+1),Default; tunable
+Technical Indicators,EMA period 172,α_172,EMA smoothing factor,dimensionless,E,0.011561,Definition α = 2/(172+1),Default; tunable
+Technical Indicators,EMA period 173,α_173,EMA smoothing factor,dimensionless,E,0.011494,Definition α = 2/(173+1),Default; tunable
+Technical Indicators,EMA period 174,α_174,EMA smoothing factor,dimensionless,E,0.011429,Definition α = 2/(174+1),Default; tunable
+Technical Indicators,EMA period 175,α_175,EMA smoothing factor,dimensionless,E,0.011364,Definition α = 2/(175+1),Default; tunable
+Technical Indicators,EMA period 176,α_176,EMA smoothing factor,dimensionless,E,0.011299,Definition α = 2/(176+1),Default; tunable
+Technical Indicators,EMA period 177,α_177,EMA smoothing factor,dimensionless,E,0.011236,Definition α = 2/(177+1),Default; tunable
+Technical Indicators,EMA period 178,α_178,EMA smoothing factor,dimensionless,E,0.011173,Definition α = 2/(178+1),Default; tunable
+Technical Indicators,EMA period 179,α_179,EMA smoothing factor,dimensionless,E,0.011111,Definition α = 2/(179+1),Default; tunable
+Technical Indicators,EMA period 180,α_180,EMA smoothing factor,dimensionless,E,0.011050,Definition α = 2/(180+1),Default; tunable
+Technical Indicators,EMA period 181,α_181,EMA smoothing factor,dimensionless,E,0.010989,Definition α = 2/(181+1),Default; tunable
+Technical Indicators,EMA period 182,α_182,EMA smoothing factor,dimensionless,E,0.010929,Definition α = 2/(182+1),Default; tunable
+Technical Indicators,EMA period 183,α_183,EMA smoothing factor,dimensionless,E,0.010870,Definition α = 2/(183+1),Default; tunable
+Technical Indicators,EMA period 184,α_184,EMA smoothing factor,dimensionless,E,0.010811,Definition α = 2/(184+1),Default; tunable
+Technical Indicators,EMA period 185,α_185,EMA smoothing factor,dimensionless,E,0.010753,Definition α = 2/(185+1),Default; tunable
+Technical Indicators,EMA period 186,α_186,EMA smoothing factor,dimensionless,E,0.010695,Definition α = 2/(186+1),Default; tunable
+Technical Indicators,EMA period 187,α_187,EMA smoothing factor,dimensionless,E,0.010638,Definition α = 2/(187+1),Default; tunable
+Technical Indicators,EMA period 188,α_188,EMA smoothing factor,dimensionless,E,0.010582,Definition α = 2/(188+1),Default; tunable
+Technical Indicators,EMA period 189,α_189,EMA smoothing factor,dimensionless,E,0.010526,Definition α = 2/(189+1),Default; tunable
+Technical Indicators,EMA period 190,α_190,EMA smoothing factor,dimensionless,E,0.010471,Definition α = 2/(190+1),Default; tunable
+Technical Indicators,EMA period 191,α_191,EMA smoothing factor,dimensionless,E,0.010417,Definition α = 2/(191+1),Default; tunable
+Technical Indicators,EMA period 192,α_192,EMA smoothing factor,dimensionless,E,0.010363,Definition α = 2/(192+1),Default; tunable
+Technical Indicators,EMA period 193,α_193,EMA smoothing factor,dimensionless,E,0.010309,Definition α = 2/(193+1),Default; tunable
+Technical Indicators,EMA period 194,α_194,EMA smoothing factor,dimensionless,E,0.010256,Definition α = 2/(194+1),Default; tunable
+Technical Indicators,EMA period 195,α_195,EMA smoothing factor,dimensionless,E,0.010204,Definition α = 2/(195+1),Default; tunable
+Technical Indicators,EMA period 196,α_196,EMA smoothing factor,dimensionless,E,0.010152,Definition α = 2/(196+1),Default; tunable
+Technical Indicators,EMA period 197,α_197,EMA smoothing factor,dimensionless,E,0.010101,Definition α = 2/(197+1),Default; tunable
+Technical Indicators,EMA period 198,α_198,EMA smoothing factor,dimensionless,E,0.010050,Definition α = 2/(198+1),Default; tunable
+Technical Indicators,EMA period 199,α_199,EMA smoothing factor,dimensionless,E,0.010000,Definition α = 2/(199+1),Default; tunable
+Technical Indicators,EMA period 200,α_200,EMA smoothing factor,dimensionless,E,0.009950,Definition α = 2/(200+1),Default; tunable
+Technical Indicators,EMA period 201,α_201,EMA smoothing factor,dimensionless,E,0.009901,Definition α = 2/(201+1),Default; tunable
+Technical Indicators,EMA period 202,α_202,EMA smoothing factor,dimensionless,E,0.009852,Definition α = 2/(202+1),Default; tunable
+Technical Indicators,EMA period 203,α_203,EMA smoothing factor,dimensionless,E,0.009804,Definition α = 2/(203+1),Default; tunable
+Technical Indicators,EMA period 204,α_204,EMA smoothing factor,dimensionless,E,0.009756,Definition α = 2/(204+1),Default; tunable
+Technical Indicators,EMA period 205,α_205,EMA smoothing factor,dimensionless,E,0.009709,Definition α = 2/(205+1),Default; tunable
+Technical Indicators,EMA period 206,α_206,EMA smoothing factor,dimensionless,E,0.009662,Definition α = 2/(206+1),Default; tunable
+Technical Indicators,EMA period 207,α_207,EMA smoothing factor,dimensionless,E,0.009615,Definition α = 2/(207+1),Default; tunable
+Technical Indicators,EMA period 208,α_208,EMA smoothing factor,dimensionless,E,0.009569,Definition α = 2/(208+1),Default; tunable
+Technical Indicators,EMA period 209,α_209,EMA smoothing factor,dimensionless,E,0.009524,Definition α = 2/(209+1),Default; tunable
+Technical Indicators,EMA period 210,α_210,EMA smoothing factor,dimensionless,E,0.009479,Definition α = 2/(210+1),Default; tunable
+Technical Indicators,EMA period 211,α_211,EMA smoothing factor,dimensionless,E,0.009434,Definition α = 2/(211+1),Default; tunable
+Technical Indicators,EMA period 212,α_212,EMA smoothing factor,dimensionless,E,0.009390,Definition α = 2/(212+1),Default; tunable
+Technical Indicators,EMA period 213,α_213,EMA smoothing factor,dimensionless,E,0.009346,Definition α = 2/(213+1),Default; tunable
+Technical Indicators,EMA period 214,α_214,EMA smoothing factor,dimensionless,E,0.009302,Definition α = 2/(214+1),Default; tunable
+Technical Indicators,EMA period 215,α_215,EMA smoothing factor,dimensionless,E,0.009259,Definition α = 2/(215+1),Default; tunable
+Technical Indicators,EMA period 216,α_216,EMA smoothing factor,dimensionless,E,0.009217,Definition α = 2/(216+1),Default; tunable
+Technical Indicators,EMA period 217,α_217,EMA smoothing factor,dimensionless,E,0.009174,Definition α = 2/(217+1),Default; tunable
+Technical Indicators,EMA period 218,α_218,EMA smoothing factor,dimensionless,E,0.009132,Definition α = 2/(218+1),Default; tunable
+Technical Indicators,EMA period 219,α_219,EMA smoothing factor,dimensionless,E,0.009091,Definition α = 2/(219+1),Default; tunable
+Technical Indicators,EMA period 220,α_220,EMA smoothing factor,dimensionless,E,0.009050,Definition α = 2/(220+1),Default; tunable
+Technical Indicators,EMA period 221,α_221,EMA smoothing factor,dimensionless,E,0.009009,Definition α = 2/(221+1),Default; tunable
+Technical Indicators,EMA period 222,α_222,EMA smoothing factor,dimensionless,E,0.008969,Definition α = 2/(222+1),Default; tunable
+Technical Indicators,EMA period 223,α_223,EMA smoothing factor,dimensionless,E,0.008929,Definition α = 2/(223+1),Default; tunable
+Technical Indicators,EMA period 224,α_224,EMA smoothing factor,dimensionless,E,0.008889,Definition α = 2/(224+1),Default; tunable
+Technical Indicators,EMA period 225,α_225,EMA smoothing factor,dimensionless,E,0.008850,Definition α = 2/(225+1),Default; tunable
+Technical Indicators,EMA period 226,α_226,EMA smoothing factor,dimensionless,E,0.008811,Definition α = 2/(226+1),Default; tunable
+Technical Indicators,EMA period 227,α_227,EMA smoothing factor,dimensionless,E,0.008772,Definition α = 2/(227+1),Default; tunable
+Technical Indicators,EMA period 228,α_228,EMA smoothing factor,dimensionless,E,0.008734,Definition α = 2/(228+1),Default; tunable
+Technical Indicators,EMA period 229,α_229,EMA smoothing factor,dimensionless,E,0.008696,Definition α = 2/(229+1),Default; tunable
+Technical Indicators,EMA period 230,α_230,EMA smoothing factor,dimensionless,E,0.008658,Definition α = 2/(230+1),Default; tunable
+Technical Indicators,EMA period 231,α_231,EMA smoothing factor,dimensionless,E,0.008621,Definition α = 2/(231+1),Default; tunable
+Technical Indicators,EMA period 232,α_232,EMA smoothing factor,dimensionless,E,0.008584,Definition α = 2/(232+1),Default; tunable
+Technical Indicators,EMA period 233,α_233,EMA smoothing factor,dimensionless,E,0.008547,Definition α = 2/(233+1),Default; tunable
+Technical Indicators,EMA period 234,α_234,EMA smoothing factor,dimensionless,E,0.008511,Definition α = 2/(234+1),Default; tunable
+Technical Indicators,EMA period 235,α_235,EMA smoothing factor,dimensionless,E,0.008475,Definition α = 2/(235+1),Default; tunable
+Technical Indicators,EMA period 236,α_236,EMA smoothing factor,dimensionless,E,0.008439,Definition α = 2/(236+1),Default; tunable
+Technical Indicators,EMA period 237,α_237,EMA smoothing factor,dimensionless,E,0.008403,Definition α = 2/(237+1),Default; tunable
+Technical Indicators,EMA period 238,α_238,EMA smoothing factor,dimensionless,E,0.008368,Definition α = 2/(238+1),Default; tunable
+Technical Indicators,EMA period 239,α_239,EMA smoothing factor,dimensionless,E,0.008333,Definition α = 2/(239+1),Default; tunable
+Technical Indicators,EMA period 240,α_240,EMA smoothing factor,dimensionless,E,0.008299,Definition α = 2/(240+1),Default; tunable
+Technical Indicators,EMA period 241,α_241,EMA smoothing factor,dimensionless,E,0.008264,Definition α = 2/(241+1),Default; tunable
+Technical Indicators,EMA period 242,α_242,EMA smoothing factor,dimensionless,E,0.008230,Definition α = 2/(242+1),Default; tunable
+Technical Indicators,EMA period 243,α_243,EMA smoothing factor,dimensionless,E,0.008197,Definition α = 2/(243+1),Default; tunable
+Technical Indicators,EMA period 244,α_244,EMA smoothing factor,dimensionless,E,0.008163,Definition α = 2/(244+1),Default; tunable
+Technical Indicators,EMA period 245,α_245,EMA smoothing factor,dimensionless,E,0.008130,Definition α = 2/(245+1),Default; tunable
+Technical Indicators,EMA period 246,α_246,EMA smoothing factor,dimensionless,E,0.008097,Definition α = 2/(246+1),Default; tunable
+Technical Indicators,EMA period 247,α_247,EMA smoothing factor,dimensionless,E,0.008065,Definition α = 2/(247+1),Default; tunable
+Technical Indicators,EMA period 248,α_248,EMA smoothing factor,dimensionless,E,0.008032,Definition α = 2/(248+1),Default; tunable
+Technical Indicators,EMA period 249,α_249,EMA smoothing factor,dimensionless,E,0.008000,Definition α = 2/(249+1),Default; tunable
+Technical Indicators,EMA period 250,α_250,EMA smoothing factor,dimensionless,E,0.007968,Definition α = 2/(250+1),Default; tunable
+Technical Indicators,EMA period 251,α_251,EMA smoothing factor,dimensionless,E,0.007937,Definition α = 2/(251+1),Default; tunable
+Technical Indicators,EMA period 252,α_252,EMA smoothing factor,dimensionless,E,0.007905,Definition α = 2/(252+1),Default; tunable
+Technical Indicators,EMA period 253,α_253,EMA smoothing factor,dimensionless,E,0.007874,Definition α = 2/(253+1),Default; tunable
+Technical Indicators,EMA period 254,α_254,EMA smoothing factor,dimensionless,E,0.007843,Definition α = 2/(254+1),Default; tunable
+Technical Indicators,EMA period 255,α_255,EMA smoothing factor,dimensionless,E,0.007813,Definition α = 2/(255+1),Default; tunable
+Technical Indicators,EMA period 256,α_256,EMA smoothing factor,dimensionless,E,0.007782,Definition α = 2/(256+1),Default; tunable
+Technical Indicators,EMA period 257,α_257,EMA smoothing factor,dimensionless,E,0.007752,Definition α = 2/(257+1),Default; tunable
+Technical Indicators,EMA period 258,α_258,EMA smoothing factor,dimensionless,E,0.007722,Definition α = 2/(258+1),Default; tunable
+Technical Indicators,EMA period 259,α_259,EMA smoothing factor,dimensionless,E,0.007692,Definition α = 2/(259+1),Default; tunable
+Technical Indicators,EMA period 260,α_260,EMA smoothing factor,dimensionless,E,0.007663,Definition α = 2/(260+1),Default; tunable
+Technical Indicators,EMA period 261,α_261,EMA smoothing factor,dimensionless,E,0.007634,Definition α = 2/(261+1),Default; tunable
+Technical Indicators,EMA period 262,α_262,EMA smoothing factor,dimensionless,E,0.007605,Definition α = 2/(262+1),Default; tunable
+Technical Indicators,EMA period 263,α_263,EMA smoothing factor,dimensionless,E,0.007576,Definition α = 2/(263+1),Default; tunable
+Technical Indicators,EMA period 264,α_264,EMA smoothing factor,dimensionless,E,0.007547,Definition α = 2/(264+1),Default; tunable
+Technical Indicators,EMA period 265,α_265,EMA smoothing factor,dimensionless,E,0.007519,Definition α = 2/(265+1),Default; tunable
+Technical Indicators,EMA period 266,α_266,EMA smoothing factor,dimensionless,E,0.007491,Definition α = 2/(266+1),Default; tunable
+Technical Indicators,EMA period 267,α_267,EMA smoothing factor,dimensionless,E,0.007463,Definition α = 2/(267+1),Default; tunable
+Technical Indicators,EMA period 268,α_268,EMA smoothing factor,dimensionless,E,0.007435,Definition α = 2/(268+1),Default; tunable
+Technical Indicators,EMA period 269,α_269,EMA smoothing factor,dimensionless,E,0.007407,Definition α = 2/(269+1),Default; tunable
+Technical Indicators,EMA period 270,α_270,EMA smoothing factor,dimensionless,E,0.007380,Definition α = 2/(270+1),Default; tunable
+Technical Indicators,EMA period 271,α_271,EMA smoothing factor,dimensionless,E,0.007353,Definition α = 2/(271+1),Default; tunable
+Technical Indicators,EMA period 272,α_272,EMA smoothing factor,dimensionless,E,0.007326,Definition α = 2/(272+1),Default; tunable
+Technical Indicators,EMA period 273,α_273,EMA smoothing factor,dimensionless,E,0.007299,Definition α = 2/(273+1),Default; tunable
+Technical Indicators,EMA period 274,α_274,EMA smoothing factor,dimensionless,E,0.007273,Definition α = 2/(274+1),Default; tunable
+Technical Indicators,EMA period 275,α_275,EMA smoothing factor,dimensionless,E,0.007246,Definition α = 2/(275+1),Default; tunable
+Technical Indicators,EMA period 276,α_276,EMA smoothing factor,dimensionless,E,0.007220,Definition α = 2/(276+1),Default; tunable
+Technical Indicators,EMA period 277,α_277,EMA smoothing factor,dimensionless,E,0.007194,Definition α = 2/(277+1),Default; tunable
+Technical Indicators,EMA period 278,α_278,EMA smoothing factor,dimensionless,E,0.007168,Definition α = 2/(278+1),Default; tunable
+Technical Indicators,EMA period 279,α_279,EMA smoothing factor,dimensionless,E,0.007143,Definition α = 2/(279+1),Default; tunable
+Technical Indicators,EMA period 280,α_280,EMA smoothing factor,dimensionless,E,0.007117,Definition α = 2/(280+1),Default; tunable
+Technical Indicators,EMA period 281,α_281,EMA smoothing factor,dimensionless,E,0.007092,Definition α = 2/(281+1),Default; tunable
+Technical Indicators,EMA period 282,α_282,EMA smoothing factor,dimensionless,E,0.007067,Definition α = 2/(282+1),Default; tunable
+Technical Indicators,EMA period 283,α_283,EMA smoothing factor,dimensionless,E,0.007042,Definition α = 2/(283+1),Default; tunable
+Technical Indicators,EMA period 284,α_284,EMA smoothing factor,dimensionless,E,0.007018,Definition α = 2/(284+1),Default; tunable
+Technical Indicators,EMA period 285,α_285,EMA smoothing factor,dimensionless,E,0.006993,Definition α = 2/(285+1),Default; tunable
+Technical Indicators,EMA period 286,α_286,EMA smoothing factor,dimensionless,E,0.006969,Definition α = 2/(286+1),Default; tunable
+Technical Indicators,EMA period 287,α_287,EMA smoothing factor,dimensionless,E,0.006944,Definition α = 2/(287+1),Default; tunable
+Technical Indicators,EMA period 288,α_288,EMA smoothing factor,dimensionless,E,0.006920,Definition α = 2/(288+1),Default; tunable
+Technical Indicators,EMA period 289,α_289,EMA smoothing factor,dimensionless,E,0.006897,Definition α = 2/(289+1),Default; tunable
+Technical Indicators,EMA period 290,α_290,EMA smoothing factor,dimensionless,E,0.006873,Definition α = 2/(290+1),Default; tunable
+Technical Indicators,EMA period 291,α_291,EMA smoothing factor,dimensionless,E,0.006849,Definition α = 2/(291+1),Default; tunable
+Technical Indicators,EMA period 292,α_292,EMA smoothing factor,dimensionless,E,0.006826,Definition α = 2/(292+1),Default; tunable
+Technical Indicators,EMA period 293,α_293,EMA smoothing factor,dimensionless,E,0.006803,Definition α = 2/(293+1),Default; tunable
+Technical Indicators,EMA period 294,α_294,EMA smoothing factor,dimensionless,E,0.006780,Definition α = 2/(294+1),Default; tunable
+Technical Indicators,EMA period 295,α_295,EMA smoothing factor,dimensionless,E,0.006757,Definition α = 2/(295+1),Default; tunable
+Technical Indicators,EMA period 296,α_296,EMA smoothing factor,dimensionless,E,0.006734,Definition α = 2/(296+1),Default; tunable
+Technical Indicators,EMA period 297,α_297,EMA smoothing factor,dimensionless,E,0.006711,Definition α = 2/(297+1),Default; tunable
+Technical Indicators,EMA period 298,α_298,EMA smoothing factor,dimensionless,E,0.006689,Definition α = 2/(298+1),Default; tunable
+Technical Indicators,EMA period 299,α_299,EMA smoothing factor,dimensionless,E,0.006667,Definition α = 2/(299+1),Default; tunable
+Technical Indicators,EMA period 300,α_300,EMA smoothing factor,dimensionless,E,0.006645,Definition α = 2/(300+1),Default; tunable
+Technical Indicators,EMA period 301,α_301,EMA smoothing factor,dimensionless,E,0.006623,Definition α = 2/(301+1),Default; tunable
+Technical Indicators,EMA period 302,α_302,EMA smoothing factor,dimensionless,E,0.006601,Definition α = 2/(302+1),Default; tunable
+Technical Indicators,EMA period 303,α_303,EMA smoothing factor,dimensionless,E,0.006579,Definition α = 2/(303+1),Default; tunable
+Technical Indicators,EMA period 304,α_304,EMA smoothing factor,dimensionless,E,0.006557,Definition α = 2/(304+1),Default; tunable
+Technical Indicators,EMA period 305,α_305,EMA smoothing factor,dimensionless,E,0.006536,Definition α = 2/(305+1),Default; tunable
+Technical Indicators,EMA period 306,α_306,EMA smoothing factor,dimensionless,E,0.006515,Definition α = 2/(306+1),Default; tunable
+Technical Indicators,EMA period 307,α_307,EMA smoothing factor,dimensionless,E,0.006494,Definition α = 2/(307+1),Default; tunable
+Technical Indicators,EMA period 308,α_308,EMA smoothing factor,dimensionless,E,0.006472,Definition α = 2/(308+1),Default; tunable
+Technical Indicators,EMA period 309,α_309,EMA smoothing factor,dimensionless,E,0.006452,Definition α = 2/(309+1),Default; tunable
+Technical Indicators,EMA period 310,α_310,EMA smoothing factor,dimensionless,E,0.006431,Definition α = 2/(310+1),Default; tunable
+Technical Indicators,EMA period 311,α_311,EMA smoothing factor,dimensionless,E,0.006410,Definition α = 2/(311+1),Default; tunable
+Technical Indicators,EMA period 312,α_312,EMA smoothing factor,dimensionless,E,0.006390,Definition α = 2/(312+1),Default; tunable
+Technical Indicators,EMA period 313,α_313,EMA smoothing factor,dimensionless,E,0.006369,Definition α = 2/(313+1),Default; tunable
+Technical Indicators,EMA period 314,α_314,EMA smoothing factor,dimensionless,E,0.006349,Definition α = 2/(314+1),Default; tunable
+Technical Indicators,EMA period 315,α_315,EMA smoothing factor,dimensionless,E,0.006329,Definition α = 2/(315+1),Default; tunable
+Technical Indicators,EMA period 316,α_316,EMA smoothing factor,dimensionless,E,0.006309,Definition α = 2/(316+1),Default; tunable
+Technical Indicators,EMA period 317,α_317,EMA smoothing factor,dimensionless,E,0.006289,Definition α = 2/(317+1),Default; tunable
+Technical Indicators,EMA period 318,α_318,EMA smoothing factor,dimensionless,E,0.006270,Definition α = 2/(318+1),Default; tunable
+Technical Indicators,EMA period 319,α_319,EMA smoothing factor,dimensionless,E,0.006250,Definition α = 2/(319+1),Default; tunable
+Technical Indicators,EMA period 320,α_320,EMA smoothing factor,dimensionless,E,0.006231,Definition α = 2/(320+1),Default; tunable
+Technical Indicators,EMA period 321,α_321,EMA smoothing factor,dimensionless,E,0.006211,Definition α = 2/(321+1),Default; tunable
+Technical Indicators,EMA period 322,α_322,EMA smoothing factor,dimensionless,E,0.006192,Definition α = 2/(322+1),Default; tunable
+Technical Indicators,EMA period 323,α_323,EMA smoothing factor,dimensionless,E,0.006173,Definition α = 2/(323+1),Default; tunable
+Technical Indicators,EMA period 324,α_324,EMA smoothing factor,dimensionless,E,0.006154,Definition α = 2/(324+1),Default; tunable
+Technical Indicators,EMA period 325,α_325,EMA smoothing factor,dimensionless,E,0.006135,Definition α = 2/(325+1),Default; tunable
+Technical Indicators,EMA period 326,α_326,EMA smoothing factor,dimensionless,E,0.006116,Definition α = 2/(326+1),Default; tunable
+Technical Indicators,EMA period 327,α_327,EMA smoothing factor,dimensionless,E,0.006098,Definition α = 2/(327+1),Default; tunable
+Technical Indicators,EMA period 328,α_328,EMA smoothing factor,dimensionless,E,0.006079,Definition α = 2/(328+1),Default; tunable
+Technical Indicators,EMA period 329,α_329,EMA smoothing factor,dimensionless,E,0.006061,Definition α = 2/(329+1),Default; tunable
+Technical Indicators,EMA period 330,α_330,EMA smoothing factor,dimensionless,E,0.006042,Definition α = 2/(330+1),Default; tunable
+Technical Indicators,EMA period 331,α_331,EMA smoothing factor,dimensionless,E,0.006024,Definition α = 2/(331+1),Default; tunable
+Technical Indicators,EMA period 332,α_332,EMA smoothing factor,dimensionless,E,0.006006,Definition α = 2/(332+1),Default; tunable
+Technical Indicators,EMA period 333,α_333,EMA smoothing factor,dimensionless,E,0.005988,Definition α = 2/(333+1),Default; tunable
+Technical Indicators,EMA period 334,α_334,EMA smoothing factor,dimensionless,E,0.005970,Definition α = 2/(334+1),Default; tunable
+Technical Indicators,EMA period 335,α_335,EMA smoothing factor,dimensionless,E,0.005952,Definition α = 2/(335+1),Default; tunable
+Technical Indicators,EMA period 336,α_336,EMA smoothing factor,dimensionless,E,0.005935,Definition α = 2/(336+1),Default; tunable
+Technical Indicators,EMA period 337,α_337,EMA smoothing factor,dimensionless,E,0.005917,Definition α = 2/(337+1),Default; tunable
+Technical Indicators,EMA period 338,α_338,EMA smoothing factor,dimensionless,E,0.005900,Definition α = 2/(338+1),Default; tunable
+Technical Indicators,EMA period 339,α_339,EMA smoothing factor,dimensionless,E,0.005882,Definition α = 2/(339+1),Default; tunable
+Technical Indicators,EMA period 340,α_340,EMA smoothing factor,dimensionless,E,0.005865,Definition α = 2/(340+1),Default; tunable
+Technical Indicators,EMA period 341,α_341,EMA smoothing factor,dimensionless,E,0.005848,Definition α = 2/(341+1),Default; tunable
+Technical Indicators,EMA period 342,α_342,EMA smoothing factor,dimensionless,E,0.005831,Definition α = 2/(342+1),Default; tunable
+Technical Indicators,EMA period 343,α_343,EMA smoothing factor,dimensionless,E,0.005814,Definition α = 2/(343+1),Default; tunable
+Technical Indicators,EMA period 344,α_344,EMA smoothing factor,dimensionless,E,0.005797,Definition α = 2/(344+1),Default; tunable
+Technical Indicators,EMA period 345,α_345,EMA smoothing factor,dimensionless,E,0.005780,Definition α = 2/(345+1),Default; tunable
+Technical Indicators,EMA period 346,α_346,EMA smoothing factor,dimensionless,E,0.005764,Definition α = 2/(346+1),Default; tunable
+Technical Indicators,EMA period 347,α_347,EMA smoothing factor,dimensionless,E,0.005747,Definition α = 2/(347+1),Default; tunable
+Technical Indicators,EMA period 348,α_348,EMA smoothing factor,dimensionless,E,0.005731,Definition α = 2/(348+1),Default; tunable
+Technical Indicators,EMA period 349,α_349,EMA smoothing factor,dimensionless,E,0.005714,Definition α = 2/(349+1),Default; tunable
+Technical Indicators,EMA period 350,α_350,EMA smoothing factor,dimensionless,E,0.005698,Definition α = 2/(350+1),Default; tunable
+Technical Indicators,EMA period 351,α_351,EMA smoothing factor,dimensionless,E,0.005682,Definition α = 2/(351+1),Default; tunable
+Technical Indicators,EMA period 352,α_352,EMA smoothing factor,dimensionless,E,0.005666,Definition α = 2/(352+1),Default; tunable
+Technical Indicators,EMA period 353,α_353,EMA smoothing factor,dimensionless,E,0.005650,Definition α = 2/(353+1),Default; tunable
+Technical Indicators,EMA period 354,α_354,EMA smoothing factor,dimensionless,E,0.005634,Definition α = 2/(354+1),Default; tunable
+Technical Indicators,EMA period 355,α_355,EMA smoothing factor,dimensionless,E,0.005618,Definition α = 2/(355+1),Default; tunable
+Technical Indicators,EMA period 356,α_356,EMA smoothing factor,dimensionless,E,0.005602,Definition α = 2/(356+1),Default; tunable
+Technical Indicators,EMA period 357,α_357,EMA smoothing factor,dimensionless,E,0.005587,Definition α = 2/(357+1),Default; tunable
+Technical Indicators,EMA period 358,α_358,EMA smoothing factor,dimensionless,E,0.005571,Definition α = 2/(358+1),Default; tunable
+Technical Indicators,EMA period 359,α_359,EMA smoothing factor,dimensionless,E,0.005556,Definition α = 2/(359+1),Default; tunable
+Technical Indicators,EMA period 360,α_360,EMA smoothing factor,dimensionless,E,0.005540,Definition α = 2/(360+1),Default; tunable
+Technical Indicators,EMA period 361,α_361,EMA smoothing factor,dimensionless,E,0.005525,Definition α = 2/(361+1),Default; tunable
+Technical Indicators,EMA period 362,α_362,EMA smoothing factor,dimensionless,E,0.005510,Definition α = 2/(362+1),Default; tunable
+Technical Indicators,EMA period 363,α_363,EMA smoothing factor,dimensionless,E,0.005495,Definition α = 2/(363+1),Default; tunable
+Technical Indicators,EMA period 364,α_364,EMA smoothing factor,dimensionless,E,0.005479,Definition α = 2/(364+1),Default; tunable
+Technical Indicators,EMA period 365,α_365,EMA smoothing factor,dimensionless,E,0.005464,Definition α = 2/(365+1),Default; tunable
+Technical Indicators,EMA period 366,α_366,EMA smoothing factor,dimensionless,E,0.005450,Definition α = 2/(366+1),Default; tunable
+Technical Indicators,EMA period 367,α_367,EMA smoothing factor,dimensionless,E,0.005435,Definition α = 2/(367+1),Default; tunable
+Technical Indicators,EMA period 368,α_368,EMA smoothing factor,dimensionless,E,0.005420,Definition α = 2/(368+1),Default; tunable
+Technical Indicators,EMA period 369,α_369,EMA smoothing factor,dimensionless,E,0.005405,Definition α = 2/(369+1),Default; tunable
+Technical Indicators,EMA period 370,α_370,EMA smoothing factor,dimensionless,E,0.005391,Definition α = 2/(370+1),Default; tunable
+Technical Indicators,EMA period 371,α_371,EMA smoothing factor,dimensionless,E,0.005376,Definition α = 2/(371+1),Default; tunable
+Technical Indicators,EMA period 372,α_372,EMA smoothing factor,dimensionless,E,0.005362,Definition α = 2/(372+1),Default; tunable
+Technical Indicators,EMA period 373,α_373,EMA smoothing factor,dimensionless,E,0.005348,Definition α = 2/(373+1),Default; tunable
+Technical Indicators,EMA period 374,α_374,EMA smoothing factor,dimensionless,E,0.005333,Definition α = 2/(374+1),Default; tunable
+Technical Indicators,EMA period 375,α_375,EMA smoothing factor,dimensionless,E,0.005319,Definition α = 2/(375+1),Default; tunable
+Technical Indicators,EMA period 376,α_376,EMA smoothing factor,dimensionless,E,0.005305,Definition α = 2/(376+1),Default; tunable
+Technical Indicators,EMA period 377,α_377,EMA smoothing factor,dimensionless,E,0.005291,Definition α = 2/(377+1),Default; tunable
+Technical Indicators,EMA period 378,α_378,EMA smoothing factor,dimensionless,E,0.005277,Definition α = 2/(378+1),Default; tunable
+Technical Indicators,EMA period 379,α_379,EMA smoothing factor,dimensionless,E,0.005263,Definition α = 2/(379+1),Default; tunable
+Technical Indicators,EMA period 380,α_380,EMA smoothing factor,dimensionless,E,0.005249,Definition α = 2/(380+1),Default; tunable
+Technical Indicators,EMA period 381,α_381,EMA smoothing factor,dimensionless,E,0.005236,Definition α = 2/(381+1),Default; tunable
+Technical Indicators,EMA period 382,α_382,EMA smoothing factor,dimensionless,E,0.005222,Definition α = 2/(382+1),Default; tunable
+Technical Indicators,EMA period 383,α_383,EMA smoothing factor,dimensionless,E,0.005208,Definition α = 2/(383+1),Default; tunable
+Technical Indicators,EMA period 384,α_384,EMA smoothing factor,dimensionless,E,0.005195,Definition α = 2/(384+1),Default; tunable
+Technical Indicators,EMA period 385,α_385,EMA smoothing factor,dimensionless,E,0.005181,Definition α = 2/(385+1),Default; tunable
+Technical Indicators,EMA period 386,α_386,EMA smoothing factor,dimensionless,E,0.005168,Definition α = 2/(386+1),Default; tunable
+Technical Indicators,EMA period 387,α_387,EMA smoothing factor,dimensionless,E,0.005155,Definition α = 2/(387+1),Default; tunable
+Technical Indicators,EMA period 388,α_388,EMA smoothing factor,dimensionless,E,0.005141,Definition α = 2/(388+1),Default; tunable
+Technical Indicators,EMA period 389,α_389,EMA smoothing factor,dimensionless,E,0.005128,Definition α = 2/(389+1),Default; tunable
+Technical Indicators,EMA period 390,α_390,EMA smoothing factor,dimensionless,E,0.005115,Definition α = 2/(390+1),Default; tunable
+Technical Indicators,EMA period 391,α_391,EMA smoothing factor,dimensionless,E,0.005102,Definition α = 2/(391+1),Default; tunable
+Technical Indicators,EMA period 392,α_392,EMA smoothing factor,dimensionless,E,0.005089,Definition α = 2/(392+1),Default; tunable
+Technical Indicators,EMA period 393,α_393,EMA smoothing factor,dimensionless,E,0.005076,Definition α = 2/(393+1),Default; tunable
+Technical Indicators,EMA period 394,α_394,EMA smoothing factor,dimensionless,E,0.005063,Definition α = 2/(394+1),Default; tunable
+Technical Indicators,EMA period 395,α_395,EMA smoothing factor,dimensionless,E,0.005051,Definition α = 2/(395+1),Default; tunable
+Technical Indicators,EMA period 396,α_396,EMA smoothing factor,dimensionless,E,0.005038,Definition α = 2/(396+1),Default; tunable
+Technical Indicators,EMA period 397,α_397,EMA smoothing factor,dimensionless,E,0.005025,Definition α = 2/(397+1),Default; tunable
+Technical Indicators,EMA period 398,α_398,EMA smoothing factor,dimensionless,E,0.005013,Definition α = 2/(398+1),Default; tunable
+Technical Indicators,EMA period 399,α_399,EMA smoothing factor,dimensionless,E,0.005000,Definition α = 2/(399+1),Default; tunable
+Technical Indicators,EMA period 400,α_400,EMA smoothing factor,dimensionless,E,0.004988,Definition α = 2/(400+1),Default; tunable
+Technical Indicators,EMA period 401,α_401,EMA smoothing factor,dimensionless,E,0.004975,Definition α = 2/(401+1),Default; tunable
+Technical Indicators,EMA period 402,α_402,EMA smoothing factor,dimensionless,E,0.004963,Definition α = 2/(402+1),Default; tunable
+Technical Indicators,EMA period 403,α_403,EMA smoothing factor,dimensionless,E,0.004950,Definition α = 2/(403+1),Default; tunable
+Technical Indicators,EMA period 404,α_404,EMA smoothing factor,dimensionless,E,0.004938,Definition α = 2/(404+1),Default; tunable
+Technical Indicators,EMA period 405,α_405,EMA smoothing factor,dimensionless,E,0.004926,Definition α = 2/(405+1),Default; tunable
+Technical Indicators,EMA period 406,α_406,EMA smoothing factor,dimensionless,E,0.004914,Definition α = 2/(406+1),Default; tunable
+Technical Indicators,EMA period 407,α_407,EMA smoothing factor,dimensionless,E,0.004902,Definition α = 2/(407+1),Default; tunable
+Technical Indicators,EMA period 408,α_408,EMA smoothing factor,dimensionless,E,0.004890,Definition α = 2/(408+1),Default; tunable
+Technical Indicators,EMA period 409,α_409,EMA smoothing factor,dimensionless,E,0.004878,Definition α = 2/(409+1),Default; tunable
+Technical Indicators,EMA period 410,α_410,EMA smoothing factor,dimensionless,E,0.004866,Definition α = 2/(410+1),Default; tunable
+Technical Indicators,EMA period 411,α_411,EMA smoothing factor,dimensionless,E,0.004854,Definition α = 2/(411+1),Default; tunable
+Technical Indicators,EMA period 412,α_412,EMA smoothing factor,dimensionless,E,0.004843,Definition α = 2/(412+1),Default; tunable
+Technical Indicators,EMA period 413,α_413,EMA smoothing factor,dimensionless,E,0.004831,Definition α = 2/(413+1),Default; tunable
+Technical Indicators,EMA period 414,α_414,EMA smoothing factor,dimensionless,E,0.004819,Definition α = 2/(414+1),Default; tunable
+Technical Indicators,EMA period 415,α_415,EMA smoothing factor,dimensionless,E,0.004808,Definition α = 2/(415+1),Default; tunable
+Technical Indicators,EMA period 416,α_416,EMA smoothing factor,dimensionless,E,0.004796,Definition α = 2/(416+1),Default; tunable
+Technical Indicators,EMA period 417,α_417,EMA smoothing factor,dimensionless,E,0.004785,Definition α = 2/(417+1),Default; tunable
+Technical Indicators,EMA period 418,α_418,EMA smoothing factor,dimensionless,E,0.004773,Definition α = 2/(418+1),Default; tunable
+Technical Indicators,EMA period 419,α_419,EMA smoothing factor,dimensionless,E,0.004762,Definition α = 2/(419+1),Default; tunable
+Technical Indicators,EMA period 420,α_420,EMA smoothing factor,dimensionless,E,0.004751,Definition α = 2/(420+1),Default; tunable
+Technical Indicators,EMA period 421,α_421,EMA smoothing factor,dimensionless,E,0.004739,Definition α = 2/(421+1),Default; tunable
+Technical Indicators,EMA period 422,α_422,EMA smoothing factor,dimensionless,E,0.004728,Definition α = 2/(422+1),Default; tunable
+Technical Indicators,EMA period 423,α_423,EMA smoothing factor,dimensionless,E,0.004717,Definition α = 2/(423+1),Default; tunable
+Technical Indicators,EMA period 424,α_424,EMA smoothing factor,dimensionless,E,0.004706,Definition α = 2/(424+1),Default; tunable
+Technical Indicators,EMA period 425,α_425,EMA smoothing factor,dimensionless,E,0.004695,Definition α = 2/(425+1),Default; tunable
+Technical Indicators,EMA period 426,α_426,EMA smoothing factor,dimensionless,E,0.004684,Definition α = 2/(426+1),Default; tunable
+Technical Indicators,EMA period 427,α_427,EMA smoothing factor,dimensionless,E,0.004673,Definition α = 2/(427+1),Default; tunable
+Technical Indicators,EMA period 428,α_428,EMA smoothing factor,dimensionless,E,0.004662,Definition α = 2/(428+1),Default; tunable
+Technical Indicators,EMA period 429,α_429,EMA smoothing factor,dimensionless,E,0.004651,Definition α = 2/(429+1),Default; tunable
+Technical Indicators,EMA period 430,α_430,EMA smoothing factor,dimensionless,E,0.004640,Definition α = 2/(430+1),Default; tunable
+Technical Indicators,EMA period 431,α_431,EMA smoothing factor,dimensionless,E,0.004630,Definition α = 2/(431+1),Default; tunable
+Technical Indicators,EMA period 432,α_432,EMA smoothing factor,dimensionless,E,0.004619,Definition α = 2/(432+1),Default; tunable
+Technical Indicators,EMA period 433,α_433,EMA smoothing factor,dimensionless,E,0.004608,Definition α = 2/(433+1),Default; tunable
+Technical Indicators,EMA period 434,α_434,EMA smoothing factor,dimensionless,E,0.004598,Definition α = 2/(434+1),Default; tunable
+Technical Indicators,EMA period 435,α_435,EMA smoothing factor,dimensionless,E,0.004587,Definition α = 2/(435+1),Default; tunable
+Technical Indicators,EMA period 436,α_436,EMA smoothing factor,dimensionless,E,0.004577,Definition α = 2/(436+1),Default; tunable
+Technical Indicators,EMA period 437,α_437,EMA smoothing factor,dimensionless,E,0.004566,Definition α = 2/(437+1),Default; tunable
+Technical Indicators,EMA period 438,α_438,EMA smoothing factor,dimensionless,E,0.004556,Definition α = 2/(438+1),Default; tunable
+Technical Indicators,EMA period 439,α_439,EMA smoothing factor,dimensionless,E,0.004545,Definition α = 2/(439+1),Default; tunable
+Technical Indicators,EMA period 440,α_440,EMA smoothing factor,dimensionless,E,0.004535,Definition α = 2/(440+1),Default; tunable
+Technical Indicators,EMA period 441,α_441,EMA smoothing factor,dimensionless,E,0.004525,Definition α = 2/(441+1),Default; tunable
+Technical Indicators,EMA period 442,α_442,EMA smoothing factor,dimensionless,E,0.004515,Definition α = 2/(442+1),Default; tunable
+Technical Indicators,EMA period 443,α_443,EMA smoothing factor,dimensionless,E,0.004505,Definition α = 2/(443+1),Default; tunable
+Technical Indicators,EMA period 444,α_444,EMA smoothing factor,dimensionless,E,0.004494,Definition α = 2/(444+1),Default; tunable
+Technical Indicators,EMA period 445,α_445,EMA smoothing factor,dimensionless,E,0.004484,Definition α = 2/(445+1),Default; tunable
+Technical Indicators,EMA period 446,α_446,EMA smoothing factor,dimensionless,E,0.004474,Definition α = 2/(446+1),Default; tunable
+Technical Indicators,EMA period 447,α_447,EMA smoothing factor,dimensionless,E,0.004464,Definition α = 2/(447+1),Default; tunable
+Technical Indicators,EMA period 448,α_448,EMA smoothing factor,dimensionless,E,0.004454,Definition α = 2/(448+1),Default; tunable
+Technical Indicators,EMA period 449,α_449,EMA smoothing factor,dimensionless,E,0.004444,Definition α = 2/(449+1),Default; tunable
+Technical Indicators,EMA period 450,α_450,EMA smoothing factor,dimensionless,E,0.004435,Definition α = 2/(450+1),Default; tunable
+Technical Indicators,EMA period 451,α_451,EMA smoothing factor,dimensionless,E,0.004425,Definition α = 2/(451+1),Default; tunable
+Technical Indicators,EMA period 452,α_452,EMA smoothing factor,dimensionless,E,0.004415,Definition α = 2/(452+1),Default; tunable
+Technical Indicators,EMA period 453,α_453,EMA smoothing factor,dimensionless,E,0.004405,Definition α = 2/(453+1),Default; tunable
+Technical Indicators,EMA period 454,α_454,EMA smoothing factor,dimensionless,E,0.004396,Definition α = 2/(454+1),Default; tunable
+Technical Indicators,EMA period 455,α_455,EMA smoothing factor,dimensionless,E,0.004386,Definition α = 2/(455+1),Default; tunable
+Technical Indicators,EMA period 456,α_456,EMA smoothing factor,dimensionless,E,0.004376,Definition α = 2/(456+1),Default; tunable
+Technical Indicators,EMA period 457,α_457,EMA smoothing factor,dimensionless,E,0.004367,Definition α = 2/(457+1),Default; tunable
+Technical Indicators,EMA period 458,α_458,EMA smoothing factor,dimensionless,E,0.004357,Definition α = 2/(458+1),Default; tunable
+Technical Indicators,EMA period 459,α_459,EMA smoothing factor,dimensionless,E,0.004348,Definition α = 2/(459+1),Default; tunable
+Technical Indicators,EMA period 460,α_460,EMA smoothing factor,dimensionless,E,0.004338,Definition α = 2/(460+1),Default; tunable
+Technical Indicators,EMA period 461,α_461,EMA smoothing factor,dimensionless,E,0.004329,Definition α = 2/(461+1),Default; tunable
+Technical Indicators,EMA period 462,α_462,EMA smoothing factor,dimensionless,E,0.004320,Definition α = 2/(462+1),Default; tunable
+Technical Indicators,EMA period 463,α_463,EMA smoothing factor,dimensionless,E,0.004310,Definition α = 2/(463+1),Default; tunable
+Technical Indicators,EMA period 464,α_464,EMA smoothing factor,dimensionless,E,0.004301,Definition α = 2/(464+1),Default; tunable
+Technical Indicators,EMA period 465,α_465,EMA smoothing factor,dimensionless,E,0.004292,Definition α = 2/(465+1),Default; tunable
+Technical Indicators,EMA period 466,α_466,EMA smoothing factor,dimensionless,E,0.004283,Definition α = 2/(466+1),Default; tunable
+Technical Indicators,EMA period 467,α_467,EMA smoothing factor,dimensionless,E,0.004274,Definition α = 2/(467+1),Default; tunable
+Technical Indicators,EMA period 468,α_468,EMA smoothing factor,dimensionless,E,0.004264,Definition α = 2/(468+1),Default; tunable
+Technical Indicators,EMA period 469,α_469,EMA smoothing factor,dimensionless,E,0.004255,Definition α = 2/(469+1),Default; tunable
+Technical Indicators,EMA period 470,α_470,EMA smoothing factor,dimensionless,E,0.004246,Definition α = 2/(470+1),Default; tunable
+Technical Indicators,EMA period 471,α_471,EMA smoothing factor,dimensionless,E,0.004237,Definition α = 2/(471+1),Default; tunable
+Technical Indicators,EMA period 472,α_472,EMA smoothing factor,dimensionless,E,0.004228,Definition α = 2/(472+1),Default; tunable
+Technical Indicators,EMA period 473,α_473,EMA smoothing factor,dimensionless,E,0.004219,Definition α = 2/(473+1),Default; tunable
+Technical Indicators,EMA period 474,α_474,EMA smoothing factor,dimensionless,E,0.004211,Definition α = 2/(474+1),Default; tunable
+Technical Indicators,EMA period 475,α_475,EMA smoothing factor,dimensionless,E,0.004202,Definition α = 2/(475+1),Default; tunable
+Technical Indicators,EMA period 476,α_476,EMA smoothing factor,dimensionless,E,0.004193,Definition α = 2/(476+1),Default; tunable
+Technical Indicators,EMA period 477,α_477,EMA smoothing factor,dimensionless,E,0.004184,Definition α = 2/(477+1),Default; tunable
+Technical Indicators,EMA period 478,α_478,EMA smoothing factor,dimensionless,E,0.004175,Definition α = 2/(478+1),Default; tunable
+Technical Indicators,EMA period 479,α_479,EMA smoothing factor,dimensionless,E,0.004167,Definition α = 2/(479+1),Default; tunable
+Technical Indicators,EMA period 480,α_480,EMA smoothing factor,dimensionless,E,0.004158,Definition α = 2/(480+1),Default; tunable
+Technical Indicators,EMA period 481,α_481,EMA smoothing factor,dimensionless,E,0.004149,Definition α = 2/(481+1),Default; tunable
+Technical Indicators,EMA period 482,α_482,EMA smoothing factor,dimensionless,E,0.004141,Definition α = 2/(482+1),Default; tunable
+Technical Indicators,EMA period 483,α_483,EMA smoothing factor,dimensionless,E,0.004132,Definition α = 2/(483+1),Default; tunable
+Technical Indicators,EMA period 484,α_484,EMA smoothing factor,dimensionless,E,0.004124,Definition α = 2/(484+1),Default; tunable
+Technical Indicators,EMA period 485,α_485,EMA smoothing factor,dimensionless,E,0.004115,Definition α = 2/(485+1),Default; tunable
+Technical Indicators,EMA period 486,α_486,EMA smoothing factor,dimensionless,E,0.004107,Definition α = 2/(486+1),Default; tunable
+Technical Indicators,EMA period 487,α_487,EMA smoothing factor,dimensionless,E,0.004098,Definition α = 2/(487+1),Default; tunable
+Technical Indicators,EMA period 488,α_488,EMA smoothing factor,dimensionless,E,0.004090,Definition α = 2/(488+1),Default; tunable
+Technical Indicators,EMA period 489,α_489,EMA smoothing factor,dimensionless,E,0.004082,Definition α = 2/(489+1),Default; tunable
+Technical Indicators,EMA period 490,α_490,EMA smoothing factor,dimensionless,E,0.004073,Definition α = 2/(490+1),Default; tunable
+Technical Indicators,EMA period 491,α_491,EMA smoothing factor,dimensionless,E,0.004065,Definition α = 2/(491+1),Default; tunable
+Technical Indicators,EMA period 492,α_492,EMA smoothing factor,dimensionless,E,0.004057,Definition α = 2/(492+1),Default; tunable
+Technical Indicators,EMA period 493,α_493,EMA smoothing factor,dimensionless,E,0.004049,Definition α = 2/(493+1),Default; tunable
+Technical Indicators,EMA period 494,α_494,EMA smoothing factor,dimensionless,E,0.004040,Definition α = 2/(494+1),Default; tunable
+Technical Indicators,EMA period 495,α_495,EMA smoothing factor,dimensionless,E,0.004032,Definition α = 2/(495+1),Default; tunable
+Technical Indicators,EMA period 496,α_496,EMA smoothing factor,dimensionless,E,0.004024,Definition α = 2/(496+1),Default; tunable
+Technical Indicators,EMA period 497,α_497,EMA smoothing factor,dimensionless,E,0.004016,Definition α = 2/(497+1),Default; tunable
+Technical Indicators,EMA period 498,α_498,EMA smoothing factor,dimensionless,E,0.004008,Definition α = 2/(498+1),Default; tunable
+Technical Indicators,EMA period 499,α_499,EMA smoothing factor,dimensionless,E,0.004000,Definition α = 2/(499+1),Default; tunable
+Technical Indicators,EMA period 500,α_500,EMA smoothing factor,dimensionless,E,0.003992,Definition α = 2/(500+1),Default; tunable
+Technical Indicators,RSI period 2,RSI_2,Relative Strength Index lookback period,periods,E,2,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 3,RSI_3,Relative Strength Index lookback period,periods,E,3,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 4,RSI_4,Relative Strength Index lookback period,periods,E,4,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 5,RSI_5,Relative Strength Index lookback period,periods,E,5,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 6,RSI_6,Relative Strength Index lookback period,periods,E,6,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 7,RSI_7,Relative Strength Index lookback period,periods,E,7,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 8,RSI_8,Relative Strength Index lookback period,periods,E,8,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 9,RSI_9,Relative Strength Index lookback period,periods,E,9,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 10,RSI_10,Relative Strength Index lookback period,periods,E,10,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 11,RSI_11,Relative Strength Index lookback period,periods,E,11,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 12,RSI_12,Relative Strength Index lookback period,periods,E,12,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 13,RSI_13,Relative Strength Index lookback period,periods,E,13,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 14,RSI_14,Relative Strength Index lookback period,periods,E,14,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 15,RSI_15,Relative Strength Index lookback period,periods,E,15,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 16,RSI_16,Relative Strength Index lookback period,periods,E,16,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 17,RSI_17,Relative Strength Index lookback period,periods,E,17,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 18,RSI_18,Relative Strength Index lookback period,periods,E,18,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 19,RSI_19,Relative Strength Index lookback period,periods,E,19,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 20,RSI_20,Relative Strength Index lookback period,periods,E,20,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 21,RSI_21,Relative Strength Index lookback period,periods,E,21,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 22,RSI_22,Relative Strength Index lookback period,periods,E,22,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 23,RSI_23,Relative Strength Index lookback period,periods,E,23,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 24,RSI_24,Relative Strength Index lookback period,periods,E,24,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 25,RSI_25,Relative Strength Index lookback period,periods,E,25,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 26,RSI_26,Relative Strength Index lookback period,periods,E,26,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 27,RSI_27,Relative Strength Index lookback period,periods,E,27,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 28,RSI_28,Relative Strength Index lookback period,periods,E,28,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 29,RSI_29,Relative Strength Index lookback period,periods,E,29,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 30,RSI_30,Relative Strength Index lookback period,periods,E,30,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 31,RSI_31,Relative Strength Index lookback period,periods,E,31,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 32,RSI_32,Relative Strength Index lookback period,periods,E,32,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 33,RSI_33,Relative Strength Index lookback period,periods,E,33,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 34,RSI_34,Relative Strength Index lookback period,periods,E,34,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 35,RSI_35,Relative Strength Index lookback period,periods,E,35,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 36,RSI_36,Relative Strength Index lookback period,periods,E,36,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 37,RSI_37,Relative Strength Index lookback period,periods,E,37,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 38,RSI_38,Relative Strength Index lookback period,periods,E,38,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 39,RSI_39,Relative Strength Index lookback period,periods,E,39,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 40,RSI_40,Relative Strength Index lookback period,periods,E,40,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 41,RSI_41,Relative Strength Index lookback period,periods,E,41,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 42,RSI_42,Relative Strength Index lookback period,periods,E,42,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 43,RSI_43,Relative Strength Index lookback period,periods,E,43,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 44,RSI_44,Relative Strength Index lookback period,periods,E,44,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 45,RSI_45,Relative Strength Index lookback period,periods,E,45,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 46,RSI_46,Relative Strength Index lookback period,periods,E,46,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 47,RSI_47,Relative Strength Index lookback period,periods,E,47,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 48,RSI_48,Relative Strength Index lookback period,periods,E,48,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 49,RSI_49,Relative Strength Index lookback period,periods,E,49,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 50,RSI_50,Relative Strength Index lookback period,periods,E,50,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 51,RSI_51,Relative Strength Index lookback period,periods,E,51,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 52,RSI_52,Relative Strength Index lookback period,periods,E,52,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 53,RSI_53,Relative Strength Index lookback period,periods,E,53,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 54,RSI_54,Relative Strength Index lookback period,periods,E,54,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 55,RSI_55,Relative Strength Index lookback period,periods,E,55,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 56,RSI_56,Relative Strength Index lookback period,periods,E,56,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 57,RSI_57,Relative Strength Index lookback period,periods,E,57,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 58,RSI_58,Relative Strength Index lookback period,periods,E,58,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 59,RSI_59,Relative Strength Index lookback period,periods,E,59,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 60,RSI_60,Relative Strength Index lookback period,periods,E,60,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 61,RSI_61,Relative Strength Index lookback period,periods,E,61,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 62,RSI_62,Relative Strength Index lookback period,periods,E,62,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 63,RSI_63,Relative Strength Index lookback period,periods,E,63,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 64,RSI_64,Relative Strength Index lookback period,periods,E,64,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 65,RSI_65,Relative Strength Index lookback period,periods,E,65,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 66,RSI_66,Relative Strength Index lookback period,periods,E,66,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 67,RSI_67,Relative Strength Index lookback period,periods,E,67,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 68,RSI_68,Relative Strength Index lookback period,periods,E,68,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 69,RSI_69,Relative Strength Index lookback period,periods,E,69,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 70,RSI_70,Relative Strength Index lookback period,periods,E,70,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 71,RSI_71,Relative Strength Index lookback period,periods,E,71,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 72,RSI_72,Relative Strength Index lookback period,periods,E,72,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 73,RSI_73,Relative Strength Index lookback period,periods,E,73,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 74,RSI_74,Relative Strength Index lookback period,periods,E,74,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 75,RSI_75,Relative Strength Index lookback period,periods,E,75,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 76,RSI_76,Relative Strength Index lookback period,periods,E,76,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 77,RSI_77,Relative Strength Index lookback period,periods,E,77,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 78,RSI_78,Relative Strength Index lookback period,periods,E,78,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 79,RSI_79,Relative Strength Index lookback period,periods,E,79,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 80,RSI_80,Relative Strength Index lookback period,periods,E,80,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 81,RSI_81,Relative Strength Index lookback period,periods,E,81,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 82,RSI_82,Relative Strength Index lookback period,periods,E,82,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 83,RSI_83,Relative Strength Index lookback period,periods,E,83,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 84,RSI_84,Relative Strength Index lookback period,periods,E,84,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 85,RSI_85,Relative Strength Index lookback period,periods,E,85,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 86,RSI_86,Relative Strength Index lookback period,periods,E,86,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 87,RSI_87,Relative Strength Index lookback period,periods,E,87,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 88,RSI_88,Relative Strength Index lookback period,periods,E,88,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 89,RSI_89,Relative Strength Index lookback period,periods,E,89,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 90,RSI_90,Relative Strength Index lookback period,periods,E,90,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 91,RSI_91,Relative Strength Index lookback period,periods,E,91,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 92,RSI_92,Relative Strength Index lookback period,periods,E,92,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 93,RSI_93,Relative Strength Index lookback period,periods,E,93,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 94,RSI_94,Relative Strength Index lookback period,periods,E,94,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 95,RSI_95,Relative Strength Index lookback period,periods,E,95,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 96,RSI_96,Relative Strength Index lookback period,periods,E,96,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 97,RSI_97,Relative Strength Index lookback period,periods,E,97,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 98,RSI_98,Relative Strength Index lookback period,periods,E,98,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 99,RSI_99,Relative Strength Index lookback period,periods,E,99,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 100,RSI_100,Relative Strength Index lookback period,periods,E,100,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 101,RSI_101,Relative Strength Index lookback period,periods,E,101,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 102,RSI_102,Relative Strength Index lookback period,periods,E,102,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 103,RSI_103,Relative Strength Index lookback period,periods,E,103,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 104,RSI_104,Relative Strength Index lookback period,periods,E,104,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 105,RSI_105,Relative Strength Index lookback period,periods,E,105,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 106,RSI_106,Relative Strength Index lookback period,periods,E,106,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 107,RSI_107,Relative Strength Index lookback period,periods,E,107,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 108,RSI_108,Relative Strength Index lookback period,periods,E,108,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 109,RSI_109,Relative Strength Index lookback period,periods,E,109,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 110,RSI_110,Relative Strength Index lookback period,periods,E,110,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 111,RSI_111,Relative Strength Index lookback period,periods,E,111,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 112,RSI_112,Relative Strength Index lookback period,periods,E,112,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 113,RSI_113,Relative Strength Index lookback period,periods,E,113,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 114,RSI_114,Relative Strength Index lookback period,periods,E,114,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 115,RSI_115,Relative Strength Index lookback period,periods,E,115,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 116,RSI_116,Relative Strength Index lookback period,periods,E,116,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 117,RSI_117,Relative Strength Index lookback period,periods,E,117,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 118,RSI_118,Relative Strength Index lookback period,periods,E,118,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 119,RSI_119,Relative Strength Index lookback period,periods,E,119,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 120,RSI_120,Relative Strength Index lookback period,periods,E,120,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 121,RSI_121,Relative Strength Index lookback period,periods,E,121,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 122,RSI_122,Relative Strength Index lookback period,periods,E,122,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 123,RSI_123,Relative Strength Index lookback period,periods,E,123,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 124,RSI_124,Relative Strength Index lookback period,periods,E,124,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 125,RSI_125,Relative Strength Index lookback period,periods,E,125,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 126,RSI_126,Relative Strength Index lookback period,periods,E,126,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 127,RSI_127,Relative Strength Index lookback period,periods,E,127,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 128,RSI_128,Relative Strength Index lookback period,periods,E,128,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 129,RSI_129,Relative Strength Index lookback period,periods,E,129,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 130,RSI_130,Relative Strength Index lookback period,periods,E,130,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 131,RSI_131,Relative Strength Index lookback period,periods,E,131,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 132,RSI_132,Relative Strength Index lookback period,periods,E,132,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 133,RSI_133,Relative Strength Index lookback period,periods,E,133,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 134,RSI_134,Relative Strength Index lookback period,periods,E,134,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 135,RSI_135,Relative Strength Index lookback period,periods,E,135,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 136,RSI_136,Relative Strength Index lookback period,periods,E,136,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 137,RSI_137,Relative Strength Index lookback period,periods,E,137,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 138,RSI_138,Relative Strength Index lookback period,periods,E,138,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 139,RSI_139,Relative Strength Index lookback period,periods,E,139,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 140,RSI_140,Relative Strength Index lookback period,periods,E,140,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 141,RSI_141,Relative Strength Index lookback period,periods,E,141,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 142,RSI_142,Relative Strength Index lookback period,periods,E,142,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 143,RSI_143,Relative Strength Index lookback period,periods,E,143,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 144,RSI_144,Relative Strength Index lookback period,periods,E,144,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 145,RSI_145,Relative Strength Index lookback period,periods,E,145,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 146,RSI_146,Relative Strength Index lookback period,periods,E,146,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 147,RSI_147,Relative Strength Index lookback period,periods,E,147,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 148,RSI_148,Relative Strength Index lookback period,periods,E,148,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 149,RSI_149,Relative Strength Index lookback period,periods,E,149,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 150,RSI_150,Relative Strength Index lookback period,periods,E,150,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 151,RSI_151,Relative Strength Index lookback period,periods,E,151,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 152,RSI_152,Relative Strength Index lookback period,periods,E,152,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 153,RSI_153,Relative Strength Index lookback period,periods,E,153,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 154,RSI_154,Relative Strength Index lookback period,periods,E,154,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 155,RSI_155,Relative Strength Index lookback period,periods,E,155,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 156,RSI_156,Relative Strength Index lookback period,periods,E,156,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 157,RSI_157,Relative Strength Index lookback period,periods,E,157,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 158,RSI_158,Relative Strength Index lookback period,periods,E,158,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 159,RSI_159,Relative Strength Index lookback period,periods,E,159,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 160,RSI_160,Relative Strength Index lookback period,periods,E,160,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 161,RSI_161,Relative Strength Index lookback period,periods,E,161,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 162,RSI_162,Relative Strength Index lookback period,periods,E,162,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 163,RSI_163,Relative Strength Index lookback period,periods,E,163,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 164,RSI_164,Relative Strength Index lookback period,periods,E,164,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 165,RSI_165,Relative Strength Index lookback period,periods,E,165,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 166,RSI_166,Relative Strength Index lookback period,periods,E,166,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 167,RSI_167,Relative Strength Index lookback period,periods,E,167,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 168,RSI_168,Relative Strength Index lookback period,periods,E,168,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 169,RSI_169,Relative Strength Index lookback period,periods,E,169,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 170,RSI_170,Relative Strength Index lookback period,periods,E,170,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 171,RSI_171,Relative Strength Index lookback period,periods,E,171,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 172,RSI_172,Relative Strength Index lookback period,periods,E,172,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 173,RSI_173,Relative Strength Index lookback period,periods,E,173,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 174,RSI_174,Relative Strength Index lookback period,periods,E,174,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 175,RSI_175,Relative Strength Index lookback period,periods,E,175,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 176,RSI_176,Relative Strength Index lookback period,periods,E,176,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 177,RSI_177,Relative Strength Index lookback period,periods,E,177,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 178,RSI_178,Relative Strength Index lookback period,periods,E,178,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 179,RSI_179,Relative Strength Index lookback period,periods,E,179,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 180,RSI_180,Relative Strength Index lookback period,periods,E,180,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 181,RSI_181,Relative Strength Index lookback period,periods,E,181,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 182,RSI_182,Relative Strength Index lookback period,periods,E,182,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 183,RSI_183,Relative Strength Index lookback period,periods,E,183,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 184,RSI_184,Relative Strength Index lookback period,periods,E,184,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 185,RSI_185,Relative Strength Index lookback period,periods,E,185,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 186,RSI_186,Relative Strength Index lookback period,periods,E,186,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 187,RSI_187,Relative Strength Index lookback period,periods,E,187,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 188,RSI_188,Relative Strength Index lookback period,periods,E,188,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 189,RSI_189,Relative Strength Index lookback period,periods,E,189,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 190,RSI_190,Relative Strength Index lookback period,periods,E,190,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 191,RSI_191,Relative Strength Index lookback period,periods,E,191,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 192,RSI_192,Relative Strength Index lookback period,periods,E,192,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 193,RSI_193,Relative Strength Index lookback period,periods,E,193,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 194,RSI_194,Relative Strength Index lookback period,periods,E,194,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 195,RSI_195,Relative Strength Index lookback period,periods,E,195,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 196,RSI_196,Relative Strength Index lookback period,periods,E,196,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 197,RSI_197,Relative Strength Index lookback period,periods,E,197,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 198,RSI_198,Relative Strength Index lookback period,periods,E,198,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 199,RSI_199,Relative Strength Index lookback period,periods,E,199,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 200,RSI_200,Relative Strength Index lookback period,periods,E,200,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 201,RSI_201,Relative Strength Index lookback period,periods,E,201,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 202,RSI_202,Relative Strength Index lookback period,periods,E,202,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 203,RSI_203,Relative Strength Index lookback period,periods,E,203,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 204,RSI_204,Relative Strength Index lookback period,periods,E,204,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 205,RSI_205,Relative Strength Index lookback period,periods,E,205,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 206,RSI_206,Relative Strength Index lookback period,periods,E,206,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 207,RSI_207,Relative Strength Index lookback period,periods,E,207,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 208,RSI_208,Relative Strength Index lookback period,periods,E,208,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 209,RSI_209,Relative Strength Index lookback period,periods,E,209,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 210,RSI_210,Relative Strength Index lookback period,periods,E,210,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 211,RSI_211,Relative Strength Index lookback period,periods,E,211,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 212,RSI_212,Relative Strength Index lookback period,periods,E,212,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 213,RSI_213,Relative Strength Index lookback period,periods,E,213,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 214,RSI_214,Relative Strength Index lookback period,periods,E,214,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 215,RSI_215,Relative Strength Index lookback period,periods,E,215,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 216,RSI_216,Relative Strength Index lookback period,periods,E,216,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 217,RSI_217,Relative Strength Index lookback period,periods,E,217,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 218,RSI_218,Relative Strength Index lookback period,periods,E,218,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 219,RSI_219,Relative Strength Index lookback period,periods,E,219,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 220,RSI_220,Relative Strength Index lookback period,periods,E,220,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 221,RSI_221,Relative Strength Index lookback period,periods,E,221,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 222,RSI_222,Relative Strength Index lookback period,periods,E,222,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 223,RSI_223,Relative Strength Index lookback period,periods,E,223,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 224,RSI_224,Relative Strength Index lookback period,periods,E,224,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 225,RSI_225,Relative Strength Index lookback period,periods,E,225,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 226,RSI_226,Relative Strength Index lookback period,periods,E,226,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 227,RSI_227,Relative Strength Index lookback period,periods,E,227,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 228,RSI_228,Relative Strength Index lookback period,periods,E,228,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 229,RSI_229,Relative Strength Index lookback period,periods,E,229,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 230,RSI_230,Relative Strength Index lookback period,periods,E,230,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 231,RSI_231,Relative Strength Index lookback period,periods,E,231,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 232,RSI_232,Relative Strength Index lookback period,periods,E,232,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 233,RSI_233,Relative Strength Index lookback period,periods,E,233,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 234,RSI_234,Relative Strength Index lookback period,periods,E,234,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 235,RSI_235,Relative Strength Index lookback period,periods,E,235,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 236,RSI_236,Relative Strength Index lookback period,periods,E,236,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 237,RSI_237,Relative Strength Index lookback period,periods,E,237,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 238,RSI_238,Relative Strength Index lookback period,periods,E,238,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 239,RSI_239,Relative Strength Index lookback period,periods,E,239,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 240,RSI_240,Relative Strength Index lookback period,periods,E,240,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 241,RSI_241,Relative Strength Index lookback period,periods,E,241,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 242,RSI_242,Relative Strength Index lookback period,periods,E,242,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 243,RSI_243,Relative Strength Index lookback period,periods,E,243,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 244,RSI_244,Relative Strength Index lookback period,periods,E,244,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 245,RSI_245,Relative Strength Index lookback period,periods,E,245,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 246,RSI_246,Relative Strength Index lookback period,periods,E,246,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 247,RSI_247,Relative Strength Index lookback period,periods,E,247,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 248,RSI_248,Relative Strength Index lookback period,periods,E,248,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 249,RSI_249,Relative Strength Index lookback period,periods,E,249,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 250,RSI_250,Relative Strength Index lookback period,periods,E,250,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 251,RSI_251,Relative Strength Index lookback period,periods,E,251,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 252,RSI_252,Relative Strength Index lookback period,periods,E,252,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 253,RSI_253,Relative Strength Index lookback period,periods,E,253,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 254,RSI_254,Relative Strength Index lookback period,periods,E,254,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 255,RSI_255,Relative Strength Index lookback period,periods,E,255,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 256,RSI_256,Relative Strength Index lookback period,periods,E,256,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 257,RSI_257,Relative Strength Index lookback period,periods,E,257,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 258,RSI_258,Relative Strength Index lookback period,periods,E,258,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 259,RSI_259,Relative Strength Index lookback period,periods,E,259,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 260,RSI_260,Relative Strength Index lookback period,periods,E,260,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 261,RSI_261,Relative Strength Index lookback period,periods,E,261,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 262,RSI_262,Relative Strength Index lookback period,periods,E,262,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 263,RSI_263,Relative Strength Index lookback period,periods,E,263,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 264,RSI_264,Relative Strength Index lookback period,periods,E,264,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 265,RSI_265,Relative Strength Index lookback period,periods,E,265,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 266,RSI_266,Relative Strength Index lookback period,periods,E,266,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 267,RSI_267,Relative Strength Index lookback period,periods,E,267,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 268,RSI_268,Relative Strength Index lookback period,periods,E,268,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 269,RSI_269,Relative Strength Index lookback period,periods,E,269,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 270,RSI_270,Relative Strength Index lookback period,periods,E,270,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 271,RSI_271,Relative Strength Index lookback period,periods,E,271,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 272,RSI_272,Relative Strength Index lookback period,periods,E,272,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 273,RSI_273,Relative Strength Index lookback period,periods,E,273,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 274,RSI_274,Relative Strength Index lookback period,periods,E,274,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 275,RSI_275,Relative Strength Index lookback period,periods,E,275,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 276,RSI_276,Relative Strength Index lookback period,periods,E,276,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 277,RSI_277,Relative Strength Index lookback period,periods,E,277,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 278,RSI_278,Relative Strength Index lookback period,periods,E,278,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 279,RSI_279,Relative Strength Index lookback period,periods,E,279,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 280,RSI_280,Relative Strength Index lookback period,periods,E,280,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 281,RSI_281,Relative Strength Index lookback period,periods,E,281,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 282,RSI_282,Relative Strength Index lookback period,periods,E,282,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 283,RSI_283,Relative Strength Index lookback period,periods,E,283,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 284,RSI_284,Relative Strength Index lookback period,periods,E,284,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 285,RSI_285,Relative Strength Index lookback period,periods,E,285,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 286,RSI_286,Relative Strength Index lookback period,periods,E,286,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 287,RSI_287,Relative Strength Index lookback period,periods,E,287,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 288,RSI_288,Relative Strength Index lookback period,periods,E,288,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 289,RSI_289,Relative Strength Index lookback period,periods,E,289,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 290,RSI_290,Relative Strength Index lookback period,periods,E,290,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 291,RSI_291,Relative Strength Index lookback period,periods,E,291,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 292,RSI_292,Relative Strength Index lookback period,periods,E,292,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 293,RSI_293,Relative Strength Index lookback period,periods,E,293,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 294,RSI_294,Relative Strength Index lookback period,periods,E,294,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 295,RSI_295,Relative Strength Index lookback period,periods,E,295,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 296,RSI_296,Relative Strength Index lookback period,periods,E,296,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 297,RSI_297,Relative Strength Index lookback period,periods,E,297,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 298,RSI_298,Relative Strength Index lookback period,periods,E,298,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 299,RSI_299,Relative Strength Index lookback period,periods,E,299,Default (Wilder),Momentum oscillator
+Technical Indicators,RSI period 300,RSI_300,Relative Strength Index lookback period,periods,E,300,Default (Wilder),Momentum oscillator
+Technical Indicators,ATR period 2,ATR_2,Average True Range lookback period,periods,E,2,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 3,ATR_3,Average True Range lookback period,periods,E,3,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 4,ATR_4,Average True Range lookback period,periods,E,4,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 5,ATR_5,Average True Range lookback period,periods,E,5,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 6,ATR_6,Average True Range lookback period,periods,E,6,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 7,ATR_7,Average True Range lookback period,periods,E,7,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 8,ATR_8,Average True Range lookback period,periods,E,8,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 9,ATR_9,Average True Range lookback period,periods,E,9,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 10,ATR_10,Average True Range lookback period,periods,E,10,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 11,ATR_11,Average True Range lookback period,periods,E,11,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 12,ATR_12,Average True Range lookback period,periods,E,12,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 13,ATR_13,Average True Range lookback period,periods,E,13,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 14,ATR_14,Average True Range lookback period,periods,E,14,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 15,ATR_15,Average True Range lookback period,periods,E,15,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 16,ATR_16,Average True Range lookback period,periods,E,16,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 17,ATR_17,Average True Range lookback period,periods,E,17,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 18,ATR_18,Average True Range lookback period,periods,E,18,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 19,ATR_19,Average True Range lookback period,periods,E,19,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 20,ATR_20,Average True Range lookback period,periods,E,20,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 21,ATR_21,Average True Range lookback period,periods,E,21,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 22,ATR_22,Average True Range lookback period,periods,E,22,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 23,ATR_23,Average True Range lookback period,periods,E,23,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 24,ATR_24,Average True Range lookback period,periods,E,24,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 25,ATR_25,Average True Range lookback period,periods,E,25,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 26,ATR_26,Average True Range lookback period,periods,E,26,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 27,ATR_27,Average True Range lookback period,periods,E,27,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 28,ATR_28,Average True Range lookback period,periods,E,28,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 29,ATR_29,Average True Range lookback period,periods,E,29,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 30,ATR_30,Average True Range lookback period,periods,E,30,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 31,ATR_31,Average True Range lookback period,periods,E,31,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 32,ATR_32,Average True Range lookback period,periods,E,32,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 33,ATR_33,Average True Range lookback period,periods,E,33,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 34,ATR_34,Average True Range lookback period,periods,E,34,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 35,ATR_35,Average True Range lookback period,periods,E,35,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 36,ATR_36,Average True Range lookback period,periods,E,36,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 37,ATR_37,Average True Range lookback period,periods,E,37,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 38,ATR_38,Average True Range lookback period,periods,E,38,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 39,ATR_39,Average True Range lookback period,periods,E,39,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 40,ATR_40,Average True Range lookback period,periods,E,40,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 41,ATR_41,Average True Range lookback period,periods,E,41,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 42,ATR_42,Average True Range lookback period,periods,E,42,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 43,ATR_43,Average True Range lookback period,periods,E,43,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 44,ATR_44,Average True Range lookback period,periods,E,44,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 45,ATR_45,Average True Range lookback period,periods,E,45,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 46,ATR_46,Average True Range lookback period,periods,E,46,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 47,ATR_47,Average True Range lookback period,periods,E,47,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 48,ATR_48,Average True Range lookback period,periods,E,48,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 49,ATR_49,Average True Range lookback period,periods,E,49,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 50,ATR_50,Average True Range lookback period,periods,E,50,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 51,ATR_51,Average True Range lookback period,periods,E,51,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 52,ATR_52,Average True Range lookback period,periods,E,52,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 53,ATR_53,Average True Range lookback period,periods,E,53,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 54,ATR_54,Average True Range lookback period,periods,E,54,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 55,ATR_55,Average True Range lookback period,periods,E,55,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 56,ATR_56,Average True Range lookback period,periods,E,56,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 57,ATR_57,Average True Range lookback period,periods,E,57,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 58,ATR_58,Average True Range lookback period,periods,E,58,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 59,ATR_59,Average True Range lookback period,periods,E,59,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 60,ATR_60,Average True Range lookback period,periods,E,60,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 61,ATR_61,Average True Range lookback period,periods,E,61,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 62,ATR_62,Average True Range lookback period,periods,E,62,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 63,ATR_63,Average True Range lookback period,periods,E,63,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 64,ATR_64,Average True Range lookback period,periods,E,64,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 65,ATR_65,Average True Range lookback period,periods,E,65,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 66,ATR_66,Average True Range lookback period,periods,E,66,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 67,ATR_67,Average True Range lookback period,periods,E,67,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 68,ATR_68,Average True Range lookback period,periods,E,68,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 69,ATR_69,Average True Range lookback period,periods,E,69,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 70,ATR_70,Average True Range lookback period,periods,E,70,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 71,ATR_71,Average True Range lookback period,periods,E,71,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 72,ATR_72,Average True Range lookback period,periods,E,72,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 73,ATR_73,Average True Range lookback period,periods,E,73,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 74,ATR_74,Average True Range lookback period,periods,E,74,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 75,ATR_75,Average True Range lookback period,periods,E,75,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 76,ATR_76,Average True Range lookback period,periods,E,76,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 77,ATR_77,Average True Range lookback period,periods,E,77,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 78,ATR_78,Average True Range lookback period,periods,E,78,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 79,ATR_79,Average True Range lookback period,periods,E,79,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 80,ATR_80,Average True Range lookback period,periods,E,80,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 81,ATR_81,Average True Range lookback period,periods,E,81,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 82,ATR_82,Average True Range lookback period,periods,E,82,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 83,ATR_83,Average True Range lookback period,periods,E,83,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 84,ATR_84,Average True Range lookback period,periods,E,84,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 85,ATR_85,Average True Range lookback period,periods,E,85,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 86,ATR_86,Average True Range lookback period,periods,E,86,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 87,ATR_87,Average True Range lookback period,periods,E,87,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 88,ATR_88,Average True Range lookback period,periods,E,88,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 89,ATR_89,Average True Range lookback period,periods,E,89,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 90,ATR_90,Average True Range lookback period,periods,E,90,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 91,ATR_91,Average True Range lookback period,periods,E,91,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 92,ATR_92,Average True Range lookback period,periods,E,92,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 93,ATR_93,Average True Range lookback period,periods,E,93,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 94,ATR_94,Average True Range lookback period,periods,E,94,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 95,ATR_95,Average True Range lookback period,periods,E,95,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 96,ATR_96,Average True Range lookback period,periods,E,96,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 97,ATR_97,Average True Range lookback period,periods,E,97,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 98,ATR_98,Average True Range lookback period,periods,E,98,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 99,ATR_99,Average True Range lookback period,periods,E,99,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 100,ATR_100,Average True Range lookback period,periods,E,100,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 101,ATR_101,Average True Range lookback period,periods,E,101,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 102,ATR_102,Average True Range lookback period,periods,E,102,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 103,ATR_103,Average True Range lookback period,periods,E,103,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 104,ATR_104,Average True Range lookback period,periods,E,104,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 105,ATR_105,Average True Range lookback period,periods,E,105,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 106,ATR_106,Average True Range lookback period,periods,E,106,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 107,ATR_107,Average True Range lookback period,periods,E,107,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 108,ATR_108,Average True Range lookback period,periods,E,108,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 109,ATR_109,Average True Range lookback period,periods,E,109,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 110,ATR_110,Average True Range lookback period,periods,E,110,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 111,ATR_111,Average True Range lookback period,periods,E,111,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 112,ATR_112,Average True Range lookback period,periods,E,112,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 113,ATR_113,Average True Range lookback period,periods,E,113,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 114,ATR_114,Average True Range lookback period,periods,E,114,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 115,ATR_115,Average True Range lookback period,periods,E,115,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 116,ATR_116,Average True Range lookback period,periods,E,116,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 117,ATR_117,Average True Range lookback period,periods,E,117,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 118,ATR_118,Average True Range lookback period,periods,E,118,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 119,ATR_119,Average True Range lookback period,periods,E,119,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 120,ATR_120,Average True Range lookback period,periods,E,120,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 121,ATR_121,Average True Range lookback period,periods,E,121,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 122,ATR_122,Average True Range lookback period,periods,E,122,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 123,ATR_123,Average True Range lookback period,periods,E,123,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 124,ATR_124,Average True Range lookback period,periods,E,124,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 125,ATR_125,Average True Range lookback period,periods,E,125,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 126,ATR_126,Average True Range lookback period,periods,E,126,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 127,ATR_127,Average True Range lookback period,periods,E,127,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 128,ATR_128,Average True Range lookback period,periods,E,128,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 129,ATR_129,Average True Range lookback period,periods,E,129,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 130,ATR_130,Average True Range lookback period,periods,E,130,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 131,ATR_131,Average True Range lookback period,periods,E,131,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 132,ATR_132,Average True Range lookback period,periods,E,132,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 133,ATR_133,Average True Range lookback period,periods,E,133,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 134,ATR_134,Average True Range lookback period,periods,E,134,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 135,ATR_135,Average True Range lookback period,periods,E,135,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 136,ATR_136,Average True Range lookback period,periods,E,136,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 137,ATR_137,Average True Range lookback period,periods,E,137,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 138,ATR_138,Average True Range lookback period,periods,E,138,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 139,ATR_139,Average True Range lookback period,periods,E,139,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 140,ATR_140,Average True Range lookback period,periods,E,140,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 141,ATR_141,Average True Range lookback period,periods,E,141,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 142,ATR_142,Average True Range lookback period,periods,E,142,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 143,ATR_143,Average True Range lookback period,periods,E,143,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 144,ATR_144,Average True Range lookback period,periods,E,144,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 145,ATR_145,Average True Range lookback period,periods,E,145,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 146,ATR_146,Average True Range lookback period,periods,E,146,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 147,ATR_147,Average True Range lookback period,periods,E,147,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 148,ATR_148,Average True Range lookback period,periods,E,148,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 149,ATR_149,Average True Range lookback period,periods,E,149,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 150,ATR_150,Average True Range lookback period,periods,E,150,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 151,ATR_151,Average True Range lookback period,periods,E,151,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 152,ATR_152,Average True Range lookback period,periods,E,152,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 153,ATR_153,Average True Range lookback period,periods,E,153,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 154,ATR_154,Average True Range lookback period,periods,E,154,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 155,ATR_155,Average True Range lookback period,periods,E,155,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 156,ATR_156,Average True Range lookback period,periods,E,156,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 157,ATR_157,Average True Range lookback period,periods,E,157,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 158,ATR_158,Average True Range lookback period,periods,E,158,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 159,ATR_159,Average True Range lookback period,periods,E,159,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 160,ATR_160,Average True Range lookback period,periods,E,160,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 161,ATR_161,Average True Range lookback period,periods,E,161,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 162,ATR_162,Average True Range lookback period,periods,E,162,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 163,ATR_163,Average True Range lookback period,periods,E,163,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 164,ATR_164,Average True Range lookback period,periods,E,164,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 165,ATR_165,Average True Range lookback period,periods,E,165,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 166,ATR_166,Average True Range lookback period,periods,E,166,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 167,ATR_167,Average True Range lookback period,periods,E,167,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 168,ATR_168,Average True Range lookback period,periods,E,168,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 169,ATR_169,Average True Range lookback period,periods,E,169,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 170,ATR_170,Average True Range lookback period,periods,E,170,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 171,ATR_171,Average True Range lookback period,periods,E,171,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 172,ATR_172,Average True Range lookback period,periods,E,172,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 173,ATR_173,Average True Range lookback period,periods,E,173,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 174,ATR_174,Average True Range lookback period,periods,E,174,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 175,ATR_175,Average True Range lookback period,periods,E,175,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 176,ATR_176,Average True Range lookback period,periods,E,176,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 177,ATR_177,Average True Range lookback period,periods,E,177,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 178,ATR_178,Average True Range lookback period,periods,E,178,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 179,ATR_179,Average True Range lookback period,periods,E,179,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 180,ATR_180,Average True Range lookback period,periods,E,180,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 181,ATR_181,Average True Range lookback period,periods,E,181,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 182,ATR_182,Average True Range lookback period,periods,E,182,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 183,ATR_183,Average True Range lookback period,periods,E,183,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 184,ATR_184,Average True Range lookback period,periods,E,184,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 185,ATR_185,Average True Range lookback period,periods,E,185,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 186,ATR_186,Average True Range lookback period,periods,E,186,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 187,ATR_187,Average True Range lookback period,periods,E,187,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 188,ATR_188,Average True Range lookback period,periods,E,188,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 189,ATR_189,Average True Range lookback period,periods,E,189,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 190,ATR_190,Average True Range lookback period,periods,E,190,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 191,ATR_191,Average True Range lookback period,periods,E,191,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 192,ATR_192,Average True Range lookback period,periods,E,192,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 193,ATR_193,Average True Range lookback period,periods,E,193,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 194,ATR_194,Average True Range lookback period,periods,E,194,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 195,ATR_195,Average True Range lookback period,periods,E,195,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 196,ATR_196,Average True Range lookback period,periods,E,196,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 197,ATR_197,Average True Range lookback period,periods,E,197,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 198,ATR_198,Average True Range lookback period,periods,E,198,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 199,ATR_199,Average True Range lookback period,periods,E,199,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 200,ATR_200,Average True Range lookback period,periods,E,200,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 201,ATR_201,Average True Range lookback period,periods,E,201,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 202,ATR_202,Average True Range lookback period,periods,E,202,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 203,ATR_203,Average True Range lookback period,periods,E,203,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 204,ATR_204,Average True Range lookback period,periods,E,204,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 205,ATR_205,Average True Range lookback period,periods,E,205,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 206,ATR_206,Average True Range lookback period,periods,E,206,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 207,ATR_207,Average True Range lookback period,periods,E,207,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 208,ATR_208,Average True Range lookback period,periods,E,208,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 209,ATR_209,Average True Range lookback period,periods,E,209,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 210,ATR_210,Average True Range lookback period,periods,E,210,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 211,ATR_211,Average True Range lookback period,periods,E,211,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 212,ATR_212,Average True Range lookback period,periods,E,212,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 213,ATR_213,Average True Range lookback period,periods,E,213,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 214,ATR_214,Average True Range lookback period,periods,E,214,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 215,ATR_215,Average True Range lookback period,periods,E,215,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 216,ATR_216,Average True Range lookback period,periods,E,216,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 217,ATR_217,Average True Range lookback period,periods,E,217,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 218,ATR_218,Average True Range lookback period,periods,E,218,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 219,ATR_219,Average True Range lookback period,periods,E,219,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 220,ATR_220,Average True Range lookback period,periods,E,220,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 221,ATR_221,Average True Range lookback period,periods,E,221,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 222,ATR_222,Average True Range lookback period,periods,E,222,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 223,ATR_223,Average True Range lookback period,periods,E,223,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 224,ATR_224,Average True Range lookback period,periods,E,224,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 225,ATR_225,Average True Range lookback period,periods,E,225,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 226,ATR_226,Average True Range lookback period,periods,E,226,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 227,ATR_227,Average True Range lookback period,periods,E,227,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 228,ATR_228,Average True Range lookback period,periods,E,228,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 229,ATR_229,Average True Range lookback period,periods,E,229,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 230,ATR_230,Average True Range lookback period,periods,E,230,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 231,ATR_231,Average True Range lookback period,periods,E,231,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 232,ATR_232,Average True Range lookback period,periods,E,232,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 233,ATR_233,Average True Range lookback period,periods,E,233,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 234,ATR_234,Average True Range lookback period,periods,E,234,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 235,ATR_235,Average True Range lookback period,periods,E,235,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 236,ATR_236,Average True Range lookback period,periods,E,236,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 237,ATR_237,Average True Range lookback period,periods,E,237,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 238,ATR_238,Average True Range lookback period,periods,E,238,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 239,ATR_239,Average True Range lookback period,periods,E,239,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 240,ATR_240,Average True Range lookback period,periods,E,240,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 241,ATR_241,Average True Range lookback period,periods,E,241,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 242,ATR_242,Average True Range lookback period,periods,E,242,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 243,ATR_243,Average True Range lookback period,periods,E,243,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 244,ATR_244,Average True Range lookback period,periods,E,244,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 245,ATR_245,Average True Range lookback period,periods,E,245,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 246,ATR_246,Average True Range lookback period,periods,E,246,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 247,ATR_247,Average True Range lookback period,periods,E,247,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 248,ATR_248,Average True Range lookback period,periods,E,248,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 249,ATR_249,Average True Range lookback period,periods,E,249,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 250,ATR_250,Average True Range lookback period,periods,E,250,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 251,ATR_251,Average True Range lookback period,periods,E,251,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 252,ATR_252,Average True Range lookback period,periods,E,252,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 253,ATR_253,Average True Range lookback period,periods,E,253,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 254,ATR_254,Average True Range lookback period,periods,E,254,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 255,ATR_255,Average True Range lookback period,periods,E,255,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 256,ATR_256,Average True Range lookback period,periods,E,256,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 257,ATR_257,Average True Range lookback period,periods,E,257,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 258,ATR_258,Average True Range lookback period,periods,E,258,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 259,ATR_259,Average True Range lookback period,periods,E,259,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 260,ATR_260,Average True Range lookback period,periods,E,260,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 261,ATR_261,Average True Range lookback period,periods,E,261,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 262,ATR_262,Average True Range lookback period,periods,E,262,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 263,ATR_263,Average True Range lookback period,periods,E,263,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 264,ATR_264,Average True Range lookback period,periods,E,264,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 265,ATR_265,Average True Range lookback period,periods,E,265,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 266,ATR_266,Average True Range lookback period,periods,E,266,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 267,ATR_267,Average True Range lookback period,periods,E,267,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 268,ATR_268,Average True Range lookback period,periods,E,268,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 269,ATR_269,Average True Range lookback period,periods,E,269,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 270,ATR_270,Average True Range lookback period,periods,E,270,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 271,ATR_271,Average True Range lookback period,periods,E,271,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 272,ATR_272,Average True Range lookback period,periods,E,272,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 273,ATR_273,Average True Range lookback period,periods,E,273,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 274,ATR_274,Average True Range lookback period,periods,E,274,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 275,ATR_275,Average True Range lookback period,periods,E,275,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 276,ATR_276,Average True Range lookback period,periods,E,276,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 277,ATR_277,Average True Range lookback period,periods,E,277,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 278,ATR_278,Average True Range lookback period,periods,E,278,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 279,ATR_279,Average True Range lookback period,periods,E,279,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 280,ATR_280,Average True Range lookback period,periods,E,280,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 281,ATR_281,Average True Range lookback period,periods,E,281,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 282,ATR_282,Average True Range lookback period,periods,E,282,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 283,ATR_283,Average True Range lookback period,periods,E,283,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 284,ATR_284,Average True Range lookback period,periods,E,284,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 285,ATR_285,Average True Range lookback period,periods,E,285,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 286,ATR_286,Average True Range lookback period,periods,E,286,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 287,ATR_287,Average True Range lookback period,periods,E,287,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 288,ATR_288,Average True Range lookback period,periods,E,288,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 289,ATR_289,Average True Range lookback period,periods,E,289,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 290,ATR_290,Average True Range lookback period,periods,E,290,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 291,ATR_291,Average True Range lookback period,periods,E,291,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 292,ATR_292,Average True Range lookback period,periods,E,292,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 293,ATR_293,Average True Range lookback period,periods,E,293,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 294,ATR_294,Average True Range lookback period,periods,E,294,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 295,ATR_295,Average True Range lookback period,periods,E,295,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 296,ATR_296,Average True Range lookback period,periods,E,296,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 297,ATR_297,Average True Range lookback period,periods,E,297,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 298,ATR_298,Average True Range lookback period,periods,E,298,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 299,ATR_299,Average True Range lookback period,periods,E,299,Default (Wilder),Volatility measure
+Technical Indicators,ATR period 300,ATR_300,Average True Range lookback period,periods,E,300,Default (Wilder),Volatility measure
+Technical Indicators,Bollinger width 1 @ 5,k_1_5,Bollinger band standard deviation multiplier,dimensionless,E,1,Standard 1σ bands over 5 periods,Volatility bands
+Technical Indicators,Bollinger width 1 @ 10,k_1_10,Bollinger band standard deviation multiplier,dimensionless,E,1,Standard 1σ bands over 10 periods,Volatility bands
+Technical Indicators,Bollinger width 1 @ 20,k_1_20,Bollinger band standard deviation multiplier,dimensionless,E,1,Standard 1σ bands over 20 periods,Volatility bands
+Technical Indicators,Bollinger width 1 @ 30,k_1_30,Bollinger band standard deviation multiplier,dimensionless,E,1,Standard 1σ bands over 30 periods,Volatility bands
+Technical Indicators,Bollinger width 1 @ 50,k_1_50,Bollinger band standard deviation multiplier,dimensionless,E,1,Standard 1σ bands over 50 periods,Volatility bands
+Technical Indicators,Bollinger width 1 @ 100,k_1_100,Bollinger band standard deviation multiplier,dimensionless,E,1,Standard 1σ bands over 100 periods,Volatility bands
+Technical Indicators,Bollinger width 1 @ 150,k_1_150,Bollinger band standard deviation multiplier,dimensionless,E,1,Standard 1σ bands over 150 periods,Volatility bands
+Technical Indicators,Bollinger width 1 @ 200,k_1_200,Bollinger band standard deviation multiplier,dimensionless,E,1,Standard 1σ bands over 200 periods,Volatility bands
+Technical Indicators,Bollinger width 2 @ 5,k_2_5,Bollinger band standard deviation multiplier,dimensionless,E,2,Standard 2σ bands over 5 periods,Volatility bands
+Technical Indicators,Bollinger width 2 @ 10,k_2_10,Bollinger band standard deviation multiplier,dimensionless,E,2,Standard 2σ bands over 10 periods,Volatility bands
+Technical Indicators,Bollinger width 2 @ 20,k_2_20,Bollinger band standard deviation multiplier,dimensionless,E,2,Standard 2σ bands over 20 periods,Volatility bands
+Technical Indicators,Bollinger width 2 @ 30,k_2_30,Bollinger band standard deviation multiplier,dimensionless,E,2,Standard 2σ bands over 30 periods,Volatility bands
+Technical Indicators,Bollinger width 2 @ 50,k_2_50,Bollinger band standard deviation multiplier,dimensionless,E,2,Standard 2σ bands over 50 periods,Volatility bands
+Technical Indicators,Bollinger width 2 @ 100,k_2_100,Bollinger band standard deviation multiplier,dimensionless,E,2,Standard 2σ bands over 100 periods,Volatility bands
+Technical Indicators,Bollinger width 2 @ 150,k_2_150,Bollinger band standard deviation multiplier,dimensionless,E,2,Standard 2σ bands over 150 periods,Volatility bands
+Technical Indicators,Bollinger width 2 @ 200,k_2_200,Bollinger band standard deviation multiplier,dimensionless,E,2,Standard 2σ bands over 200 periods,Volatility bands
+Technical Indicators,Bollinger width 3 @ 5,k_3_5,Bollinger band standard deviation multiplier,dimensionless,E,3,Standard 3σ bands over 5 periods,Volatility bands
+Technical Indicators,Bollinger width 3 @ 10,k_3_10,Bollinger band standard deviation multiplier,dimensionless,E,3,Standard 3σ bands over 10 periods,Volatility bands
+Technical Indicators,Bollinger width 3 @ 20,k_3_20,Bollinger band standard deviation multiplier,dimensionless,E,3,Standard 3σ bands over 20 periods,Volatility bands
+Technical Indicators,Bollinger width 3 @ 30,k_3_30,Bollinger band standard deviation multiplier,dimensionless,E,3,Standard 3σ bands over 30 periods,Volatility bands
+Technical Indicators,Bollinger width 3 @ 50,k_3_50,Bollinger band standard deviation multiplier,dimensionless,E,3,Standard 3σ bands over 50 periods,Volatility bands
+Technical Indicators,Bollinger width 3 @ 100,k_3_100,Bollinger band standard deviation multiplier,dimensionless,E,3,Standard 3σ bands over 100 periods,Volatility bands
+Technical Indicators,Bollinger width 3 @ 150,k_3_150,Bollinger band standard deviation multiplier,dimensionless,E,3,Standard 3σ bands over 150 periods,Volatility bands
+Technical Indicators,Bollinger width 3 @ 200,k_3_200,Bollinger band standard deviation multiplier,dimensionless,E,3,Standard 3σ bands over 200 periods,Volatility bands
+Technical Indicators,Bollinger width 4 @ 5,k_4_5,Bollinger band standard deviation multiplier,dimensionless,E,4,Standard 4σ bands over 5 periods,Volatility bands
+Technical Indicators,Bollinger width 4 @ 10,k_4_10,Bollinger band standard deviation multiplier,dimensionless,E,4,Standard 4σ bands over 10 periods,Volatility bands
+Technical Indicators,Bollinger width 4 @ 20,k_4_20,Bollinger band standard deviation multiplier,dimensionless,E,4,Standard 4σ bands over 20 periods,Volatility bands
+Technical Indicators,Bollinger width 4 @ 30,k_4_30,Bollinger band standard deviation multiplier,dimensionless,E,4,Standard 4σ bands over 30 periods,Volatility bands
+Technical Indicators,Bollinger width 4 @ 50,k_4_50,Bollinger band standard deviation multiplier,dimensionless,E,4,Standard 4σ bands over 50 periods,Volatility bands
+Technical Indicators,Bollinger width 4 @ 100,k_4_100,Bollinger band standard deviation multiplier,dimensionless,E,4,Standard 4σ bands over 100 periods,Volatility bands
+Technical Indicators,Bollinger width 4 @ 150,k_4_150,Bollinger band standard deviation multiplier,dimensionless,E,4,Standard 4σ bands over 150 periods,Volatility bands
+Technical Indicators,Bollinger width 4 @ 200,k_4_200,Bollinger band standard deviation multiplier,dimensionless,E,4,Standard 4σ bands over 200 periods,Volatility bands
+Technical Indicators,Bollinger width 5 @ 5,k_5_5,Bollinger band standard deviation multiplier,dimensionless,E,5,Standard 5σ bands over 5 periods,Volatility bands
+Technical Indicators,Bollinger width 5 @ 10,k_5_10,Bollinger band standard deviation multiplier,dimensionless,E,5,Standard 5σ bands over 10 periods,Volatility bands
+Technical Indicators,Bollinger width 5 @ 20,k_5_20,Bollinger band standard deviation multiplier,dimensionless,E,5,Standard 5σ bands over 20 periods,Volatility bands
+Technical Indicators,Bollinger width 5 @ 30,k_5_30,Bollinger band standard deviation multiplier,dimensionless,E,5,Standard 5σ bands over 30 periods,Volatility bands
+Technical Indicators,Bollinger width 5 @ 50,k_5_50,Bollinger band standard deviation multiplier,dimensionless,E,5,Standard 5σ bands over 50 periods,Volatility bands
+Technical Indicators,Bollinger width 5 @ 100,k_5_100,Bollinger band standard deviation multiplier,dimensionless,E,5,Standard 5σ bands over 100 periods,Volatility bands
+Technical Indicators,Bollinger width 5 @ 150,k_5_150,Bollinger band standard deviation multiplier,dimensionless,E,5,Standard 5σ bands over 150 periods,Volatility bands
+Technical Indicators,Bollinger width 5 @ 200,k_5_200,Bollinger band standard deviation multiplier,dimensionless,E,5,Standard 5σ bands over 200 periods,Volatility bands
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,0.5%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,1%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,1.5%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,2%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,2.5%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,3%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,3.5%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,4%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,4.5%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,5%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,5.5%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,6%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,6.5%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,7%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,7.5%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,8%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,8.5%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,9%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,9.5%,Risk management policy,Daily stop loss
+Risk Management,Max daily loss,MDL,Maximum daily portfolio loss threshold,percentage,E,10%,Risk management policy,Daily stop loss
+Risk Management,Position cap per asset,Cap_1,Maximum position size per individual asset,percentage,E,1%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_2,Maximum position size per individual asset,percentage,E,2%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_3,Maximum position size per individual asset,percentage,E,3%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_4,Maximum position size per individual asset,percentage,E,4%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_5,Maximum position size per individual asset,percentage,E,5%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_6,Maximum position size per individual asset,percentage,E,6%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_7,Maximum position size per individual asset,percentage,E,7%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_8,Maximum position size per individual asset,percentage,E,8%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_9,Maximum position size per individual asset,percentage,E,9%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_10,Maximum position size per individual asset,percentage,E,10%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_11,Maximum position size per individual asset,percentage,E,11%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_12,Maximum position size per individual asset,percentage,E,12%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_13,Maximum position size per individual asset,percentage,E,13%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_14,Maximum position size per individual asset,percentage,E,14%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_15,Maximum position size per individual asset,percentage,E,15%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_16,Maximum position size per individual asset,percentage,E,16%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_17,Maximum position size per individual asset,percentage,E,17%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_18,Maximum position size per individual asset,percentage,E,18%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_19,Maximum position size per individual asset,percentage,E,19%,Position sizing limit,Concentration risk control
+Risk Management,Position cap per asset,Cap_20,Maximum position size per individual asset,percentage,E,20%,Position sizing limit,Concentration risk control
+Risk Management,Target volatility,σ*,Target portfolio volatility for vol targeting,percentage,A,5%,Vol targeting parameter,Portfolio construction
+Risk Management,Target volatility,σ*,Target portfolio volatility for vol targeting,percentage,A,7.5%,Vol targeting parameter,Portfolio construction
+Risk Management,Target volatility,σ*,Target portfolio volatility for vol targeting,percentage,A,10%,Vol targeting parameter,Portfolio construction
+Risk Management,Target volatility,σ*,Target portfolio volatility for vol targeting,percentage,A,12.5%,Vol targeting parameter,Portfolio construction
+Risk Management,Target volatility,σ*,Target portfolio volatility for vol targeting,percentage,A,15%,Vol targeting parameter,Portfolio construction
+Risk Management,Target volatility,σ*,Target portfolio volatility for vol targeting,percentage,A,20%,Vol targeting parameter,Portfolio construction
+Risk Management,Target volatility,σ*,Target portfolio volatility for vol targeting,percentage,A,25%,Vol targeting parameter,Portfolio construction
+Risk Management,Target volatility,σ*,Target portfolio volatility for vol targeting,percentage,A,30%,Vol targeting parameter,Portfolio construction
+DeFi/AMM,Uniswap v3 fee tier,fee_0.01,Uniswap v3 pool fee tier,percentage,E,0.01%,Protocol parameter,LP fee structure
+DeFi/AMM,Uniswap v3 fee tier,fee_0.05,Uniswap v3 pool fee tier,percentage,E,0.05%,Protocol parameter,LP fee structure
+DeFi/AMM,Uniswap v3 fee tier,fee_0.3,Uniswap v3 pool fee tier,percentage,E,0.3%,Protocol parameter,LP fee structure
+DeFi/AMM,Uniswap v3 fee tier,fee_1,Uniswap v3 pool fee tier,percentage,E,1%,Protocol parameter,LP fee structure
+DeFi/AMM,Stable-swap amplification,A_10,Curve stable-swap amplification parameter,dimensionless,A,10,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_20,Curve stable-swap amplification parameter,dimensionless,A,20,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_30,Curve stable-swap amplification parameter,dimensionless,A,30,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_40,Curve stable-swap amplification parameter,dimensionless,A,40,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_50,Curve stable-swap amplification parameter,dimensionless,A,50,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_60,Curve stable-swap amplification parameter,dimensionless,A,60,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_70,Curve stable-swap amplification parameter,dimensionless,A,70,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_80,Curve stable-swap amplification parameter,dimensionless,A,80,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_90,Curve stable-swap amplification parameter,dimensionless,A,90,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_100,Curve stable-swap amplification parameter,dimensionless,A,100,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_110,Curve stable-swap amplification parameter,dimensionless,A,110,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_120,Curve stable-swap amplification parameter,dimensionless,A,120,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_130,Curve stable-swap amplification parameter,dimensionless,A,130,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_140,Curve stable-swap amplification parameter,dimensionless,A,140,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_150,Curve stable-swap amplification parameter,dimensionless,A,150,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_160,Curve stable-swap amplification parameter,dimensionless,A,160,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_170,Curve stable-swap amplification parameter,dimensionless,A,170,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_180,Curve stable-swap amplification parameter,dimensionless,A,180,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_190,Curve stable-swap amplification parameter,dimensionless,A,190,Curve AMM parameter,Stable asset trading efficiency
+DeFi/AMM,Stable-swap amplification,A_200,Curve stable-swap amplification parameter,dimensionless,A,200,Curve AMM parameter,Stable asset trading efficiency
+Microstructure,Tick size BINANCE BTC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BINANCE BTC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BINANCE ETH/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BINANCE ETH/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BINANCE MATIC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BINANCE MATIC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BINANCE SOL/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BINANCE SOL/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BINANCE BNB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BINANCE BNB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BINANCE XRP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BINANCE XRP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BINANCE DOGE/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BINANCE DOGE/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BINANCE ADA/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BINANCE ADA/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BINANCE OP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BINANCE OP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BINANCE ARB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BINANCE ARB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size OKX BTC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size OKX BTC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size OKX ETH/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size OKX ETH/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size OKX MATIC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size OKX MATIC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size OKX SOL/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size OKX SOL/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size OKX BNB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size OKX BNB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size OKX XRP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size OKX XRP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size OKX DOGE/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size OKX DOGE/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size OKX ADA/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size OKX ADA/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size OKX OP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size OKX OP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size OKX ARB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size OKX ARB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BYBIT BTC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BYBIT BTC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BYBIT ETH/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BYBIT ETH/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BYBIT MATIC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BYBIT MATIC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BYBIT SOL/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BYBIT SOL/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BYBIT BNB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BYBIT BNB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BYBIT XRP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BYBIT XRP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BYBIT DOGE/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BYBIT DOGE/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BYBIT ADA/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BYBIT ADA/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BYBIT OP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BYBIT OP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size BYBIT ARB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size BYBIT ARB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KRAKEN BTC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KRAKEN BTC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KRAKEN ETH/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KRAKEN ETH/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KRAKEN MATIC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KRAKEN MATIC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KRAKEN SOL/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KRAKEN SOL/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KRAKEN BNB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KRAKEN BNB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KRAKEN XRP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KRAKEN XRP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KRAKEN DOGE/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KRAKEN DOGE/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KRAKEN ADA/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KRAKEN ADA/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KRAKEN OP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KRAKEN OP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KRAKEN ARB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KRAKEN ARB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size COINBASE BTC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size COINBASE BTC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size COINBASE ETH/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size COINBASE ETH/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size COINBASE MATIC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size COINBASE MATIC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size COINBASE SOL/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size COINBASE SOL/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size COINBASE BNB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size COINBASE BNB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size COINBASE XRP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size COINBASE XRP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size COINBASE DOGE/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size COINBASE DOGE/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size COINBASE ADA/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size COINBASE ADA/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size COINBASE OP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size COINBASE OP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size COINBASE ARB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size COINBASE ARB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size UNISWAP BTC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size UNISWAP BTC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size UNISWAP ETH/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size UNISWAP ETH/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size UNISWAP MATIC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size UNISWAP MATIC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size UNISWAP SOL/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size UNISWAP SOL/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size UNISWAP BNB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size UNISWAP BNB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size UNISWAP XRP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size UNISWAP XRP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size UNISWAP DOGE/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size UNISWAP DOGE/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size UNISWAP ADA/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size UNISWAP ADA/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size UNISWAP OP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size UNISWAP OP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size UNISWAP ARB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size UNISWAP ARB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size QUICKSWAP BTC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size QUICKSWAP BTC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size QUICKSWAP ETH/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size QUICKSWAP ETH/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size QUICKSWAP MATIC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size QUICKSWAP MATIC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size QUICKSWAP SOL/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size QUICKSWAP SOL/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size QUICKSWAP BNB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size QUICKSWAP BNB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size QUICKSWAP XRP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size QUICKSWAP XRP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size QUICKSWAP DOGE/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size QUICKSWAP DOGE/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size QUICKSWAP ADA/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size QUICKSWAP ADA/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size QUICKSWAP OP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size QUICKSWAP OP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size QUICKSWAP ARB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size QUICKSWAP ARB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size ONEINCH BTC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size ONEINCH BTC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size ONEINCH ETH/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size ONEINCH ETH/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size ONEINCH MATIC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size ONEINCH MATIC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size ONEINCH SOL/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size ONEINCH SOL/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size ONEINCH BNB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size ONEINCH BNB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size ONEINCH XRP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size ONEINCH XRP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size ONEINCH DOGE/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size ONEINCH DOGE/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size ONEINCH ADA/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size ONEINCH ADA/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size ONEINCH OP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size ONEINCH OP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size ONEINCH ARB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size ONEINCH ARB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KYBER BTC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KYBER BTC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KYBER ETH/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KYBER ETH/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KYBER MATIC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KYBER MATIC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KYBER SOL/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KYBER SOL/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KYBER BNB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KYBER BNB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KYBER XRP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KYBER XRP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KYBER DOGE/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KYBER DOGE/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KYBER ADA/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KYBER ADA/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KYBER OP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KYBER OP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size KYBER ARB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size KYBER ARB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size PANCAKE BTC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size PANCAKE BTC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size PANCAKE ETH/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size PANCAKE ETH/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size PANCAKE MATIC/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size PANCAKE MATIC/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size PANCAKE SOL/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size PANCAKE SOL/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size PANCAKE BNB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size PANCAKE BNB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size PANCAKE XRP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size PANCAKE XRP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size PANCAKE DOGE/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size PANCAKE DOGE/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size PANCAKE ADA/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size PANCAKE ADA/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size PANCAKE OP/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size PANCAKE OP/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Microstructure,Tick size PANCAKE ARB/USDT,τ,Minimum price increment,USD,E,0.01,Venue-specific,Price precision
+Microstructure,Lot size PANCAKE ARB/USDT,L,Minimum order quantity,base currency,E,0.001,Venue-specific,Quantity precision
+Bitcoin,Block time,T_block,Average time between blocks,seconds,P,600,Target 10 minutes,Mining difficulty adjustment
+Bitcoin,Halving interval,H_interval,Blocks between halvings,blocks,P,210000,Protocol parameter,Supply emission schedule
+Bitcoin,Max supply,S_max,Maximum total supply,BTC,P,21000000,Protocol hardcap,Monetary policy
+Ethereum,Slot time,T_slot,Time per beacon chain slot,seconds,P,12,Post-merge parameter,Consensus timing
+Ethereum,Epoch slots,N_epoch,Slots per epoch,slots,P,32,Beacon chain parameter,Attestation window
+Ethereum,Base fee adjustment,δ_base,EIP-1559 base fee adjustment factor,percentage,P,12.5,EIP-1559 parameter,Fee market dynamics
+Polygon,Block time,T_block_poly,Average block time,seconds,P,2,PoS consensus target,Network throughput
+Polygon,Checkpoint interval,N_checkpoint,Blocks per checkpoint,blocks,P,256,Security parameter,Finality mechanism
+Arbitrum,Batch posting,T_batch,L2 batch posting frequency,seconds,P,300,Typical interval,Data availability
+Optimism,Challenge period,T_challenge,Fraud proof challenge window,seconds,P,604800,7 days,Security mechanism
+Avalanche,Block time,T_block_avax,C-chain block time,seconds,P,2,Consensus target,Subnet timing
+Solana,Slot time,T_slot_sol,Expected slot duration,milliseconds,P,400,PoH parameter,Consensus clock
+BNB Chain,Block time,T_block_bnb,Average block time,seconds,P,3,PoSA consensus,Validator rotation
+Cardano,Slot length,T_slot_ada,Ouroboros slot duration,seconds,P,1,Protocol parameter,Consensus timing
+Cardano,Epoch length,N_epoch_ada,Slots per epoch,slots,P,432000,5 days,Stake delegation cycle
+Polkadot,Block time,T_block_dot,Expected block time,seconds,P,6,BABE/GRANDPA,Consensus mechanism
+Cosmos,Block time,T_block_atom,Tendermint block time,seconds,P,7,BFT consensus,IBC timing
+Chainlink,Heartbeat,T_heartbeat,Price feed update interval,seconds,P,3600,Oracle parameter,Data freshness
+Uniswap v3,Fee growth,G_fee,Fee growth per unit liquidity,dimensionless,P,1e18,Precision parameter,LP accounting
+Compound,Block delta,Δ_block,Interest accrual frequency,blocks,P,1,Per block accrual,DeFi timing
