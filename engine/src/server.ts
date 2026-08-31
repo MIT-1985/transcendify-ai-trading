@@ -16,6 +16,7 @@ import {
 } from './compat/base44Client.ts';
 import { LlmGateway } from './ai/llm.ts';
 import { GoogleImageClient, mimeForExtension } from './ai/images.ts';
+import { bus, type BotEvent } from './core/eventBus.js';
 
 /**
  * Локалният сървър - това, което фронтендът вика вместо облака на платформата.
@@ -105,6 +106,47 @@ const server = createServer(async (request, response) => {
         claude: claude.available,
         images: images_.available,
       });
+    }
+
+    // GET /api/events - жив поток от решенията на роботите
+    //
+    // Server-Sent Events, не websocket: потокът е еднопосочен (двигателят
+    // говори, екранът слуша), минава през обикновен HTTP и се вдига сам при
+    // прекъсване, без код от страна на браузъра. Websocket би добавил
+    // зависимост и ръчно преизграждане на връзката без нищо в замяна.
+    if (segments[0] === 'api' && segments[1] === 'events') {
+      const afterSeq = Number(url.searchParams.get('after') ?? 0);
+
+      response.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        // Без това nginx буферира потока и събитията излизат на пакети.
+        'X-Accel-Buffering': 'no',
+      });
+
+      const write = (ev: BotEvent) => {
+        response.write(`id: ${ev.seq}\n`);
+        response.write(`event: ${ev.kind}\n`);
+        response.write(`data: ${JSON.stringify(ev)}\n\n`);
+      };
+
+      // Каквото е пропуснал, докато е бил затворен - по seq, не по време.
+      for (const ev of bus.recent(afterSeq)) write(ev);
+
+      const onEvent = (ev: BotEvent) => write(ev);
+      bus.on('event', onEvent);
+
+      // Посредниците затварят тиха връзка. Двоеточието е коментар в
+      // протокола - стига, за да я държи жива, без да стига до екрана.
+      const ping = setInterval(() => response.write(': ping\n\n'), 20_000);
+
+      request.on('close', () => {
+        clearInterval(ping);
+        bus.off('event', onEvent);
+      });
+      return;
     }
 
     // GET /api/auth/me

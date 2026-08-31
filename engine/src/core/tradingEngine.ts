@@ -6,6 +6,7 @@ import { PolygonClient, crossCheck } from '../market/polygon.ts';
 import { ClaudeSignals } from '../ai/claude.ts';
 import { snapshot } from '../strategy/indicators.ts';
 import { RiskEngine, type ClosedTrade, type OpenPosition } from '../risk/riskEngine.ts';
+import { bus } from './eventBus.ts';
 
 /**
  * Целият път на една сделка: данни -> преценка -> риск -> изпълнение -> запис.
@@ -122,6 +123,7 @@ export class TradingEngine {
    * трябва да е запис, не предположение.
    */
   async runCycle(instId: string): Promise<CycleResult> {
+    bus.emitEvent('cycle', `Проверявам ${instId}`, { instId });
     try {
       const [candles, ticker] = await Promise.all([
         this.okx.candles(instId, '5m', 120),
@@ -175,6 +177,8 @@ export class TradingEngine {
         ? await this.polygon.news(instId, 5).catch(() => [])
         : [];
 
+      // Решението на модела излиза навън в момента, в който е взето -
+      // това е, което клиентът вижда като "как мисли роботът".
       const decision = await this.claude.decide({
         snapshot: market,
         news,
@@ -186,6 +190,10 @@ export class TradingEngine {
       await this.journal.create({ type: 'decision', instId, decision, breakeven, sample });
 
       if (decision.action === 'hold') {
+        bus.emitEvent('signal', `Изчаквам: ${decision.rationale}`, {
+          instId,
+          data: { action: 'wait', rationale: decision.rationale },
+        });
         return this.skip(instId, `моделът препоръчва изчакване: ${decision.rationale}`);
       }
 
@@ -199,6 +207,11 @@ export class TradingEngine {
       const tradesToday = (await this.trades.filter({})).filter((row) =>
         String(row.created_date).startsWith(new Date().toISOString().slice(0, 10))
       ).length;
+
+      bus.emitEvent('signal', `Намерение: ${decision.action} по ${instId}`, {
+        instId,
+        data: { action: decision.action, rationale: decision.rationale },
+      });
 
       const verdict = this.risk.evaluate(
         {
@@ -280,6 +293,8 @@ export class TradingEngine {
     }
 
     try {
+      bus.emitEvent('order', `Подавам поръчка по ${instId}`, { instId });
+
       const placed = await this.okx.placeProtectedEntry({
         instId,
         side,
