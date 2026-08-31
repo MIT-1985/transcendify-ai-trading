@@ -33,6 +33,7 @@ export interface TrokState {
   k: Record<TrokCriterion, number>;
   target: Record<TrokCriterion, number>;
   steps: number;
+  epoch: number;
 }
 
 export interface TrokLimits {
@@ -49,10 +50,28 @@ export interface SizeCandidate {
 
 const DEFAULT_LIMITS: TrokLimits = { rate: 0.08, kMin: 0.25, kMax: 4.0 };
 
+/** Един запис в историята - същите полета като таблицата TrokEpoch. */
+export interface TrokEpochRow {
+  epoch: number;
+  botId?: string;
+  kRisk: number; kCost: number; kEdge: number; kExposure: number;
+  tRisk: number; tCost: number; tEdge: number; tExposure: number;
+  steps: number;
+  decision?: string;
+  costJ?: number;
+  sizeFrac?: number;
+}
+
+/** Записва нов epoch. Никога не презаписва - историята е одитът. */
+export type TrokPersist = (row: TrokEpochRow) => void | Promise<void>;
+
 export class Trok {
   private readonly k: Record<TrokCriterion, number>;
   private readonly target: Record<TrokCriterion, number>;
   private steps = 0;
+  private epoch = 0;
+  private persist?: TrokPersist;
+  private botId?: string;
 
   constructor(private readonly limits: TrokLimits = DEFAULT_LIMITS) {
     // Равна начална тежест, после системата ги коригира сама.
@@ -154,10 +173,55 @@ export class Trok {
       data: { fraction: best.sizeFraction, j: bestJ, k: { ...this.k }, steps: this.steps },
     });
 
+    this.record(best.label, bestJ, best.sizeFraction);
+
     return { fraction: best.sizeFraction, label: best.label, j: bestJ, k: { ...this.k } };
   }
 
+  /**
+   * Възстановява последното състояние след рестарт.
+   *
+   * Без това роботът се връща към началните тежести при всяко пускане и
+   * забравя какво е научил - тоест адаптацията не значи нищо, а клиентът
+   * вижда различно поведение без причина.
+   */
+  restore(row: TrokEpochRow): void {
+    this.k.risk = row.kRisk; this.k.cost = row.kCost;
+    this.k.edge = row.kEdge; this.k.exposure = row.kExposure;
+    this.target.risk = row.tRisk; this.target.cost = row.tCost;
+    this.target.edge = row.tEdge; this.target.exposure = row.tExposure;
+    this.steps = row.steps;
+    this.epoch = row.epoch;
+  }
+
+  attachStore(persist: TrokPersist, botId?: string): void {
+    this.persist = persist;
+    this.botId = botId;
+  }
+
+  private record(decision: string, costJ: number, sizeFrac: number): void {
+    if (!this.persist) return;
+    this.epoch++;
+    const row: TrokEpochRow = {
+      epoch: this.epoch,
+      botId: this.botId,
+      kRisk: this.k.risk, kCost: this.k.cost,
+      kEdge: this.k.edge, kExposure: this.k.exposure,
+      tRisk: this.target.risk, tCost: this.target.cost,
+      tEdge: this.target.edge, tExposure: this.target.exposure,
+      steps: this.steps,
+      decision, costJ, sizeFrac,
+    };
+    // Провалът на записа не бива да събори търговията - историята е важна,
+    // но не по-важна от това роботът да продължи да работи.
+    void Promise.resolve(this.persist(row)).catch(() => undefined);
+  }
+
+  currentEpoch(): number {
+    return this.epoch;
+  }
+
   state(): TrokState {
-    return { k: { ...this.k }, target: { ...this.target }, steps: this.steps };
+    return { k: { ...this.k }, target: { ...this.target }, steps: this.steps, epoch: this.epoch };
   }
 }
