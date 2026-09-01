@@ -66,12 +66,16 @@ export default function BotCard({ bot, onSubscribe, isSubscribed }) {
       
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-slate-800/50 rounded-lg p-3">
-          <div className="text-xs text-slate-500 mb-1">Expected ROI</div>
-          <div className="text-emerald-400 font-semibold">{bot.expected_roi}</div>
+          <div className="text-xs text-slate-500 mb-1">Нула при</div>
+          <div className="text-amber-300 font-semibold">
+            {bot.breakeven_win_rate != null ? `${bot.breakeven_win_rate}% печеливши` : '—'}
+          </div>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3">
-          <div className="text-xs text-slate-500 mb-1">Min Capital</div>
-          <div className="text-white font-semibold">${bot.min_capital?.toLocaleString()}</div>
+          <div className="text-xs text-slate-500 mb-1">Стоп / цел</div>
+          <div className="text-white font-semibold">
+            {bot.stop_pct != null ? `${bot.stop_pct}% · 1:${bot.reward_risk}` : '—'}
+          </div>
         </div>
       </div>
       
@@ -101,7 +105,7 @@ export default function BotCard({ bot, onSubscribe, isSubscribed }) {
             isSubscribed && "bg-emerald-600 hover:bg-emerald-600"
           )}
         >
-          {loading ? 'Loading...' : isSubscribed ? 'Active' : `Buy $${bot.price}`}
+          {loading ? '…' : isSubscribed ? 'Активен' : `Купи $${bot.price} — доживотно`}
         </Button>
       </div>
     </div>
