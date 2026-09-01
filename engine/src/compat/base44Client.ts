@@ -65,7 +65,11 @@ function entityProxy(): Record<string, unknown> {
 
 export interface LocalBase44Client {
   entities: EntityProxy;
-  asServiceRole: { entities: EntityProxy };
+  asServiceRole: {
+    entities: EntityProxy;
+    integrations: LocalBase44Client['integrations'];
+    functions: LocalBase44Client['functions'];
+  };
   auth: {
     me(): Promise<LocalUser>;
     login(): Promise<LocalUser>;
@@ -118,9 +122,34 @@ const notAvailable = (what: string) => async () => ({
 
 export function createClient(): LocalBase44Client {
   const entities = entityProxy();
+  const integrations: LocalBase44Client['integrations'] = {
+    Core: {
+      async InvokeLLM(args) {
+        if (!llmInvoker) throw new Error('няма настроен модел за InvokeLLM');
+        return llmInvoker(args as unknown as Record<string, unknown>);
+      },
+      async GenerateImage(args) {
+        if (!imageGenerator) throw new Error('няма настроен доставчик за изображения');
+        return imageGenerator(args as Record<string, unknown>);
+      },
+      SendEmail: notAvailable('изпращането на поща'),
+      SendSMS: notAvailable('изпращането на SMS'),
+      UploadFile: notAvailable('качването на файлове'),
+      ExtractDataFromUploadedFile: notAvailable('извличането на данни от файл'),
+    },
+  };
+  const functions: LocalBase44Client['functions'] = {
+    async invoke(name, payload) {
+      if (!functionInvoker) throw new Error('рутерът на функциите не е инициализиран');
+      return functionInvoker(name, payload);
+    },
+  };
   return {
     entities,
-    asServiceRole: { entities },
+    // Локално няма разделение на права - потребителят е един. Но старите
+    // функции викат ту `base44.integrations`, ту `base44.asServiceRole.
+    // integrations`, затова двата пътя трябва да водят до едно и също място.
+    asServiceRole: { entities, integrations, functions },
     auth: {
       async me() {
         return OWNER;
@@ -132,28 +161,8 @@ export function createClient(): LocalBase44Client {
         /* локално няма сесия за прекратяване */
       },
     },
-    functions: {
-      async invoke(name, payload) {
-        if (!functionInvoker) throw new Error('рутерът на функциите не е инициализиран');
-        return functionInvoker(name, payload);
-      },
-    },
-    integrations: {
-      Core: {
-        async InvokeLLM(args) {
-          if (!llmInvoker) throw new Error('няма настроен модел за InvokeLLM');
-          return llmInvoker(args as unknown as Record<string, unknown>);
-        },
-        async GenerateImage(args) {
-          if (!imageGenerator) throw new Error('няма настроен доставчик за изображения');
-          return imageGenerator(args as Record<string, unknown>);
-        },
-        SendEmail: notAvailable('изпращането на поща'),
-        SendSMS: notAvailable('изпращането на SMS'),
-        UploadFile: notAvailable('качването на файлове'),
-        ExtractDataFromUploadedFile: notAvailable('извличането на данни от файл'),
-      },
-    },
+    functions,
+    integrations,
     appLogs: {
       async logUserInApp(...args) {
         getDatabase().collection('app_logs').create({ args });

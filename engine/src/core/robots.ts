@@ -28,10 +28,42 @@ import type { FeeModel } from '../config.ts';
 
 export type EntryStyle = 'limit' | 'market';
 
+/**
+ * Шестте стратегии.
+ *
+ * Списъкът идва от първия Base44 вариант, където бяха scalping, swing, grid,
+ * DCA, arbitrage и momentum. Пет от шестте се пренасят както са. Шестата -
+ * arbitrage - НЕ се предлага: тя означава да купиш на една борса и да продадеш
+ * на друга в същата секунда, а тук борсата е една. С един OKX това е реклама
+ * за нещо, което няма как да се случи, затова мястото ѝ заема `steady`.
+ */
+export type Strategy = 'scalp' | 'momentum' | 'swing' | 'grid' | 'dca' | 'steady';
+
+/** Стълбата на "Мрежа": стъпка и брой нива. */
+export interface GridParams {
+  /** Разстояние между две нива, като част от цената. */
+  rungSpacingPct: number;
+  /** Колко нива има стълбата надолу. */
+  rungs: number;
+}
+
+/** Разписанието на "Стълба" (DCA). */
+export interface DcaParams {
+  /** През колко часа влиза следващият транш. */
+  intervalHours: number;
+  /** Максимален брой транша - таванът, който не позволява мартингейл. */
+  maxEntries: number;
+}
+
 export interface RobotProfile {
   id: string;
   name: string;
+  strategy: Strategy;
   summary: string;
+  /** Цена за доживотно ползване, в долари. */
+  priceUsd: number;
+  /** Двойките, по които работи. */
+  pairs: string[];
   /** Разстояние до стопа като част от цената. */
   stopDistancePct: number;
   rewardRiskRatio: number;
@@ -43,12 +75,23 @@ export interface RobotProfile {
   /** Какво цени този робот - подава се на TROK. */
   trokTargets: Record<TrokCriterion, number>;
   trokLimits?: Partial<TrokLimits>;
+  grid?: GridParams;
+  dca?: DcaParams;
 }
+
+/** Трите двойки, които двигателят покрива. Не е "всички пазари" - това е истината. */
+const PAIRS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
+
+/** Пакетна цена за всичките шест. */
+export const BUNDLE_PRICE_USD = 349;
 
 export const ROBOTS: RobotProfile[] = [
   {
     id: 'guardian',
     name: 'Пазител',
+    strategy: 'swing',
+    priceUsd: 149,
+    pairs: PAIRS,
     summary:
       'Широк стоп, редки сделки, лимитен вход. Най-прощаващият - нужни са под 30% печеливши, ' +
       'за да е на плюс. За търпелив човек, който не иска да гледа екрана.',
@@ -60,8 +103,30 @@ export const ROBOTS: RobotProfile[] = [
     trokTargets: { risk: 0.20, cost: 0.20, edge: 0.85, exposure: 0.30 },
   },
   {
+    id: 'ladder',
+    name: 'Стълба',
+    strategy: 'dca',
+    priceUsd: 79,
+    pairs: PAIRS,
+    summary:
+      'Купува на равни части през равно време, до най-много осем транша. ' +
+      'Размерът НЕ расте при спад - това би било мартингейл, а мартингейлът ' +
+      'не е стратегия, а отложена загуба. Таванът от осем транша е границата, ' +
+      'която го прави преброима.',
+    stopDistancePct: 0.05,
+    rewardRiskRatio: 2,
+    entry: 'limit',
+    maxConcurrent: 8,
+    cooldownMinutes: 360,
+    dca: { intervalHours: 6, maxEntries: 8 },
+    trokTargets: { risk: 0.25, cost: 0.20, edge: 0.70, exposure: 0.90 },
+  },
+  {
     id: 'steady',
     name: 'Постоянен',
+    strategy: 'steady',
+    priceUsd: 99,
+    pairs: PAIRS,
     summary:
       'Средносрочен. Стоп 1%, цел 1:2, лимитен вход. Нужни са около 39% печеливши. ' +
       'Балансът между честота и запас.',
@@ -75,6 +140,9 @@ export const ROBOTS: RobotProfile[] = [
   {
     id: 'momentum',
     name: 'Инерция',
+    strategy: 'momentum',
+    priceUsd: 89,
+    pairs: PAIRS,
     summary:
       'По-активен. Стоп 0.5%, цел 1:2. Нужни са около 45% печеливши с лимитен вход. ' +
       'Работи, когато има ясна посока; мълчи в тесен пазар.',
@@ -86,8 +154,31 @@ export const ROBOTS: RobotProfile[] = [
     trokTargets: { risk: 0.40, cost: 0.30, edge: 0.90, exposure: 0.60 },
   },
   {
+    id: 'grid',
+    name: 'Мрежа',
+    strategy: 'grid',
+    priceUsd: 129,
+    pairs: PAIRS,
+    summary:
+      'Стълба от лимитни поръчки на всеки 0.5% надолу, всяка с изход +0.5% нагоре. ' +
+      'Печели от люлеенето, не от посоката. Стъпката е 0.5%, защото при 0.2% такси ' +
+      'за влизане и излизане по-тясна стълба не оставя нищо. Пет нива, твърд стоп ' +
+      'под последното - без него падащ пазар пълни стълбата догоре.',
+    // Стопът е под цялата стълба: 5 нива по 0.5% = 2.5%, плюс запас.
+    stopDistancePct: 0.03,
+    rewardRiskRatio: 1,
+    entry: 'limit',
+    maxConcurrent: 5,
+    cooldownMinutes: 0,
+    grid: { rungSpacingPct: 0.005, rungs: 5 },
+    trokTargets: { risk: 0.35, cost: 0.20, edge: 0.75, exposure: 0.80 },
+  },
+  {
     id: 'sprinter',
     name: 'Спринтьор',
+    strategy: 'scalp',
+    priceUsd: 69,
+    pairs: ['BTC-USDT'],
     summary:
       'Най-агресивният, който математиката допуска. Стоп 0.3%, цел 1:2, САМО лимитен вход - ' +
       'с пазарен таксите правят нивото непостижимо. Нужни са над 53% печеливши, което е ' +

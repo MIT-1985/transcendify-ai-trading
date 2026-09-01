@@ -21,6 +21,7 @@ import PaperTradingDashboard from './pages/PaperTradingDashboard';
 import Phase5RealTestMode from './pages/Phase5RealTestMode';
 import Transactions from './pages/Transactions';
 import ChartGuide from './pages/ChartGuide';
+import Robots from './pages/Robots';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -66,6 +67,7 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
+      <Route path="/robots" element={<Robots />} />
       <Route path="/clean-dashboard" element={
         <LayoutWrapper currentPageName="CleanDashboard">
           <CleanDashboard />

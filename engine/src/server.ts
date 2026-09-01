@@ -17,6 +17,7 @@ import {
 import { LlmGateway } from './ai/llm.ts';
 import { GoogleImageClient, mimeForExtension } from './ai/images.ts';
 import { bus, type BotEvent } from './core/eventBus.js';
+import { catalogue, buyRobot, robotMarket } from './core/catalogue.ts';
 
 /**
  * Локалният сървър - това, което фронтендът вика вместо облака на платформата.
@@ -147,6 +148,27 @@ const server = createServer(async (request, response) => {
         bus.off('event', onEvent);
       });
       return;
+    }
+
+    // GET  /api/robots            - витрината: шест робота, цени, точка на нулата
+    // POST /api/robots/:id/buy     - доживотен лиценз
+    // GET  /api/robots/:id/market  - цена, свещи, индикатори, присъда, сделки
+    //
+    // Три маршрута за целия продукт. Не защото е малко, а защото това е
+    // всичко, което човек прави: гледа, купува, следи.
+    if (segments[0] === 'api' && segments[1] === 'robots') {
+      const id = segments[2];
+      if (!id) return send(response, 200, await catalogue(config, db));
+
+      if (segments[3] === 'buy' && request.method === 'POST') {
+        const result = await buyRobot(db, id);
+        return send(response, result.ok ? 200 : 404, result);
+      }
+
+      if (segments[3] === 'market') {
+        const view = await robotMarket(db, id, url.searchParams.get('pair') ?? undefined);
+        return send(response, 'error' in view ? 502 : 200, view);
+      }
     }
 
     // GET /api/auth/me
