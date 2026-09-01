@@ -15,6 +15,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import LiveRobotFeed from '@/components/bots/LiveRobotFeed';
 
 // ── Robot status card (one per real robot) ─────────────────────────────────────
 function RobotCard({ robot }) {
@@ -221,6 +222,13 @@ export default function BotDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Живият поток - клиентът вижда решенията, докато се вземат,
+            включително когато роботът отказва да търгува. */}
+        <div className="mt-6">
+          <LiveRobotFeed />
+        </div>
+
       </div>
     </div>
   );
