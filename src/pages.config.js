@@ -1,59 +1,48 @@
-import AIAnalysis from './pages/AIAnalysis';
-import AgentOrchestrator from './pages/AgentOrchestrator';
-import Backtesting from './pages/Backtesting';
-import BotAnalytics from './pages/BotAnalytics';
+/**
+ * Страниците на приложението - всичките.
+ *
+ * Бяха трийсет и пет. Двайсет и две паднаха: едните показваха измислени
+ * числа (портфейл с $5000, който не съществува, VIP нива, минери, реферали),
+ * другите бяха празни рамки без нищо зад тях. И двата вида ти отнемат време
+ * и не ти дават нищо в замяна.
+ *
+ * Остана това, което работи с истински данни.
+ */
 import BotDashboard from './pages/BotDashboard';
-import BotRunner from './pages/BotRunner';
-import BotWizard from './pages/BotWizard';
-import Bots from './pages/Bots';
-import ConstantsLibrary from './pages/ConstantsLibrary';
-import CustomStrategies from './pages/CustomStrategies';
 import Dashboard from './pages/Dashboard';
-import Deposit from './pages/Deposit';
-import DeviceMining from './pages/DeviceMining';
-import Home from './pages/Home';
-import Landing from './pages/Landing';
-import Miners from './pages/Miners';
+// Landing нарочно НЕ е тук: входът няма меню.
+import ConnectOKX from './pages/ConnectOKX';
+
+// Диагностика: инструменти за собственика, не за купувача. Работят с истински
+// данни, затова не се трият - но и не стоят в главното меню.
+import SignalDashboard from './pages/SignalDashboard';
+import PaperTradingDashboard from './pages/PaperTradingDashboard';
+import Phase5RealTestMode from './pages/Phase5RealTestMode';
+import Transactions from './pages/Transactions';
 import PolygonConsole from './pages/PolygonConsole';
-import Portfolio from './pages/Portfolio';
-import Profile from './pages/Profile';
-import PromptLibrary from './pages/PromptLibrary';
-import Referrals from './pages/Referrals';
-import RiskProfiles from './pages/RiskProfiles';
-import VIPUpgrade from './pages/VIPUpgrade';
-import Wallet from './pages/Wallet';
+import ChartGuide from './pages/ChartGuide';
+import OKXDashboard from './pages/OKXDashboard';
+import OKXDataSync from './pages/OKXDataSync';
+
 import __Layout from './Layout.jsx';
 
-
 export const PAGES = {
-    "AIAnalysis": AIAnalysis,
-    "AgentOrchestrator": AgentOrchestrator,
-    "Backtesting": Backtesting,
-    "BotAnalytics": BotAnalytics,
     "BotDashboard": BotDashboard,
-    "BotRunner": BotRunner,
-    "BotWizard": BotWizard,
-    "Bots": Bots,
-    "ConstantsLibrary": ConstantsLibrary,
-    "CustomStrategies": CustomStrategies,
     "Dashboard": Dashboard,
-    "Deposit": Deposit,
-    "DeviceMining": DeviceMining,
-    "Home": Home,
-    "Landing": Landing,
-    "Miners": Miners,
+    "ConnectOKX": ConnectOKX,
+    "SignalDashboard": SignalDashboard,
+    "PaperTradingDashboard": PaperTradingDashboard,
+    "Phase5RealTestMode": Phase5RealTestMode,
+    "Transactions": Transactions,
     "PolygonConsole": PolygonConsole,
-    "Portfolio": Portfolio,
-    "Profile": Profile,
-    "PromptLibrary": PromptLibrary,
-    "Referrals": Referrals,
-    "RiskProfiles": RiskProfiles,
-    "VIPUpgrade": VIPUpgrade,
-    "Wallet": Wallet,
-}
+    "ChartGuide": ChartGuide,
+    "OKXDashboard": OKXDashboard,
+    "OKXDataSync": OKXDataSync,
+};
 
 export const pagesConfig = {
-    mainPage: "Dashboard",
+    // Първото, което човек вижда, са роботите - заради тях идва.
+    mainPage: "BotDashboard",
     Pages: PAGES,
     Layout: __Layout,
 };

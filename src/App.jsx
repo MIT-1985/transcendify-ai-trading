@@ -6,30 +6,42 @@ import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-import ConnectBinance from './pages/ConnectBinance';
-import ConnectOKX from './pages/ConnectOKX';
 import PaymentSuccess from './pages/PaymentSuccess';
-import OKXDashboard from './pages/OKXDashboard';
-import CleanDashboard from './components/dashboard/CleanDashboard';
-import OKXDataSync from './pages/OKXDataSync';
-import SignalDashboard from './pages/SignalDashboard';
-import PaperTradingDashboard from './pages/PaperTradingDashboard';
-import Phase5RealTestMode from './pages/Phase5RealTestMode';
-import Transactions from './pages/Transactions';
-import ChartGuide from './pages/ChartGuide';
-import Robots from './pages/Robots';
+import Landing from './pages/Landing';
+import { base44 } from '@/api/base44Client';
+
+/**
+ * Без сесия всеки адрес води до входа.
+ *
+ * Досега нямаше такъв пазач: входният екран съществуваше, но се стигаше до
+ * приложението и без да се мине през него. Вход, който може да се прескочи,
+ * не е вход.
+ */
+const RequireSession = ({ children }) => {
+  const [state, setState] = React.useState('checking');
+  React.useEffect(() => {
+    base44.auth.isAuthenticated()
+      .then((ok) => setState(ok ? 'in' : 'out'))
+      .catch(() => setState('out'));
+  }, []);
+  if (state === 'checking') return null;
+  if (state === 'out') return <Navigate to="/Landing" replace />;
+  return children;
+};
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
-const LayoutWrapper = ({ children, currentPageName }) => Layout ?
-  <Layout currentPageName={currentPageName}>{children}</Layout>
-  : <>{children}</>;
+const LayoutWrapper = ({ children, currentPageName }) => (
+  <RequireSession>
+    {Layout ? <Layout currentPageName={currentPageName}>{children}</Layout> : <>{children}</>}
+  </RequireSession>
+);
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin, user } = useAuth();
@@ -67,42 +79,6 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
-      <Route path="/robots" element={<Robots />} />
-      <Route path="/clean-dashboard" element={
-        <LayoutWrapper currentPageName="CleanDashboard">
-          <CleanDashboard />
-        </LayoutWrapper>
-      } />
-      <Route path="/SignalDashboard" element={
-        <LayoutWrapper currentPageName="SignalDashboard">
-          <SignalDashboard />
-        </LayoutWrapper>
-      } />
-      <Route path="/Transactions" element={
-        <LayoutWrapper currentPageName="Transactions">
-          <Transactions />
-        </LayoutWrapper>
-      } />
-      <Route path="/ChartGuide" element={
-        <LayoutWrapper currentPageName="ChartGuide">
-          <ChartGuide />
-        </LayoutWrapper>
-      } />
-      <Route path="/Phase5RealTestMode" element={
-        <LayoutWrapper currentPageName="Phase5RealTestMode">
-          <Phase5RealTestMode />
-        </LayoutWrapper>
-      } />
-      <Route path="/PaperTradingDashboard" element={
-        <LayoutWrapper currentPageName="PaperTradingDashboard">
-          <PaperTradingDashboard />
-        </LayoutWrapper>
-      } />
-      <Route path="/OKXDataSync" element={
-        <LayoutWrapper currentPageName="OKXDataSync">
-          <OKXDataSync />
-        </LayoutWrapper>
-      } />
       <Route path="/" element={
         <LayoutWrapper currentPageName={mainPageKey}>
           <MainPage />
@@ -119,22 +95,12 @@ const AuthenticatedApp = () => {
           }
         />
       ))}
-      <Route path="/ConnectBinance" element={
-            <LayoutWrapper currentPageName="ConnectBinance">
-              <ConnectBinance />
-            </LayoutWrapper>
-          } />
-      <Route path="/ConnectOKX" element={
-            <LayoutWrapper currentPageName="ConnectOKX">
-              <ConnectOKX />
-            </LayoutWrapper>
-          } />
+      {/* Входът е без лента: няма меню, докато няма влизане. */}
+      <Route path="/Landing" element={<Landing />} />
+      {/* Старият адрес на екрана с роботите - води където и преди. */}
+      <Route path="/robots" element={<Navigate to="/BotDashboard" replace />} />
+      {/* Връщането от Stripe е без лента: човекът идва отвън, не от менюто. */}
       <Route path="/PaymentSuccess" element={<PaymentSuccess />} />
-      <Route path="/OKXDashboard" element={
-            <LayoutWrapper currentPageName="OKXDashboard">
-              <OKXDashboard />
-            </LayoutWrapper>
-          } />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

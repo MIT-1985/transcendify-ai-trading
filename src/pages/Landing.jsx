@@ -10,7 +10,7 @@ export default function Landing() {
   useEffect(() => {
     base44.auth.isAuthenticated().then(authenticated => {
       if (authenticated) {
-        window.location.href = createPageUrl('Dashboard');
+        window.location.href = createPageUrl('BotDashboard');
       } else {
         setIsChecking(false);
       }
@@ -18,11 +18,7 @@ export default function Landing() {
   }, []);
 
   const handleLogin = () => {
-    base44.auth.redirectToLogin(createPageUrl('Dashboard'));
-  };
-
-  const handleSignup = () => {
-    base44.auth.redirectToLogin(createPageUrl('Dashboard'));
+    base44.auth.redirectToLogin(createPageUrl('BotDashboard'));
   };
 
   if (isChecking) {
@@ -91,47 +87,45 @@ export default function Landing() {
             Transcendify
           </h2>
 
-          {/* Features */}
+          {/* Четирите неща, които наистина има. "VIP Rewards" и "Fuel Mining"
+              стояха тук, след като страниците им бяха махнати - вход, който
+              обещава несъществуващо, е по-лош от никакъв вход. */}
           <div className="grid grid-cols-2 gap-3 mb-12 max-w-sm mx-auto">
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:border-blue-500/50 transition-all">
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
               <Bot className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-              <div className="text-xs font-medium">AI Trading Bots</div>
+              <div className="text-xs font-medium">Шест робота</div>
             </div>
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:border-emerald-500/50 transition-all">
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
               <TrendingUp className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
-              <div className="text-xs font-medium">Real-Time Data</div>
+              <div className="text-xs font-medium">Данни от OKX на живо</div>
             </div>
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:border-purple-500/50 transition-all">
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
               <Shield className="w-6 h-6 text-purple-400 mx-auto mb-2" />
-              <div className="text-xs font-medium">VIP Rewards</div>
+              <div className="text-xs font-medium">Твоите ключове, само търговия</div>
             </div>
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:border-amber-500/50 transition-all">
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
               <Zap className="w-6 h-6 text-amber-400 mx-auto mb-2" />
-              <div className="text-xs font-medium">Fuel Mining</div>
+              <div className="text-xs font-medium">Купуваш веднъж</div>
             </div>
           </div>
 
-          {/* Buttons */}
-          <div className="space-y-4 max-w-sm mx-auto">
+          {/* Един бутон.
+              "Login" и "Create account" викаха една и съща функция и правеха
+              едно и също - два бутона, между които няма разлика, само карат
+              човека да се чуди кой е верният. Регистрацията се появява тук,
+              когато отпред застане Stripe и има какво да се регистрира. */}
+          <div className="max-w-sm mx-auto">
             <Button
               onClick={handleLogin}
               size="lg"
               className="w-full bg-blue-500 hover:bg-blue-600 text-white text-base font-medium py-6 rounded-2xl shadow-lg shadow-blue-500/30 transition-all hover:shadow-blue-500/50"
             >
-              Login
-            </Button>
-            <Button
-              onClick={handleSignup}
-              size="lg"
-              variant="outline"
-              className="w-full border-2 border-white/20 bg-transparent hover:bg-white/5 text-white text-base font-medium py-6 rounded-2xl transition-all"
-            >
-              Create account
+              Влез
             </Button>
           </div>
 
           <p className="text-xs text-slate-500 mt-8">
-            AI-Powered Cryptocurrency Trading Platform
+            Автоматизирана търговия с крипто · OKX · Polygon · Claude
           </p>
         </div>
       </div>

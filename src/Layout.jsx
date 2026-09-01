@@ -24,11 +24,12 @@ import {
 import { cn } from '@/lib/utils';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useTranslation } from '@/components/utils/translations';
+import { base44 } from '@/api/base44Client';
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [language, setLanguage] = useState(() => {
-    return localStorage.getItem('language') || 'en';
+    return localStorage.getItem('language') || 'bg';
   });
   
   const { t } = useTranslation(language);
@@ -37,17 +38,26 @@ export default function Layout({ children, currentPageName }) {
     localStorage.setItem('language', language);
   }, [language]);
   
+  // Три реда за човека, който е дошъл да купи робот. Всичко останало е
+  // инструмент за собственика и стои прибрано - не защото е тайна, а защото
+  // "📄 Phase 4 Paper Trading" не значи нищо за купувача.
   const navItems = [
-    { nameKey: 'dashboard', page: 'Dashboard', icon: LayoutDashboard },
-    { nameKey: 'botDashboard', page: 'BotDashboard', icon: Activity },
-    { nameKey: 'signalDashboard', page: 'SignalDashboard', icon: Activity, fallback: '📡 Signal Dashboard' },
-    { nameKey: 'paperTrading', page: 'PaperTradingDashboard', icon: Activity, fallback: '📄 Phase 4 Paper Trading' },
-    { nameKey: 'phase5Real', page: 'Phase5RealTestMode', icon: Activity, fallback: '🔴 Phase 5 Real Test Mode' },
-    { nameKey: 'transactions', page: 'Transactions', icon: Activity, fallback: '📒 Transactions' },
-    { nameKey: 'polygonConsole', page: 'PolygonConsole', icon: Terminal, fallback: '🔌 Polygon Console' },
-    { nameKey: 'connectOKX', page: 'ConnectOKX', icon: Link2, fallback: 'Connect OKX' },
-    { nameKey: 'chartGuide', page: 'ChartGuide', icon: Brain, fallback: '📊 Chart Guide' },
+    { label: 'Роботи', page: 'BotDashboard', icon: Bot },
+    { label: 'Табло', page: 'Dashboard', icon: LayoutDashboard },
+    { label: 'OKX ключове', page: 'ConnectOKX', icon: Link2 },
   ];
+
+  const devItems = [
+    { label: 'Сигнали', page: 'SignalDashboard' },
+    { label: 'Хартиена търговия', page: 'PaperTradingDashboard' },
+    { label: 'Истински тест', page: 'Phase5RealTestMode' },
+    { label: 'Дневник', page: 'Transactions' },
+    { label: 'Polygon конзола', page: 'PolygonConsole' },
+    { label: 'Чеклист за графики', page: 'ChartGuide' },
+    { label: 'OKX табло', page: 'OKXDashboard' },
+    { label: 'OKX синхрон', page: 'OKXDataSync' },
+  ];
+
 
   return (
     <div className="min-h-screen bg-[#0A0A0F]">
@@ -86,7 +96,7 @@ export default function Layout({ children, currentPageName }) {
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+        <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 150px)' }}>
           {navItems.map((item) => {
             const isActive = currentPageName === item.page;
             const Icon = item.icon;
@@ -104,38 +114,47 @@ export default function Layout({ children, currentPageName }) {
                 )}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
-                <span className="font-medium text-sm">{t(item.nameKey) || item.fallback || item.nameKey}</span>
+                <span className="font-medium text-sm">{item.label}</span>
                 {isActive && (
                   <ChevronRight className="w-4 h-4 ml-auto flex-shrink-0" />
                 )}
               </Link>
             );
           })}
+
+          <details className="mt-4 pt-4 border-t border-slate-800/70">
+            <summary className="px-4 py-2 text-xs uppercase tracking-wide text-slate-600 cursor-pointer select-none hover:text-slate-400">
+              Диагностика
+            </summary>
+            <div className="mt-1 space-y-0.5">
+              {devItems.map((item) => (
+                <Link
+                  key={item.page}
+                  to={createPageUrl(item.page)}
+                  onClick={() => setSidebarOpen(false)}
+                  className={cn(
+                    "block px-4 py-2 rounded-lg text-sm transition-colors",
+                    currentPageName === item.page
+                      ? "bg-slate-800/70 text-slate-200"
+                      : "text-slate-500 hover:bg-slate-800/40 hover:text-slate-300"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </details>
         </nav>
 
         {/* Bottom Section */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800">
-          <div className="space-y-3">
-            <LanguageSwitcher language={language} onLanguageChange={setLanguage} />
-            <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl p-4 border border-blue-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <Bot className="w-5 h-5 text-blue-400" />
-                <span className="text-sm font-semibold text-white">
-                  {language === 'bg' ? 'Pro Функции' : language === 'de' ? 'Pro-Funktionen' : 'Pro Features'}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mb-3">
-                {language === 'bg' 
-                  ? 'Отключете разширени ботове и AI инструменти' 
-                  : language === 'de'
-                  ? 'Erweiterte Bots und KI-Analysetools freischalten'
-                  : 'Unlock advanced bots and AI analysis tools'}
-              </p>
-              <button className="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2 rounded-lg transition-colors">
-                {language === 'bg' ? 'Надградете Сега' : language === 'de' ? 'Jetzt Upgraden' : 'Upgrade Now'}
-              </button>
-            </div>
-          </div>
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800 space-y-2">
+          <LanguageSwitcher language={language} onLanguageChange={setLanguage} />
+          <button
+            onClick={() => base44.auth.logout()}
+            className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-500 hover:bg-slate-800/50 hover:text-slate-300 transition-colors"
+          >
+            Излез
+          </button>
         </div>
       </aside>
 

@@ -12,6 +12,8 @@
  * грешка в код, който работи.
  */
 
+const SESSION_KEY = 'transcendify_session';
+
 const BASE_URL = import.meta.env?.VITE_ENGINE_URL ?? 'http://127.0.0.1:8787';
 
 async function request(path, { method = 'GET', body, query } = {}) {
@@ -91,7 +93,30 @@ export const base44 = {
   auth: {
     me: () => request('/api/auth/me'),
     login: () => request('/api/auth/me'),
-    logout: async () => undefined,
+
+    /**
+     * Влизането локално.
+     *
+     * Тези три метода липсваха и заради това входният екран падаше с
+     * TypeError и оставаше празен - виждаше се черно нищо.
+     *
+     * Локално няма чужди потребители, но сесията НЕ се приема наум: пази се
+     * белег в браузъра, за да съществува истински вход и истинско излизане.
+     * Когато отпред застане Stripe и истинско удостоверяване, се сменя
+     * само това място - екраните вече викат правилните имена.
+     */
+    isAuthenticated: async () => localStorage.getItem(SESSION_KEY) === '1',
+
+    redirectToLogin: (next) => {
+      localStorage.setItem(SESSION_KEY, '1');
+      window.location.href = next || '/';
+    },
+
+    logout: async () => {
+      localStorage.removeItem(SESSION_KEY);
+      window.location.href = '/Landing';
+    },
+
     updateMyUserData: async () => undefined,
   },
 
