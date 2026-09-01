@@ -112,12 +112,12 @@ export default function Robots() {
           </div>
         </header>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-stretch">
           {cat.robots.map(r => (
             <button
               key={r.id}
               onClick={() => { setOpenId(r.id); setPair(null); setMarket(null); }}
-              className={`text-left rounded-xl border p-5 transition
+              className={`text-left rounded-xl border p-5 transition flex flex-col h-full
                 ${openId === r.id ? 'border-sky-500/60 bg-sky-500/5' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'}`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -130,7 +130,7 @@ export default function Robots() {
                   : <span className="text-white font-semibold">${r.priceUsd}</span>}
               </div>
 
-              <p className="text-sm text-slate-400 mt-3 leading-relaxed">{r.summary}</p>
+              <p className="text-sm text-slate-400 mt-3 leading-relaxed flex-1">{r.summary}</p>
 
               <dl className="grid grid-cols-3 gap-2 mt-4 text-xs">
                 <Stat k="стоп" v={`${r.stopPct}%`} />
