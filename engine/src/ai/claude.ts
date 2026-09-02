@@ -135,7 +135,16 @@ export class ClaudeSignals {
       };
     }
 
-    const response = await this.client.messages.parse({
+    // Отказът на доставчика НЕ бива да сваля цикъла.
+    //
+    // Липсващ ключ връщаше вежливо "hold"; празна сметка хвърляше и целият
+    // /api/functions/... падаше с 500. Тоест същият по същество проблем -
+    // няма мнение от модела - в единия случай беше решение, а в другия
+    // повреда. Двигателят има собствени порти и трябва да продължи да съди по
+    // тях, а причината да се каже с думи.
+    let response;
+    try {
+      response = await this.client.messages.parse({
       model: this.model,
       max_tokens: 4096,
       thinking: { type: 'adaptive' },
@@ -152,7 +161,20 @@ export class ClaudeSignals {
         },
       ],
       messages: [{ role: 'user', content: ClaudeSignals.describe(request) }],
-    });
+      });
+    } catch (error) {
+      const message = (error as Error).message ?? '';
+      const outOfCredit = /credit balance is too low/i.test(message);
+      return {
+        action: 'hold',
+        confidence: 0,
+        stopAtrMultiple: 1.5,
+        rationale: outOfCredit
+          ? 'сметката в Anthropic е празна - без мнение от модела'
+          : `моделът не отговори: ${message.slice(0, 140)}`,
+        againstThesis: 'решението е взето само по портите на робота',
+      };
+    }
 
     if (response.stop_reason === 'refusal') {
       return {

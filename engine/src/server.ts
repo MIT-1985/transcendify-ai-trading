@@ -90,6 +90,37 @@ function send(response: ServerResponse, status: number, body: unknown): void {
   response.end(payload);
 }
 
+
+/**
+ * Превежда отказите на доставчика на човешки език.
+ *
+ * Суровият JSON блок от Anthropic не казва нищо на човека пред екрана, а
+ * "500" го праща да търси повреда в кода, каквато няма. Празната сметка и
+ * отхвърленият ключ са различни неща и заслужават различни кодове.
+ */
+function translateProviderError(text: string): { status: number; body: unknown } | null {
+  if (/credit balance is too low/i.test(text)) {
+    return {
+      status: 402,
+      body: {
+        error: 'BILLING',
+        message: 'Сметката в Anthropic е празна. Ключът е валиден, но няма кредит.',
+        where: 'https://console.anthropic.com/settings/billing',
+      },
+    };
+  }
+  if (/authentication_error|invalid x-api-key/i.test(text)) {
+    return {
+      status: 401,
+      body: {
+        error: 'BAD_KEY',
+        message: 'Anthropic отхвърли ключа. Провери ANTHROPIC_API_KEY в engine/.env.',
+      },
+    };
+  }
+  return null;
+}
+
 const server = createServer(async (request, response) => {
   if (request.method === 'OPTIONS') return send(response, 204, null);
 
@@ -269,14 +300,20 @@ const server = createServer(async (request, response) => {
       if (!hasFunction(name)) return send(response, 404, { error: `няма функция "${name}"` });
       const payload = await readBody(request);
       const result = await invokeFunction(name, payload, context);
+      const translated = translateProviderError(JSON.stringify(result.body ?? ''));
+      if (translated) return send(response, translated.status, translated.body);
       return send(response, result.status, result.body);
     }
 
     send(response, 404, { error: 'непознат път' });
   } catch (error) {
-    // Грешката се показва цяла: това е локален инструмент за един човек, а
-    // скритото съобщение струва час търсене.
-    send(response, 500, { error: (error as Error).message, stack: (error as Error).stack });
+    const message = (error as Error).message ?? '';
+    const translated = translateProviderError(message);
+    if (translated) return send(response, translated.status, translated.body);
+
+    // Всичко останало се показва цяло: това е локален инструмент за един
+    // човек, а скритото съобщение струва час търсене.
+    send(response, 500, { error: message, stack: (error as Error).stack });
   }
 });
 

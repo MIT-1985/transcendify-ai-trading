@@ -17,6 +17,9 @@
  * СЛЕД такси и спред, иначе сделката просто не се прави.
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 export type Env = Record<string, string | undefined>;
 
 const num = (env: Env, key: string, fallback: number): number => {
@@ -125,7 +128,32 @@ export interface EngineConfig {
   allowRealOrders: boolean;
 }
 
+/**
+ * Чете engine/.env, ако го има.
+ *
+ * Файлът съществуваше в примера и в указанията, но никой не го зареждаше -
+ * двигателят четеше само process.env. Ключ, записан в .env, стигаше доникъде
+ * и изглеждаше, че не работи, вместо да е ясно, че не е прочетен.
+ *
+ * Стойности, вече зададени в средата, НЕ се презаписват: изричното при
+ * пускането трябва да бие записаното във файл.
+ */
+function loadEnvFile(): void {
+  const file = resolve(process.cwd(), '.env');
+  if (!existsSync(file)) return;
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq < 1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    if (process.env[key] !== undefined) continue;
+    process.env[key] = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+  }
+}
+
 export function loadConfig(env: Env = process.env): EngineConfig {
+  loadEnvFile();
   const mode = (env.TRADING_MODE ?? 'paper') as 'paper' | 'live';
   if (mode !== 'paper' && mode !== 'live') {
     throw new Error(`TRADING_MODE трябва да е "paper" или "live", а не "${mode}"`);
