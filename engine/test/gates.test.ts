@@ -19,20 +19,20 @@ test('всеки робот има порти', () => {
 });
 
 test('бюджетът за спред е част от стопа, не общо число', () => {
-  const sprinter = robotById('sprinter')!;
+  const fastest = robotById('momentum')!;
   const guardian = robotById('guardian')!;
   // Стоп 0.3% срещу 2% - по-стегнатият робот трябва да иска по-тесен спред.
-  assert.ok(spreadBudgetFor(sprinter) < spreadBudgetFor(guardian),
-    'скалпърът не бива да търпи същия спред като суинга');
+  assert.ok(spreadBudgetFor(fastest) < spreadBudgetFor(guardian),
+    'по-стегнатият робот не бива да търпи същия спред като суинга');
   // И трябва да е под самия стоп - иначе входът яде целия запас.
   for (const p of ROBOTS) {
     assert.ok(spreadBudgetFor(p) < p.stopDistancePct * 100, `${p.name}: спредът яде стопа`);
   }
 });
 
-test('скалпърът иска повече натиск от суинга', () => {
-  assert.ok(robotById('sprinter')!.gates.minTickScore > robotById('guardian')!.gates.minTickScore,
-    'скалпът живее от натиска - той трябва да иска повече');
+test('бързият иска повече натиск от суинга', () => {
+  assert.ok(robotById('momentum')!.gates.minTickScore > robotById('guardian')!.gates.minTickScore,
+    'който държи позиция минути живее от натиска - трябва да иска повече');
 });
 
 test('търпеливите роботи искат втори източник, бързите - не', () => {
@@ -40,7 +40,6 @@ test('търпеливите роботи искат втори източник
   // минути, не може да чака дневна свещ от Polygon.
   assert.equal(robotById('guardian')!.gates.requireMacro, true);
   assert.equal(robotById('steady')!.gates.requireMacro, true);
-  assert.equal(robotById('sprinter')!.gates.requireMacro, false);
   assert.equal(robotById('momentum')!.gates.requireMacro, false);
 });
 

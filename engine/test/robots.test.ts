@@ -24,13 +24,13 @@ test('подредени са от най-прощаващ към най-тру�
   }
 });
 
-test('най-агресивният е само с лимитен вход', () => {
-  const sprinter = robotById('sprinter')!;
-  assert.equal(sprinter.entry, 'limit');
-  // С пазарен вход същият профил би станал забележимо по-труден.
-  const asMarket = profileBreakeven({ ...sprinter, entry: 'market' }, fees);
-  const asLimit = profileBreakeven(sprinter, fees);
-  assert.ok(asMarket > asLimit, 'пазарният вход трябва да е по-скъп');
+test('всички роботи влизат с лимитна поръчка', () => {
+  for (const p of ROBOTS) {
+    assert.equal(p.entry, 'limit', `${p.name} влиза с пазарна`);
+    // С пазарен вход същият профил става забележимо по-труден.
+    const asMarket = profileBreakeven({ ...p, entry: 'market' }, fees);
+    assert.ok(asMarket > profileBreakeven(p, fees), `${p.name}: пазарният вход трябва да е по-скъп`);
+  }
 });
 
 test('всеки робот получава своите цели за TROK', () => {
@@ -42,6 +42,6 @@ test('всеки робот получава своите цели за TROK', (
 
 test('предпазливият държи риска по-ниско от агресивния', () => {
   const guardian = robotById('guardian')!;
-  const sprinter = robotById('sprinter')!;
-  assert.ok(guardian.trokTargets.risk < sprinter.trokTargets.risk);
+  const fastest = robotById('momentum')!;
+  assert.ok(guardian.trokTargets.risk < fastest.trokTargets.risk);
 });
