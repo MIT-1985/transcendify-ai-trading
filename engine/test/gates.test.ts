@@ -65,3 +65,29 @@ test('портите на шестте не са едни и същи', () => {
   assert.equal(fingerprints.size, ROBOTS.length,
     'два робота имат еднакви порти - тогава са един робот с две имена');
 });
+
+/**
+ * Порта без доказателство не спира сделка.
+ *
+ * Измерено на десет двойки и шест робота: RSI и движението не вдигат
+ * процента печеливши никъде, а при Стълба го СВАЛЯТ - веригата с тях дава
+ * +12.7 точки над нулата, само трендът +19.7. Затова остават видими, но без
+ * вето. Тестът пази това да не се върне по невнимание.
+ */
+test('само доказаните и структурните порти имат вето', async () => {
+  const { evaluate } = await import('../src/core/scanner.ts');
+  const p = robotById('steady')!;
+  const candidate = await evaluate(
+    p,
+    { instId: 'BTC-USDT', volumeUsd: 4e8, spreadPct: 0.001, change24hPct: 2, last: 77000 },
+    '1H', 0.2, {},
+  );
+
+  const byName = new Map(candidate.gates.map((g) => [g.name, g]));
+  assert.equal(byName.get('strength')?.blocking, false, 'RSI не бива да спира - измерено е, че вреди');
+  assert.equal(byName.get('movement')?.blocking, false, 'движението не бива да спира - измерено е, че вреди');
+  assert.equal(byName.get('pressure')?.blocking, false, 'натискът не е измерван назад - без вето');
+  assert.equal(byName.get('trend')?.blocking, true, 'трендът е единствената доказана сигнална порта');
+  assert.equal(byName.get('economics')?.blocking, true, 'икономиката е структурна');
+  assert.equal(byName.get('liquidity')?.blocking, true, 'ликвидността е структурна');
+});

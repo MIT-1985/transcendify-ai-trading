@@ -81,6 +81,14 @@ export interface Gate {
   value: string;
   threshold: string;
   note?: string;
+  /**
+   * Спира ли сделка при провал.
+   *
+   * Порта, за която НЯМА измерено доказателство, че вдига процента печеливши,
+   * не бива да спира вход. Остава видима - числото ѝ помага на човека - но
+   * не решава вместо измерването.
+   */
+  blocking: boolean;
 }
 
 export interface Candidate {
@@ -237,20 +245,34 @@ export async function evaluate(
 
   const gates: Gate[] = [
     {
+      // Структурна, не сигнална: пази от книга, в която поръчката сама си
+      // мърда цената. Не е филтър за качество на сигнала и затова не е
+      // измервана като такъв.
       name: 'liquidity', label: 'Ликвидност', passed: t.volumeUsd >= g.minVolumeUsd,
       value: `$${(t.volumeUsd / 1e6).toFixed(0)}M`, threshold: `≥ $${(g.minVolumeUsd / 1e6).toFixed(0)}M`,
+      blocking: true,
     },
     {
       name: 'spread', label: 'Спред', passed: t.spreadPct <= budget,
       value: `${t.spreadPct.toFixed(4)}%`, threshold: `≤ ${budget.toFixed(3)}%`,
+      blocking: true,
     },
     {
+      // ИЗМЕРЕНА И ОСТАВЕНА БЕЗ ПРАВО НА ВЕТО.
+      //
+      // Върху десет двойки и шест робота движението не вдигна процента
+      // печеливши никъде. При Стълба веригата с него дава +12.7 точки над
+      // нулата, а само трендът - +19.7. Тоест добавянето му ВРЕДИ.
       name: 'movement', label: 'Движение', passed: Math.abs(t.change24hPct) >= g.minDailyRangePct,
       value: `${t.change24hPct.toFixed(2)}%`, threshold: `≥ ${g.minDailyRangePct}% за 24ч`,
+      blocking: false,
     },
     {
+      // Структурна: двойка, на която целта не надживява таксите, е губеща по
+      // устройство. Не е въпрос на процент печеливши.
       name: 'economics', label: 'Икономика', passed: netPct > 0,
       value: `остават ${netPct.toFixed(2)}%`, threshold: `цел ${targetPct.toFixed(2)}% − разходи ${costPct.toFixed(2)}%`,
+      blocking: true,
     },
     {
       // Липсата на свещи е ОТКАЗ, не "не се прилага".
@@ -266,16 +288,27 @@ export async function evaluate(
         : `няма свещи (${candles.length}/30)`,
       threshold: `EMA9 > EMA21 на ${bar}`,
       note: ema9 === null ? 'OKX не върна достатъчно свещи - вход без проверка не се допуска' : undefined,
+      // ЕДИНСТВЕНАТА СИГНАЛНА ПОРТА С ДОКАЗАТЕЛСТВО.
+      // Стълба: 44.4% без порти → 54.3% само с тренда, +19.7 точки над нулата.
+      blocking: true,
     },
     {
+      // ИЗМЕРЕНА И ОСТАВЕНА БЕЗ ПРАВО НА ВЕТО.
+      // При Стълба сваля процента от 44.4% на 37.5%, тоест избира ПО-ЛОШИ
+      // входове. Числото остава на екрана, защото е полезно да се види.
       name: 'strength', label: 'Сила (RSI)',
       passed: rsi !== null ? rsi <= g.maxRsi : false,
       value: rsi !== null ? String(rsi) : 'няма свещи', threshold: `≤ ${g.maxRsi}`,
+      blocking: false,
     },
     {
+      // НЕИЗМЕРЕНА: OKX не дава историческа книга със сделки, значи няма как
+      // да се провери назад. Оставена без вето по същото правило - порта без
+      // доказателство не спира сделка.
       name: 'pressure', label: 'Натиск (тик)', passed: tick.tickScore >= g.minTickScore,
       value: `${tick.tickScore}/25 · ${tick.buyPressurePercent}% купувачи`,
       threshold: `≥ ${g.minTickScore}/25`,
+      blocking: false,
     },
     macro,
     regimeGate(),
@@ -289,7 +322,7 @@ export async function evaluate(
   // нула, това е отказ - и той се брои като порта, за да се вижда наравно с
   // останалите, а не да изчезва тихо.
   let size: Candidate['size'] = null;
-  if (sources.trok && !gates.some((x) => x.passed === false)) {
+  if (sources.trok && !gates.some((x) => x.passed === false && x.blocking)) {
     const volPct = volatilityOf(candles);
     const chosen = sources.trok.chooseSize({
       // Колко близо е обичайното люлеене до стопа. Над 1 значи, че стопът
@@ -309,10 +342,12 @@ export async function evaluate(
       value: `${chosen.label} (${Math.round(chosen.fraction * 100)}%)`,
       threshold: 'над нула',
       note: `цена на решението J=${size.j}`,
+      // Структурна: нулев размер значи "не влизай", а не мнение за посоката.
+      blocking: true,
     });
   }
 
-  const blocked = gates.find((x) => x.passed === false);
+  const blocked = gates.find((x) => x.passed === false && x.blocking);
   const verdict: Candidate['verdict'] =
     !blocked ? 'BUY'
       : blocked.name === 'economics' || blocked.name === 'spread' || blocked.name === 'liquidity'
@@ -353,6 +388,11 @@ async function macroGate(
   const base: Gate = {
     name: 'macro', label: 'Макро (дневна)', passed: null,
     value: '—', threshold: p.gates.requireMacro ? 'дневната посока да не противоречи' : 'не се изисква',
+    // Втори НЕЗАВИСИМ източник. Не е измерена назад - Polygon и Alchemy
+    // покриват само дневни затваряния, а роботите, които я изискват, работят
+    // на часова и по-дребна свещ. Оставя вето, защото не е сигнална порта, а
+    // проверка че двата източника изобщо се съгласяват за посоката.
+    blocking: p.gates.requireMacro,
   };
   if (!p.gates.requireMacro) {
     return { gate: { ...base, note: 'този робот съди само по OKX' }, spoke: false, via: null };
@@ -502,5 +542,6 @@ function regimeGate(now = new Date()): Gate {
       : `${adj.matched.length} правила · размер ×${adj.sizeMultiplier}${adj.tightenStops ? ' · стегнати стопове' : ''}`,
     threshold: 'без "Halt trading"',
     note: names || undefined,
+    blocking: true,
   };
 }
