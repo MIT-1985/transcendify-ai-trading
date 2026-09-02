@@ -111,6 +111,7 @@ export class PaperRunner {
       openedAt: new Date().toISOString(),
     };
     this.open.set(key, position);
+    this.orchestrator.setOpenCount(botId, [...this.open.values()].filter((x) => x.botId === botId).length);
 
     bus.emitEvent('order', `${p.name}: хартиен вход ${instId} на ${price}`, {
       botId, instId, data: { stop: position.stop, target: position.target },
@@ -137,6 +138,7 @@ export class PaperRunner {
       pos.netPct = Math.round((grossPct - this.feeRoundTripPct) * 1000) / 1000;
 
       this.open.delete(key);
+      this.orchestrator.setOpenCount(pos.botId, [...this.open.values()].filter((x) => x.botId === pos.botId).length);
       this.closed.push(pos);
       this.db.collection('PaperTrade').create({ ...pos }).catch(() => undefined);
 

@@ -69,7 +69,7 @@ const alchemy = new AlchemyClient({ apiKey: config.alchemy.apiKey, baseUrl: conf
 const cryptoapis = new CryptoApisClient({ apiKey: config.cryptoapis.apiKey, baseUrl: config.cryptoapis.baseUrl });
 const dataSources: DataSources = { polygonApiKey: config.polygon.apiKey, alchemy };
 
-const orchestrator = new Orchestrator(dataSources);
+const orchestrator = new Orchestrator(dataSources, db);
 const copy = new CopyTrading({ alchemy, apiKey: config.alchemy.apiKey, db });
 const paper = new PaperRunner({ orchestrator, db, takerFee: config.fees.taker });
 
@@ -191,6 +191,11 @@ const server = createServer(async (request, response) => {
         orchestrator.stop();
         return send(response, 200, orchestrator.snapshot());
       }
+      // GET /api/orchestrator/trok/:botId - тежестите на диспечера
+      if (segments[2] === 'trok' && segments[3]) {
+        const state = orchestrator.trokState(segments[3]);
+        return send(response, state ? 200 : 404, state ?? { error: 'няма такъв робот' });
+      }
       if (!segments[2]) return send(response, 200, orchestrator.snapshot());
     }
 
@@ -305,7 +310,16 @@ const server = createServer(async (request, response) => {
       // GET /api/robots/:id/scan - къде би търгувал този робот сега
       if (segments[3] === 'scan') {
         const depth = Number(url.searchParams.get('depth') ?? 8);
-        const result = await scanFor(id, dataSources, Math.max(1, Math.min(20, depth)));
+        const result = await scanFor(
+          id,
+          {
+            ...dataSources,
+            trok: orchestrator.trokOf(id),
+            openPositions: 0,
+            tickers: orchestrator.latestTickers().length > 0 ? orchestrator.latestTickers() : undefined,
+          },
+          Math.max(1, Math.min(20, depth)),
+        );
         return send(response, 'error' in result ? 502 : 200, result);
       }
 

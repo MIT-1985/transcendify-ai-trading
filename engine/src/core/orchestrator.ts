@@ -27,7 +27,10 @@
  */
 import { bus } from './eventBus.ts';
 import { ROBOTS, type RobotProfile } from './robots.ts';
-import { scanFor, type DataSources, type ScanResult } from './scanner.ts';
+import { scanFor, type DataSources, type RawTicker, type ScanResult } from './scanner.ts';
+import { trokFor } from './robots.ts';
+import type { Trok } from './trok.ts';
+import type { Database } from '../store/db.ts';
 
 /** Колко често се пресмятат портите за всеки вид робот, в милисекунди. */
 const GATE_PERIOD: Record<string, number> = {
@@ -55,21 +58,55 @@ export interface RobotState {
 
 export class Orchestrator {
   private readonly sources: DataSources;
+  /**
+   * Един диспечер на робот, създаден ВЕДНЪЖ.
+   *
+   * Тежестите му се местят след всяко решение - това е паметта. Ако се
+   * създаваше при всяко минаване, ученето нямаше да съществува и TROK би бил
+   * скъп начин да се смята едно и също число.
+   */
+  private readonly trok = new Map<string, Trok>();
+  private readonly db: Database | null;
   private readonly states = new Map<string, RobotState>();
   private prices = new Map<string, number>();
   private priceTimer: NodeJS.Timeout | null = null;
   private gateTimers: NodeJS.Timeout[] = [];
   private running = false;
   private priceAt: string | null = null;
+  private readonly openByBot = new Map<string, number>();
+  private tickers: RawTicker[] = [];
 
-  constructor(sources: DataSources) {
+  constructor(sources: DataSources, db: Database | null = null) {
     this.sources = sources;
+    this.db = db;
     for (const p of ROBOTS) {
+      const t = trokFor(p);
+      // Епохите се записват, за да преживеят рестарт - иначе всяко пускане
+      // започва от нула и ученето от вчера се губи.
+      if (db) t.attachStore((row) => void db.collection('TrokEpoch').create({ ...row }), p.id);
+      this.trok.set(p.id, t);
       this.states.set(p.id, {
         robotId: p.id, name: p.name, lastScan: null,
         lastScanAt: null, lastError: null, scans: 0, signals: 0,
       });
     }
+  }
+
+  /**
+   * Самият диспечер на робота.
+   *
+   * Дава се навън, за да съди и екранът със СЪЩАТА памет. Иначе панелът
+   * показва девет порти, а оркестраторът работи с десет - две различни
+   * присъди за едно и също.
+   */
+  trokOf(botId: string): Trok | undefined {
+    return this.trok.get(botId);
+  }
+
+  /** Състоянието на диспечера - за екрана и за проверка. */
+  trokState(botId: string) {
+    const t = this.trok.get(botId);
+    return t ? { ...t.state(), epoch: t.currentEpoch() } : null;
   }
 
   get isRunning(): boolean {
@@ -116,19 +153,38 @@ export class Orchestrator {
     return this.prices.get(instId) ?? null;
   }
 
+  /** Последният пълен списък - за екраните, за да не питат наново. */
+  latestTickers(): RawTicker[] {
+    return this.tickers;
+  }
+
   /** Един разговор, всички цени. Това е секундният ритъм. */
   private async tickPrices(): Promise<void> {
     if (!this.running) return;
     try {
       const res = await fetch(OKX_TICKERS, { signal: AbortSignal.timeout(5000) });
-      const json = (await res.json()) as { data?: Array<{ instId?: string; last?: string }> };
+      const json = (await res.json()) as { data?: Array<Record<string, string>> };
       if (Array.isArray(json.data)) {
         const next = new Map<string, number>();
+        const rows: RawTicker[] = [];
         for (const row of json.data) {
-          const px = Number(row.last ?? 0);
-          if (row.instId && px > 0) next.set(row.instId, px);
+          const last = Number(row.last ?? 0);
+          if (!row.instId || !(last > 0)) continue;
+          next.set(row.instId, last);
+          const bid = Number(row.bidPx ?? last);
+          const ask = Number(row.askPx ?? last);
+          const mid = (bid + ask) / 2;
+          const open = Number(row.open24h ?? last);
+          rows.push({
+            instId: row.instId,
+            volumeUsd: Number(row.volCcy24h ?? 0),
+            spreadPct: mid > 0 ? ((ask - bid) / mid) * 100 : 99,
+            change24hPct: open > 0 ? ((last - open) / open) * 100 : 0,
+            last,
+          });
         }
         this.prices = next;
+        this.tickers = rows;
         this.priceAt = new Date().toISOString();
       }
     } catch {
@@ -138,13 +194,32 @@ export class Orchestrator {
     if (this.running) this.priceTimer = setTimeout(() => void this.tickPrices(), PRICE_PERIOD);
   }
 
+  /** Колко позиции държи роботът - вход за заетостта в TROK. */
+  private openCount(botId: string): number {
+    return this.openByBot.get(botId) ?? 0;
+  }
+
+  /** Хартиеното проследяване съобщава колко позиции са отворени. */
+  setOpenCount(botId: string, n: number): void {
+    this.openByBot.set(botId, n);
+  }
+
   /** Пълната верига от порти за един робот, по неговия ритъм. */
   private async tickGates(p: RobotProfile): Promise<void> {
     if (!this.running) return;
     const state = this.states.get(p.id)!;
 
     try {
-      const result = await scanFor(p.id, this.sources, 10);
+      const result = await scanFor(
+        p.id,
+        {
+          ...this.sources,
+          trok: this.trok.get(p.id),
+          openPositions: this.openCount(p.id),
+          tickers: this.tickers.length > 0 ? this.tickers : undefined,
+        },
+        10,
+      );
       if ('error' in result) {
         state.lastError = result.error;
         bus.emitEvent('error', `${p.name}: ${result.error}`, { botId: p.id });

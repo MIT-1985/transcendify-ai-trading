@@ -35,6 +35,8 @@
  */
 import { robotById, type RobotProfile } from './robots.ts';
 import { AlchemyClient } from '../market/alchemy.ts';
+import { activeAdjustment } from './marketRules.ts';
+import type { Trok } from './trok.ts';
 import {
   fetchOkxCandles, fetchOkxTrades, analyzeMicroTick, calcEMA, calcRSI,
   fetchPolygonDaily, analyzePolygonMacro,
@@ -50,13 +52,26 @@ import {
 export interface DataSources {
   polygonApiKey?: string;
   alchemy?: AlchemyClient;
+  /**
+   * Диспечерът на този робот.
+   *
+   * Подава се отвън, защото носи ПАМЕТ - тежестите му се местят след всяко
+   * решение. Ако се създаваше тук, всяко минаване щеше да тръгва от нула и
+   * ученето нямаше да съществува.
+   */
+  trok?: Trok;
+  /** Колко позиции държи роботът в момента - вход за заетостта. */
+  openPositions?: number;
+  /** Вече изтеглен списък с всички двойки - спестява по един разговор на робот. */
+  tickers?: RawTicker[];
 }
 
 const OKX_TICKERS = 'https://www.okx.com/api/v5/market/tickers?instType=SPOT';
 
 export type GateName =
   | 'liquidity' | 'spread' | 'movement' | 'economics'
-  | 'trend' | 'strength' | 'pressure' | 'macro';
+  | 'trend' | 'strength' | 'pressure' | 'macro'
+  | 'regime' | 'trok';
 
 export interface Gate {
   name: GateName;
@@ -82,6 +97,8 @@ export interface Candidate {
   score: number;
   rsi: number | null;
   tickScore: number;
+  /** Какъв размер избра TROK и защо. */
+  size: { fraction: number; label: string; j: number } | null;
   /** Кои източници са говорили за тази двойка. */
   sources: string[];
 }
@@ -97,7 +114,7 @@ export interface ScanResult {
   scannedAt: string;
 }
 
-type RawTicker = { instId: string; volumeUsd: number; spreadPct: number; change24hPct: number; last: number };
+export type RawTicker = { instId: string; volumeUsd: number; spreadPct: number; change24hPct: number; last: number };
 
 /** Един разговор, всички двойки. */
 async function allTickers(): Promise<RawTicker[]> {
@@ -135,7 +152,10 @@ export async function scanFor(
   if (!p) return { error: `няма робот "${robotId}"` };
   const g = p.gates;
 
-  const tickers = await allTickers();
+  // Готовият списък се ползва, ако някой вече го е взел. Шест робота, които
+  // теглят един и същ списък по едно и също време, сами си причиняват
+  // ограничаването, което после ги оставя без свещи.
+  const tickers = sources.tickers ?? (await allTickers());
   if (tickers.length === 0) return { error: 'OKX не върна списък с двойки' };
 
   const budget = spreadBudgetFor(p);
@@ -233,15 +253,24 @@ export async function evaluate(
       value: `остават ${netPct.toFixed(2)}%`, threshold: `цел ${targetPct.toFixed(2)}% − разходи ${costPct.toFixed(2)}%`,
     },
     {
+      // Липсата на свещи е ОТКАЗ, не "не се прилага".
+      //
+      // Дотук беше null и не блокираше. Значеше, че когато OKX ни ограничи и
+      // спре да дава свещи, роботът минава БЕЗ проверка за тренд - тоест
+      // натоварването го правеше по-смел, вместо по-предпазлив. Точно
+      // обратното на това, което трябва да прави липсата на данни.
       name: 'trend', label: 'Тренд (OKX)',
-      passed: ema9 !== null && ema21 !== null ? ema9 > ema21 : null,
-      value: ema9 !== null && ema21 !== null ? (ema9 > ema21 ? 'EMA9 над EMA21' : 'EMA9 под EMA21') : 'няма свещи',
+      passed: ema9 !== null && ema21 !== null ? ema9 > ema21 : false,
+      value: ema9 !== null && ema21 !== null
+        ? (ema9 > ema21 ? 'EMA9 над EMA21' : 'EMA9 под EMA21')
+        : `няма свещи (${candles.length}/30)`,
       threshold: `EMA9 > EMA21 на ${bar}`,
+      note: ema9 === null ? 'OKX не върна достатъчно свещи - вход без проверка не се допуска' : undefined,
     },
     {
       name: 'strength', label: 'Сила (RSI)',
-      passed: rsi !== null ? rsi <= g.maxRsi : null,
-      value: rsi !== null ? String(rsi) : '—', threshold: `≤ ${g.maxRsi}`,
+      passed: rsi !== null ? rsi <= g.maxRsi : false,
+      value: rsi !== null ? String(rsi) : 'няма свещи', threshold: `≤ ${g.maxRsi}`,
     },
     {
       name: 'pressure', label: 'Натиск (тик)', passed: tick.tickScore >= g.minTickScore,
@@ -249,7 +278,39 @@ export async function evaluate(
       threshold: `≥ ${g.minTickScore}/25`,
     },
     macro,
+    regimeGate(),
   ];
+
+  // TROK решава РАЗМЕРА, след като всичко останало е минало.
+  //
+  // Досега този диспечер стоеше написан и неизползван, а праговете на портите
+  // бяха числа, които аз избрах на ръка и които не се учеха от нищо. Тук той
+  // получава четири измерими стойности и връща дял от размера. Когато върне
+  // нула, това е отказ - и той се брои като порта, за да се вижда наравно с
+  // останалите, а не да изчезва тихо.
+  let size: Candidate['size'] = null;
+  if (sources.trok && !gates.some((x) => x.passed === false)) {
+    const volPct = volatilityOf(candles);
+    const chosen = sources.trok.chooseSize({
+      // Колко близо е обичайното люлеене до стопа. Над 1 значи, че стопът
+      // стои вътре в шума и ще бъде удрян без пазарът да е тръгнал.
+      riskNow: clamp01(volPct / (p.stopDistancePct * 100)),
+      // Каква част от целта изяждат таксите и спредът.
+      costRatio: clamp01(costPct / Math.max(targetPct, 1e-9)),
+      edgeNow: clamp01(scoreOf(gates, rsi, tick.tickScore) / 100),
+      exposureNow: clamp01((sources.openPositions ?? 0) / Math.max(p.maxConcurrent, 1)),
+      instId: t.instId,
+    });
+    size = { fraction: chosen.fraction, label: chosen.label, j: Math.round(chosen.j * 1000) / 1000 };
+    gates.push({
+      name: 'trok',
+      label: 'TROK (размер)',
+      passed: chosen.fraction > 0,
+      value: `${chosen.label} (${Math.round(chosen.fraction * 100)}%)`,
+      threshold: 'над нула',
+      note: `цена на решението J=${size.j}`,
+    });
+  }
 
   const blocked = gates.find((x) => x.passed === false);
   const verdict: Candidate['verdict'] =
@@ -270,6 +331,7 @@ export async function evaluate(
     score: scoreOf(gates, rsi, tick.tickScore),
     rsi,
     tickScore: tick.tickScore,
+    size,
     sources: sourceList,
   };
 }
@@ -401,3 +463,44 @@ export async function evaluateOne(
 }
 
 export { barFor };
+
+
+/** 0..1, за входовете на TROK. */
+function clamp01(x: number): number {
+  return Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : 0;
+}
+
+/** Обичайното люлеене в проценти - най-високото минус най-ниското за 20 свещи. */
+function volatilityOf(candles: Array<{ high: number; low: number }>): number {
+  const slice = candles.slice(-20);
+  if (slice.length < 5) return 0;
+  const hi = Math.max(...slice.map((c) => c.high));
+  const lo = Math.min(...slice.map((c) => c.low));
+  return lo > 0 ? ((hi - lo) / lo) * 100 : 0;
+}
+
+/**
+ * Часът на денонощието.
+ *
+ * `data/market_patterns_rules.csv` описва 92 наблюдавани прозореца - кога
+ * ликвидността пада, кога спредът се разширява, кога има емисии. Каталогът
+ * стоеше прочетен и неизползван; тук става порта.
+ *
+ * Спира се САМО при недвусмислено "Halt trading". Останалите правила
+ * намаляват размера и това минава през TROK, вместо да блокира - тихо
+ * блокиране по неразбрано правило е по-лошо от никакво.
+ */
+function regimeGate(now = new Date()): Gate {
+  const adj = activeAdjustment(now);
+  const names = adj.matched.map((r) => r.pattern).slice(0, 2).join(', ');
+  return {
+    name: 'regime',
+    label: 'Пазарен режим',
+    passed: adj.sizeMultiplier > 0,
+    value: adj.matched.length === 0
+      ? 'няма активно правило'
+      : `${adj.matched.length} правила · размер ×${adj.sizeMultiplier}${adj.tightenStops ? ' · стегнати стопове' : ''}`,
+    threshold: 'без "Halt trading"',
+    note: names || undefined,
+  };
+}
