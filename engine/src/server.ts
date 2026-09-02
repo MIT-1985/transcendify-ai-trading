@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { setDefaultResultOrder } from 'node:dns';
 import { createReadStream, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig } from './config.ts';
@@ -27,6 +28,22 @@ import { scanFor } from './core/scanner.ts';
  * поръчки; отваряне навън е решение, което се взима съзнателно, с обратен
  * посредник и удостоверяване отпред, а не по подразбиране.
  */
+
+/**
+ * Излизаме винаги през IPv4.
+ *
+ * OKX връзва ключа за списък с адреси. Node по подразбиране пробва IPv6 и
+ * IPv4 успоредно и взима който отговори пръв - тоест адресът, който борсата
+ * вижда, се сменя от заявка на заявка. Ключ, вързан за един адрес, работи
+ * през половината време и пада без обяснение през другата.
+ *
+ * По-лошо: адресът IPv6 на тази машина е `temporary` (privacy extensions) и
+ * се сменя сам всеки ден. Списък с него е безсмислен по устройство.
+ *
+ * Затова изборът се фиксира: каквото сложиш в списъка на OKX, това ще е и
+ * адресът, от който се обажда двигателят.
+ */
+setDefaultResultOrder('ipv4first');
 
 const config = loadConfig();
 const db = new Database(config.dataDir);
