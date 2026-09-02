@@ -83,7 +83,10 @@ interface OkxResponse<T> {
 export class OkxClient {
   private readonly baseUrl: string;
   private readonly demo: boolean;
-  private readonly credentials?: OkxCredentials;
+  // Не е readonly: ключовете могат да дойдат и от екрана, не само от .env при
+  // пускане. Иначе въведеното в приложението не стига доникъде, докато
+  // двигателят не бъде рестартиран на ръка.
+  private credentials?: OkxCredentials;
   private readonly doFetch: typeof fetch;
 
   constructor(options: OkxClientOptions = {}) {
@@ -100,6 +103,14 @@ export class OkxClient {
   /** true, ако изобщо можем да подписваме заявки. Публичните данни не искат ключ. */
   get authenticated(): boolean {
     return this.credentials !== undefined;
+  }
+
+  /** Сменя ключовете в движение - за когато идват от екрана. */
+  setCredentials(credentials?: OkxCredentials): void {
+    this.credentials =
+      credentials?.apiKey && credentials.secretKey && credentials.passphrase
+        ? { ...credentials }
+        : undefined;
   }
 
   private sign(timestamp: string, method: string, path: string, body: string): string {
@@ -283,6 +294,31 @@ export class OkxClient {
     );
     const detail = row?.details?.find((d) => d.ccy === ccy);
     return detail ? Number(detail.availBal) : 0;
+  }
+
+  /**
+   * Цялото спот салдо - всяка валута с ненулево количество.
+   *
+   * Без списък от валути, зададен предварително: питаме OKX какво има в
+   * сметката и показваме каквото върне.
+   */
+  async spotBalances(): Promise<
+    Array<{ ccy: string; available: number; frozen: number; total: number; usd: number }>
+  > {
+    const [row] = await this.request<{
+      details?: { ccy: string; availBal: string; frozenBal: string; eq: string; eqUsd: string }[];
+    }>('GET', '/api/v5/account/balance', { auth: true });
+
+    return (row?.details ?? [])
+      .map((d) => ({
+        ccy: d.ccy,
+        available: Number(d.availBal || 0),
+        frozen: Number(d.frozenBal || 0),
+        total: Number(d.eq || 0),
+        usd: Number(d.eqUsd || 0),
+      }))
+      .filter((d) => d.total > 0)
+      .sort((a, b) => b.usd - a.usd);
   }
 
   async openAlgoOrders(instId?: string): Promise<Record<string, string>[]> {

@@ -8,7 +8,52 @@ import { snapshot } from '../strategy/indicators.ts';
 import { invokeLegacy, legacyExists } from '../compat/legacyLoader.ts';
 import { GoogleImageClient } from '../ai/images.ts';
 import { GoogleVideoClient } from '../ai/video.ts';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+
+/**
+ * Записва ключовете за OKX в engine/.env.
+ *
+ * Пише се на диск, а не само в паметта, защото иначе всеки рестарт изисква
+ * ново въвеждане. Файлът се затваря с 600 - той е в .gitignore, но правата
+ * пазят и от другите потребители на машината.
+ */
+/**
+ * Превежда отказа на OKX на нещо, по което се действа.
+ *
+ * Кодовете са точни, но не казват КОЕ поле е сбъркано - а трите низа си
+ * приличат достатъчно, за да се гадае. Отделно: за европейски акаунти OKX
+ * иска eea.okx.com, а ключ от там срещу www.okx.com дава същия код като
+ * сгрешен ключ. Точно тази разлика струва най-много време.
+ */
+function describeOkxFailure(message: string, baseUrl: string): string {
+  const onEea = baseUrl.includes('eea.okx.com');
+  if (/50111/.test(message)) {
+    return onEea
+      ? 'API Key не е верен.'
+      : 'API Key не е верен — или акаунтът е европейски. За акаунти от ЕС сложи ' +
+        'OKX_BASE_URL=https://eea.okx.com в engine/.env и опитай пак.';
+  }
+  if (/50113/.test(message)) return 'Подписът не излиза — API Secret е грешен.';
+  if (/50105/.test(message)) return 'Passphrase не е вярна. Това е фразата, зададена при създаването на ключа.';
+  if (/50110/.test(message)) return 'Адресът на този сървър не е в списъка на ключа в OKX.';
+  if (/KEY_ALLOWS_WITHDRAW/.test(message)) return message;
+  return message;
+}
+
+function saveOkxKeys(keys: { apiKey: string; secretKey: string; passphrase: string }): void {
+  const file = resolve(process.cwd(), '.env');
+  let text = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  const set = (name: string, value: string) => {
+    const pattern = new RegExp(`^${name}=.*$`, 'm');
+    text = pattern.test(text) ? text.replace(pattern, `${name}=${value}`) : `${text}\n${name}=${value}`;
+  };
+  set('OKX_API_KEY', keys.apiKey);
+  set('OKX_SECRET_KEY', keys.secretKey);
+  set('OKX_PASSPHRASE', keys.passphrase);
+  writeFileSync(file, text, 'utf8');
+  chmodSync(file, 0o600);
+}
 
 /**
  * Рутерът на функциите - това, което фронтендът вика като `functions.invoke`.
@@ -84,11 +129,81 @@ const native: Record<string, Handler> = {
     return { available: true, usdt: await context.okx.balance('USDT') };
   },
 
-  async okxConnect(_payload, context) {
+  /**
+   * Свързване с OKX от екрана.
+   *
+   * Дотук тази функция ПРЕНЕБРЕГВАШЕ подадените ключове и само проверяваше
+   * дали вече има такива в .env. Тоест полетата в приложението изглеждаха
+   * работещи, а не правеха нищо - въвеждаш, натискаш и връзка няма.
+   *
+   * Сега ключовете се проверяват срещу самия OKX преди да бъдат запазени, и
+   * ако минат, влизат едновременно в живия клиент (за да работи веднага) и в
+   * .env (за да преживеят рестарт).
+   */
+  async okxConnect(payload, context) {
+    const action = (payload.action as string) ?? 'balance';
+
+    if (action === 'disconnect') {
+      context.okx.setCredentials(undefined);
+      saveOkxKeys({ apiKey: '', secretKey: '', passphrase: '' });
+      return { connected: false, disconnected: true };
+    }
+
+    if (action === 'connect') {
+      const apiKey = String(payload.api_key ?? '').trim();
+      const secretKey = String(payload.api_secret ?? '').trim();
+      const passphrase = String(payload.passphrase ?? '').trim();
+
+      if (!apiKey || !secretKey || !passphrase) {
+        const reason = 'липсва някое от трите полета';
+        return { success: false, connected: false, error: reason, reason };
+      }
+
+      // Заглавките на HTTP приемат само латиница. Кирилски знак в някое поле
+      // хвърляше "Cannot convert argument to a ByteString because the
+      // character at index 0 has a value of 1077" - вярно, но нечетимо.
+      const nonLatin = [apiKey, secretKey, passphrase].some((v) => /[^\x20-\x7E]/.test(v));
+      if (nonLatin) {
+        const reason =
+          'В някое от полетата има знак извън латиницата (кирилица или интервал в края). ' +
+          'Копирай ключа наново от OKX.';
+        return { success: false, connected: false, error: reason, reason };
+      }
+
+      const previous = context.okx.authenticated;
+      context.okx.setCredentials({ apiKey, secretKey, passphrase });
+      try {
+        // Правилото е негово: само търговия, без теглене. Ключ, с който може
+        // да се тегли, се отказва и не се записва никъде.
+        await context.okx.assertSafeForTrading();
+        const balances = await context.okx.spotBalances();
+        saveOkxKeys({ apiKey, secretKey, passphrase });
+        return {
+          // И `success`, и `connected`: старите екрани четат едното, новите -
+          // другото, а разминаването показваше успеха като провал.
+          success: true,
+          connected: true,
+          demo: context.config.okx.demo,
+          assets: balances,
+          totalUsd: balances.reduce((sum, b) => sum + b.usd, 0),
+        };
+      } catch (error) {
+        // Лош ключ не бива да изхвърля работещия отпреди.
+        if (!previous) context.okx.setCredentials(undefined);
+        const reason = describeOkxFailure((error as Error).message, context.config.okx.baseUrl);
+        return { success: false, connected: false, error: reason, reason };
+      }
+    }
+
     if (!context.okx.authenticated) return { connected: false, reason: 'няма ключове за OKX' };
     try {
-      const balance = await context.okx.balance('USDT');
-      return { connected: true, demo: context.config.okx.demo, usdt: balance };
+      const balances = await context.okx.spotBalances();
+      return {
+        connected: true,
+        demo: context.config.okx.demo,
+        assets: balances,
+        totalUsd: balances.reduce((sum, b) => sum + b.usd, 0),
+      };
     } catch (error) {
       return { connected: false, reason: (error as Error).message };
     }

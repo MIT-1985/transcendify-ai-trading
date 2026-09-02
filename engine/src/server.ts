@@ -158,6 +158,19 @@ const server = createServer(async (request, response) => {
       });
     }
 
+    // GET /api/balance - спот салдото по ключа
+    if (segments[0] === 'api' && segments[1] === 'balance') {
+      if (!okx.authenticated) {
+        return send(response, 400, { error: 'NO_KEY', message: 'няма OKX ключове в engine/.env' });
+      }
+      const rows = await okx.spotBalances();
+      return send(response, 200, {
+        assets: rows,
+        totalUsd: rows.reduce((sum, r) => sum + r.usd, 0),
+        at: new Date().toISOString(),
+      });
+    }
+
     // GET /api/events - жив поток от решенията на роботите
     //
     // Server-Sent Events, не websocket: потокът е еднопосочен (двигателят

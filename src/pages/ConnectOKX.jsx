@@ -49,28 +49,30 @@ export default function ConnectOKX() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await base44.functions.invoke('okxConnect', { action: 'connect', api_key: apiKey.trim(), api_secret: apiSecret.trim(), passphrase: passphrase.trim(), label });
-      if (res.data?.success) {
+      const res = await base44.functions.invoke('okxConnect', {
+        action: 'connect',
+        api_key: apiKey.trim(),
+        api_secret: apiSecret.trim(),
+        passphrase: passphrase.trim(),
+        label,
+      });
+
+      // Отговорът се четеше като res.data.success. Местният сървър връща
+      // тялото направо, а полето се казва `connected`, не `success` - тоест
+      // условието беше винаги невярно и УСПЕШНОТО свързване се показваше като
+      // "Неуспешно свързване". Затова се приемат и двата вида отговор.
+      const body = res?.data ?? res ?? {};
+      if (body.success || body.connected) {
         setResult({ type: 'success', message: 'OKX акаунтът е свързан успешно!' });
         refetch();
         setApiKey(''); setApiSecret(''); setPassphrase('');
       } else {
-        setResult({ type: 'error', message: res.data?.error || 'Неуспешно свързване' });
+        // Причината от борсата се показва цяла. "Неуспешно свързване" не
+        // казва дали е грешен ключ, грешна фраза или адрес извън списъка.
+        setResult({ type: 'error', message: body.error || body.reason || 'Неуспешно свързване' });
       }
     } catch (err) {
-      // Network error - retry once
-      try {
-        const res2 = await base44.functions.invoke('okxConnect', { action: 'connect', api_key: apiKey.trim(), api_secret: apiSecret.trim(), passphrase: passphrase.trim(), label });
-        if (res2.data?.success) {
-          setResult({ type: 'success', message: 'OKX акаунтът е свързан успешно!' });
-          refetch();
-          setApiKey(''); setApiSecret(''); setPassphrase('');
-        } else {
-          setResult({ type: 'error', message: res2.data?.error || 'Неуспешно свързване' });
-        }
-      } catch (err2) {
-        setResult({ type: 'error', message: 'Мрежова грешка. Моля, опитайте отново след малко.' });
-      }
+      setResult({ type: 'error', message: err?.message || 'Мрежова грешка' });
     } finally {
       setLoading(false);
     }
