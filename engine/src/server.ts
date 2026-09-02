@@ -24,6 +24,7 @@ import { AlchemyClient } from './market/alchemy.ts';
 import { CryptoApisClient } from './market/cryptoapis.ts';
 import { Orchestrator } from './core/orchestrator.ts';
 import { CopyTrading } from './core/copyTrading.ts';
+import { PaperRunner } from './core/paperRunner.ts';
 
 /**
  * Локалният сървър - това, което фронтендът вика вместо облака на платформата.
@@ -70,6 +71,7 @@ const dataSources: DataSources = { polygonApiKey: config.polygon.apiKey, alchemy
 
 const orchestrator = new Orchestrator(dataSources);
 const copy = new CopyTrading({ alchemy, apiKey: config.alchemy.apiKey, db });
+const paper = new PaperRunner({ orchestrator, db, takerFee: config.fees.taker });
 
 const polygon = new PolygonClient({ apiKey: config.polygon.apiKey, baseUrl: config.polygon.baseUrl });
 const claude = new ClaudeSignals(config);
@@ -170,6 +172,7 @@ const server = createServer(async (request, response) => {
         cryptoapis: cryptoapis.available,
         orchestrator: orchestrator.isRunning,
         copyTrading: copy.available,
+        paper: paper.isRunning,
         claude: claude.available,
         images: images_.available,
       });
@@ -189,6 +192,25 @@ const server = createServer(async (request, response) => {
         return send(response, 200, orchestrator.snapshot());
       }
       if (!segments[2]) return send(response, 200, orchestrator.snapshot());
+    }
+
+    // Хартиено проследяване: сигналите се следят напред във времето.
+    //   GET  /api/paper        - какво е станало
+    //   POST /api/paper/start  - тръгва (пуска и оркестратора, ако е спрял)
+    //   POST /api/paper/stop
+    if (segments[0] === 'api' && segments[1] === 'paper') {
+      if (request.method === 'POST' && segments[2] === 'start') {
+        // Без оркестратор няма сигнали - пуска се, за да няма мълчалив празен
+        // отчет, който изглежда като "нищо не се случва".
+        if (!orchestrator.isRunning) orchestrator.start();
+        paper.start();
+        return send(response, 200, paper.report());
+      }
+      if (request.method === 'POST' && segments[2] === 'stop') {
+        paper.stop();
+        return send(response, 200, paper.report());
+      }
+      if (!segments[2]) return send(response, 200, paper.report());
     }
 
     // Копиране на едри играчи.
