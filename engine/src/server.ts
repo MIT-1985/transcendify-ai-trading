@@ -22,6 +22,8 @@ import { catalogue, buyRobot, robotMarket } from './core/catalogue.ts';
 import { scanFor, type DataSources } from './core/scanner.ts';
 import { AlchemyClient } from './market/alchemy.ts';
 import { CryptoApisClient } from './market/cryptoapis.ts';
+import { Orchestrator } from './core/orchestrator.ts';
+import { CopyTrading } from './core/copyTrading.ts';
 
 /**
  * Локалният сървър - това, което фронтендът вика вместо облака на платформата.
@@ -65,6 +67,9 @@ const okx = new OkxClient({
 const alchemy = new AlchemyClient({ apiKey: config.alchemy.apiKey, baseUrl: config.alchemy.baseUrl });
 const cryptoapis = new CryptoApisClient({ apiKey: config.cryptoapis.apiKey, baseUrl: config.cryptoapis.baseUrl });
 const dataSources: DataSources = { polygonApiKey: config.polygon.apiKey, alchemy };
+
+const orchestrator = new Orchestrator(dataSources);
+const copy = new CopyTrading({ alchemy, apiKey: config.alchemy.apiKey, db });
 
 const polygon = new PolygonClient({ apiKey: config.polygon.apiKey, baseUrl: config.polygon.baseUrl });
 const claude = new ClaudeSignals(config);
@@ -163,9 +168,47 @@ const server = createServer(async (request, response) => {
         polygon: polygon.available,
         alchemy: alchemy.available,
         cryptoapis: cryptoapis.available,
+        orchestrator: orchestrator.isRunning,
+        copyTrading: copy.available,
         claude: claude.available,
         images: images_.available,
       });
+    }
+
+    // Оркестраторът: всички роботи будни, без някой да гледа екрана.
+    //   GET  /api/orchestrator        - какво прави в момента
+    //   POST /api/orchestrator/start  - пускане
+    //   POST /api/orchestrator/stop   - спиране
+    if (segments[0] === 'api' && segments[1] === 'orchestrator') {
+      if (request.method === 'POST' && segments[2] === 'start') {
+        orchestrator.start();
+        return send(response, 200, orchestrator.snapshot());
+      }
+      if (request.method === 'POST' && segments[2] === 'stop') {
+        orchestrator.stop();
+        return send(response, 200, orchestrator.snapshot());
+      }
+      if (!segments[2]) return send(response, 200, orchestrator.snapshot());
+    }
+
+    // Копиране на едри играчи.
+    //   GET  /api/whales          - следени адреси
+    //   POST /api/whales          - добавяне {address, chain, label}
+    //   GET  /api/whales/moves    - какво са направили от последната проверка
+    if (segments[0] === 'api' && segments[1] === 'whales') {
+      if (!copy.available) {
+        return send(response, 400, { error: 'NO_KEY', message: 'няма ALCHEMY_API_KEY в engine/.env' });
+      }
+      if (segments[2] === 'moves') {
+        const moves = await copy.poll();
+        return send(response, 200, { moves, count: moves.length, at: new Date().toISOString() });
+      }
+      if (request.method === 'POST') {
+        const body = await readBody(request);
+        const result = await copy.addWallet(body as never);
+        return send(response, result.ok ? 200 : 400, result);
+      }
+      return send(response, 200, { wallets: await copy.wallets() });
     }
 
     // GET /api/balance - спот салдото по ключа

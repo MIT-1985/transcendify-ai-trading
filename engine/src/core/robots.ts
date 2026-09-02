@@ -37,7 +37,7 @@ export type EntryStyle = 'limit' | 'market';
  * на друга в същата секунда, а тук борсата е една. С един OKX това е реклама
  * за нещо, което няма как да се случи, затова мястото ѝ заема `steady`.
  */
-export type Strategy = 'scalp' | 'momentum' | 'swing' | 'grid' | 'dca' | 'steady';
+export type Strategy = 'scalp' | 'momentum' | 'swing' | 'grid' | 'dca' | 'steady' | 'copy';
 
 /** Стълбата на "Мрежа": стъпка и брой нива. */
 export interface GridParams {
@@ -150,6 +150,26 @@ export const ROBOTS: RobotProfile[] = [
     dca: { intervalHours: 6, maxEntries: 8 },
     trokTargets: { risk: 0.25, cost: 0.20, edge: 0.70, exposure: 0.90 },
     gates: { minVolumeUsd: 20_000_000, spreadBudgetOfStop: 0.10, minDailyRangePct: 0.3, minTickScore: 5,  maxRsi: 80, requireMacro: true },
+  },
+  {
+    id: 'shadow',
+    name: 'Сянка',
+    strategy: 'copy',
+    priceUsd: 199,
+    pairs: PAIRS,
+    summary:
+      'Следи едри портфейли по веригата и влиза след тях. Не гадае посоката - ' +
+      'чака някой с повече пари да я е избрал. Две неща, които трябва да знаеш: ' +
+      'винаги влиза СЛЕД тях, тоест на по-лоша цена, и влязъл токен не значи ' +
+      'непременно покупка. Затова сигналът минава през същите порти като всеки ' +
+      'друг робот - чужда сделка не отменя сметката.',
+    stopDistancePct: 0.03,
+    rewardRiskRatio: 2,
+    entry: 'limit',
+    maxConcurrent: 3,
+    cooldownMinutes: 30,
+    gates: { minVolumeUsd: 10_000_000, spreadBudgetOfStop: 0.15, minDailyRangePct: 0.5, minTickScore: 5, maxRsi: 80, requireMacro: false },
+    trokTargets: { risk: 0.35, cost: 0.25, edge: 0.80, exposure: 0.60 },
   },
   {
     id: 'steady',
