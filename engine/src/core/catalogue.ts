@@ -12,6 +12,7 @@ import {
   fetchOkxTicker, fetchOkxCandles, fetchOkxTrades, analyzeMicroTick,
   calcEMA, calcRSI, type Candle,
 } from '../../shared/microMarketData.ts';
+import { evaluateOne, type Gate } from './scanner.ts';
 import type { EngineConfig } from '../config.ts';
 import type { Database } from '../store/db.ts';
 
@@ -107,6 +108,9 @@ export interface RobotMarketView {
   indicators: { ema9: number | null; ema21: number | null; rsi14: number | null };
   tick: { direction: string; buyPressurePercent: number; tickScore: number; tradeCount: number };
   verdict: { action: 'BUY' | 'WAIT' | 'AVOID'; reason: string };
+  /** Осемте порти за тази двойка - същите, по които съди и сканирането. */
+  gates: Gate[];
+  blockedBy: string | null;
   trades: Array<Record<string, unknown>>;
   dataAt: string;
 }
@@ -121,16 +125,21 @@ export async function robotMarket(
   db: Database,
   robotId: string,
   pair?: string,
+  polygonApiKey = '',
 ): Promise<RobotMarketView | { error: string }> {
   const p = robotById(robotId);
   if (!p) return { error: `няма робот "${robotId}"` };
-  const instId = pair && p.pairs.includes(pair) ? pair : p.pairs[0]!;
+  // Двойката вече не е ограничена до трите по подразбиране: сканирането
+  // предлага от целия OKX и екранът трябва да може да покаже избраното.
+  // Образецът е за безопасност - името идва от адрес, тоест отвън.
+  const instId = pair && /^[A-Z0-9]{2,12}-USDT$/.test(pair) ? pair : p.pairs[0]!;
   const bar = barFor(p);
 
-  const [ticker, candles, trades] = await Promise.all([
+  const [ticker, candles, trades, verdictRow] = await Promise.all([
     fetchOkxTicker(instId),
     fetchOkxCandles(instId, bar, 200),
     fetchOkxTrades(instId, 200),
+    evaluateOne(robotId, instId, polygonApiKey),
   ]);
 
   if (!ticker || candles.length < 30) {
@@ -165,7 +174,11 @@ export async function robotMarket(
       tickScore: tick.tickScore,
       tradeCount: tick.tradeCount,
     },
-    verdict: verdictFor(p, ticker.spreadPct, ema9, ema21, rsi14, tick.tickScore),
+    verdict: 'error' in verdictRow
+      ? { action: 'WAIT' as const, reason: verdictRow.error }
+      : { action: verdictRow.verdict, reason: verdictRow.reason },
+    gates: 'error' in verdictRow ? [] : verdictRow.gates,
+    blockedBy: 'error' in verdictRow ? null : verdictRow.blockedBy,
     trades: myTrades.filter((t) => !t.botId || t.botId === p.id),
     dataAt: new Date().toISOString(),
   };
@@ -183,36 +196,4 @@ function barFor(p: RobotProfile): string {
   }
 }
 
-/**
- * Какво би направил роботът сега.
- *
- * AVOID при широк спред е първата проверка, не последната: при стоп от 0.3%
- * спред от 0.1% изяжда третина от целта, преди пазарът да е помръднал. Никакъв
- * сигнал не поправя скъп вход.
- */
-function verdictFor(
-  p: RobotProfile,
-  spreadPct: number,
-  ema9: number | null,
-  ema21: number | null,
-  rsi14: number | null,
-  tickScore: number,
-): { action: 'BUY' | 'WAIT' | 'AVOID'; reason: string } {
-  const spreadBudget = p.stopDistancePct * 100 * 0.2;
-  if (spreadPct > spreadBudget) {
-    return { action: 'AVOID', reason: `спред ${spreadPct.toFixed(3)}% при таван ${spreadBudget.toFixed(3)}% за този робот` };
-  }
-  if (ema9 === null || ema21 === null || rsi14 === null) {
-    return { action: 'WAIT', reason: 'недостатъчно свещи за индикаторите' };
-  }
-  if (ema9 <= ema21) {
-    return { action: 'WAIT', reason: `EMA9 под EMA21 - посоката не е в полза на вход` };
-  }
-  if (rsi14 > 75) {
-    return { action: 'WAIT', reason: `RSI ${rsi14} - купено е твърде високо` };
-  }
-  if (tickScore < 12) {
-    return { action: 'WAIT', reason: `натискът на купувачите е слаб (${tickScore}/25)` };
-  }
-  return { action: 'BUY', reason: `EMA9 над EMA21, RSI ${rsi14}, натиск ${tickScore}/25, спред ${spreadPct.toFixed(3)}%` };
-}
+

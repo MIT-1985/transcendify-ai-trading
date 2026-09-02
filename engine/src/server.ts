@@ -18,6 +18,7 @@ import { LlmGateway } from './ai/llm.ts';
 import { GoogleImageClient, mimeForExtension } from './ai/images.ts';
 import { bus, type BotEvent } from './core/eventBus.js';
 import { catalogue, buyRobot, robotMarket } from './core/catalogue.ts';
+import { scanFor } from './core/scanner.ts';
 
 /**
  * Локалният сървър - това, което фронтендът вика вместо облака на платформата.
@@ -165,8 +166,15 @@ const server = createServer(async (request, response) => {
         return send(response, result.ok ? 200 : 404, result);
       }
 
+      // GET /api/robots/:id/scan - къде би търгувал този робот сега
+      if (segments[3] === 'scan') {
+        const depth = Number(url.searchParams.get('depth') ?? 8);
+        const result = await scanFor(id, config.polygon.apiKey, Math.max(1, Math.min(20, depth)));
+        return send(response, 'error' in result ? 502 : 200, result);
+      }
+
       if (segments[3] === 'market') {
-        const view = await robotMarket(db, id, url.searchParams.get('pair') ?? undefined);
+        const view = await robotMarket(db, id, url.searchParams.get('pair') ?? undefined, config.polygon.apiKey);
         return send(response, 'error' in view ? 502 : 200, view);
       }
     }

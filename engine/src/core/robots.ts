@@ -55,6 +55,33 @@ export interface DcaParams {
   maxEntries: number;
 }
 
+/**
+ * Портите на робота.
+ *
+ * Всяка сделка минава през верига от проверки и ВСЯКА трябва да пусне. Това е
+ * разликата между роботите: не различни индикатори, а различно строги порти на
+ * едни и същи места. Скалпърът иска силен натиск и тесен спред, но приема
+ * плитка книга; суингът иска дълбока книга и потвърждение от дневната графика,
+ * но му е все едно какъв е натискът в последните двеста сделки.
+ *
+ * Когато порта спре сделка, се записва КОЯ - иначе "роботът не търгува" е
+ * необяснимо и изглежда като повреда.
+ */
+export interface GateConfig {
+  /** Под този оборот книгата е твърде тънка. */
+  minVolumeUsd: number;
+  /** Каква част от разстоянието до стопа може да отиде за спред. */
+  spreadBudgetOfStop: number;
+  /** Под това движение за 24ч двойката е закотвена - само такси. */
+  minDailyRangePct: number;
+  /** Натиск на купувачите, 0-25. */
+  minTickScore: number;
+  /** Над това е купено твърде високо. */
+  maxRsi: number;
+  /** Трябва ли Polygon да потвърди посоката, когато има данни за двойката. */
+  requireMacro: boolean;
+}
+
 export interface RobotProfile {
   id: string;
   name: string;
@@ -77,6 +104,7 @@ export interface RobotProfile {
   trokLimits?: Partial<TrokLimits>;
   grid?: GridParams;
   dca?: DcaParams;
+  gates: GateConfig;
 }
 
 /** Трите двойки, които двигателят покрива. Не е "всички пазари" - това е истината. */
@@ -101,6 +129,7 @@ export const ROBOTS: RobotProfile[] = [
     maxConcurrent: 1,
     cooldownMinutes: 240,
     trokTargets: { risk: 0.20, cost: 0.20, edge: 0.85, exposure: 0.30 },
+    gates: { minVolumeUsd: 25_000_000, spreadBudgetOfStop: 0.20, minDailyRangePct: 0.5, minTickScore: 10, maxRsi: 72, requireMacro: true },
   },
   {
     id: 'ladder',
@@ -120,6 +149,7 @@ export const ROBOTS: RobotProfile[] = [
     cooldownMinutes: 360,
     dca: { intervalHours: 6, maxEntries: 8 },
     trokTargets: { risk: 0.25, cost: 0.20, edge: 0.70, exposure: 0.90 },
+    gates: { minVolumeUsd: 20_000_000, spreadBudgetOfStop: 0.10, minDailyRangePct: 0.3, minTickScore: 5,  maxRsi: 80, requireMacro: true },
   },
   {
     id: 'steady',
@@ -136,6 +166,7 @@ export const ROBOTS: RobotProfile[] = [
     maxConcurrent: 2,
     cooldownMinutes: 60,
     trokTargets: { risk: 0.30, cost: 0.25, edge: 0.90, exposure: 0.50 },
+    gates: { minVolumeUsd: 15_000_000, spreadBudgetOfStop: 0.20, minDailyRangePct: 0.5, minTickScore: 12, maxRsi: 75, requireMacro: true },
   },
   {
     id: 'momentum',
@@ -152,6 +183,7 @@ export const ROBOTS: RobotProfile[] = [
     maxConcurrent: 3,
     cooldownMinutes: 15,
     trokTargets: { risk: 0.40, cost: 0.30, edge: 0.90, exposure: 0.60 },
+    gates: { minVolumeUsd: 10_000_000, spreadBudgetOfStop: 0.20, minDailyRangePct: 1.0, minTickScore: 15, maxRsi: 78, requireMacro: false },
   },
   {
     id: 'grid',
@@ -172,6 +204,7 @@ export const ROBOTS: RobotProfile[] = [
     cooldownMinutes: 0,
     grid: { rungSpacingPct: 0.005, rungs: 5 },
     trokTargets: { risk: 0.35, cost: 0.20, edge: 0.75, exposure: 0.80 },
+    gates: { minVolumeUsd: 15_000_000, spreadBudgetOfStop: 0.15, minDailyRangePct: 1.5, minTickScore: 5,  maxRsi: 85, requireMacro: false },
   },
   {
     id: 'sprinter',
@@ -189,6 +222,7 @@ export const ROBOTS: RobotProfile[] = [
     maxConcurrent: 2,
     cooldownMinutes: 5,
     trokTargets: { risk: 0.50, cost: 0.35, edge: 0.95, exposure: 0.70 },
+    gates: { minVolumeUsd: 5_000_000,  spreadBudgetOfStop: 0.15, minDailyRangePct: 0.5, minTickScore: 18, maxRsi: 80, requireMacro: false },
   },
 ];
 

@@ -35,6 +35,8 @@ export default function BotDashboard() {
   const [pair, setPair] = useState(null);
   const [market, setMarket] = useState(null);
   const [loadingMarket, setLoadingMarket] = useState(false);
+  const [scan, setScan] = useState(null);
+  const [scanning, setScanning] = useState(false);
   const [buying, setBuying] = useState(null);
 
   const loadCatalogue = useCallback(() => {
@@ -48,6 +50,28 @@ export default function BotDashboard() {
 
   // Пазарът се пита при отваряне и после на всеки 15 секунди. Не по-често:
   // OKX ограничава, а свещ от една минута не се променя десет пъти в минутата.
+  useEffect(() => {
+    if (!openId) return;
+    let alive = true;
+    setScan(null);
+    setScanning(true);
+    fetch(`${API}/api/robots/${openId}/scan`)
+      .then(r => r.json())
+      .then(d => {
+        if (!alive) return;
+        setScan(d);
+        // Панелът се отваря на двойката, която РОБОТЪТ е избрал, не на първата
+        // от списъка му по подразбиране. Иначе горе стои BTC с "ЧАКА", а
+        // долу най-отгоре свети UNI с "ВХОД" - две присъди за различни двойки,
+        // които изглеждат като противоречие.
+        const pick = d?.best?.instId ?? d?.candidates?.[0]?.instId;
+        if (pick) setPair(pick);
+      })
+      .catch(() => { if (alive) setScan({ error: 'сканирането не мина' }); })
+      .finally(() => { if (alive) setScanning(false); });
+    return () => { alive = false; };
+  }, [openId]);
+
   useEffect(() => {
     if (!openId) return;
     let alive = true;
@@ -169,7 +193,7 @@ export default function BotDashboard() {
           Процентът „нула при“ е сметнат с таксите на OKX — под него роботът губи пари, колкото и добре да изглежда.
         </div>
 
-        {open && <MarketPanel robot={open} market={market} loading={loadingMarket} pair={pair} onPair={setPair} />}
+        {open && <MarketPanel robot={open} market={market} loading={loadingMarket} pair={pair} onPair={setPair} scan={scan} scanning={scanning} />}
       </div>
     </div>
   );
@@ -193,7 +217,7 @@ function Stat({ k, v }) {
 }
 
 /** Данните, графиката и сделките — точно в този ред, защото така се гледа. */
-function MarketPanel({ robot, market, loading, pair, onPair }) {
+function MarketPanel({ robot, market, loading, pair, onPair, scan, scanning }) {
   if (!market) {
     return <div className="mt-8 text-slate-500 text-sm">зарежда пазара за {robot.name}…</div>;
   }
@@ -230,17 +254,11 @@ function MarketPanel({ robot, market, loading, pair, onPair }) {
           </div>
         </div>
 
-        <div className="flex gap-1">
-          {robot.pairs.map(p => (
-            <button
-              key={p}
-              onClick={() => onPair(p)}
-              className={`text-xs px-3 py-1.5 rounded border ${
-                (pair ?? market.pair) === p
-                  ? 'border-sky-500/60 bg-sky-500/10 text-sky-300'
-                  : 'border-slate-800 text-slate-400 hover:border-slate-700'}`}
-            >{p.replace('-USDT', '')}</button>
-          ))}
+        <div className="text-right text-xs text-slate-500">
+          {scanning ? 'претърсва пазара…'
+            : scan && !scan.error
+              ? <>претърсени <span className="text-slate-300">{scan.universe.total}</span> двойки · остават <span className="text-slate-300">{scan.universe.moving}</span></>
+              : null}
         </div>
       </div>
 
@@ -248,6 +266,8 @@ function MarketPanel({ robot, market, loading, pair, onPair }) {
         <span className="font-semibold text-sm">{v.text}</span>
         <span className="text-sm opacity-90">{market.verdict.reason}</span>
       </div>
+
+      <ScanList scan={scan} scanning={scanning} current={market.pair} onPick={onPair} />
 
       <div className="h-72 mt-6">
         <ResponsiveContainer width="100%" height="100%">
@@ -326,6 +346,129 @@ function MarketPanel({ robot, market, loading, pair, onPair }) {
         Данни от OKX, {new Date(market.dataAt).toLocaleTimeString('bg-BG')}. Обновяват се на 15 секунди.
       </p>
     </section>
+  );
+}
+
+/**
+ * Осемте порти.
+ *
+ * Заменя трите неподвижни бутона BTC/ETH/SOL. Те не бяха избор на робота, а
+ * избор вместо него - човекът посочваше двойка, роботът само казваше мнение
+ * за посоченото.
+ *
+ * Показва се и КОЯ порта е спряла всяка двойка. Това е обратното на обичайното:
+ * другите показват само сделките, които са станали, и мълчат за отказите.
+ * Отказът е също решение и струва толкова, колкото и входът.
+ */
+function ScanList({ scan, scanning, current, onPick }) {
+  const [openRow, setOpenRow] = useState(null);
+
+  if (scanning) return <p className="text-sm text-slate-500 mt-6">претърсва OKX…</p>;
+  if (!scan) return null;
+  if (scan.error) return <p className="text-sm text-rose-400 mt-6">{scan.error}</p>;
+
+  const u = scan.universe;
+  const g = scan.gateConfig;
+
+  return (
+    <div className="mt-8">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h3 className="text-sm text-slate-300 font-medium">Къде би търгувал</h3>
+        <span className="text-xs text-slate-500">
+          {u.total} SPOT → {u.usdt} с USDT → {u.liquid} ликвидни → {u.affordable} по спред → {u.moving} мърдащи
+        </span>
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+        <Chip>оборот ≥ ${Math.round(g.minVolumeUsd / 1e6)}M</Chip>
+        <Chip>спред ≤ {g.spreadBudgetPct}%</Chip>
+        <Chip>движение ≥ {g.minDailyRangePct}%</Chip>
+        <Chip>натиск ≥ {g.minTickScore}/25</Chip>
+        <Chip>RSI ≤ {g.maxRsi}</Chip>
+        <Chip warn={g.requireMacro && !scan.polygon}>
+          {g.requireMacro ? (scan.polygon ? 'макро: задължително' : 'макро: задължително · няма ключ') : 'макро: не се изисква'}
+        </Chip>
+      </div>
+
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full text-sm min-w-[680px]">
+          <thead className="text-slate-500 text-xs">
+            <tr className="text-left">
+              <th className="py-2 pr-4">двойка</th><th className="pr-4">оценка</th>
+              <th className="pr-4">присъда</th><th className="pr-4">спрян от</th>
+              <th className="pr-4">оборот</th><th className="pr-4">24ч</th>
+              <th>източници</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scan.candidates.map(c => {
+              const v = VERDICT[c.verdict] ?? VERDICT.WAIT;
+              const isOpen = openRow === c.instId;
+              return (
+                <React.Fragment key={c.instId}>
+                  <tr
+                    onClick={() => { setOpenRow(isOpen ? null : c.instId); onPick(c.instId); }}
+                    className={`border-t border-slate-800/70 cursor-pointer transition-colors ${
+                      c.instId === current ? 'bg-sky-500/5' : 'hover:bg-slate-800/30'}`}
+                  >
+                    <td className={`py-2 pr-4 ${c.instId === current ? 'text-sky-300' : 'text-slate-200'}`}>
+                      {c.instId.replace('-USDT', '')}
+                    </td>
+                    <td className="pr-4 text-slate-300 font-medium">{c.score}</td>
+                    <td className="pr-4">
+                      <span className={`text-[11px] px-2 py-0.5 rounded border ${v.cls}`}>{v.text}</span>
+                    </td>
+                    <td className="pr-4 text-slate-400 text-xs">{c.blockedBy ?? '—'}</td>
+                    <td className="pr-4 text-slate-400">${Math.round(c.volumeUsd / 1e6)}M</td>
+                    <td className={`pr-4 ${c.change24hPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {c.change24hPct >= 0 ? '+' : ''}{c.change24hPct}%
+                    </td>
+                    <td className="text-slate-500 text-xs">{c.sources.join(' + ')}</td>
+                  </tr>
+                  {isOpen && (
+                    <tr className="bg-slate-950/60">
+                      <td colSpan={7} className="px-3 py-3">
+                        <div className="grid gap-1.5 sm:grid-cols-2">
+                          {c.gates.map(x => (
+                            <div key={x.name} className="flex items-start gap-2 text-xs">
+                              <span className={
+                                x.passed === true ? 'text-emerald-400'
+                                  : x.passed === false ? 'text-rose-400' : 'text-slate-600'}>
+                                {x.passed === true ? '✓' : x.passed === false ? '✗' : '·'}
+                              </span>
+                              <div>
+                                <span className="text-slate-300">{x.label}</span>{' '}
+                                <span className="text-slate-400">{x.value}</span>
+                                <span className="text-slate-600"> · {x.threshold}</span>
+                                {x.note && <div className="text-slate-600">{x.note}</div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-xs text-slate-500 mt-2">
+        {scan.best
+          ? <>Избор сега: <span className="text-emerald-300">{scan.best.instId}</span> — всичките осем порти минават.</>
+          : 'Нито една двойка не минава всичките осем порти. Роботът чака - това е решение, не повреда.'}
+      </p>
+    </div>
+  );
+}
+
+function Chip({ children, warn }) {
+  return (
+    <span className={`px-2 py-0.5 rounded border ${warn
+      ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+      : 'border-slate-800 text-slate-500'}`}>{children}</span>
   );
 }
 
