@@ -12,7 +12,7 @@ import {
   fetchOkxTicker, fetchOkxCandles, fetchOkxTrades, analyzeMicroTick,
   calcEMA, calcRSI, type Candle,
 } from '../../shared/microMarketData.ts';
-import { evaluateOne, type Gate } from './scanner.ts';
+import { evaluateOne, type DataSources, type Gate } from './scanner.ts';
 import type { EngineConfig } from '../config.ts';
 import type { Database } from '../store/db.ts';
 
@@ -125,7 +125,7 @@ export async function robotMarket(
   db: Database,
   robotId: string,
   pair?: string,
-  polygonApiKey = '',
+  sources: DataSources = {},
 ): Promise<RobotMarketView | { error: string }> {
   const p = robotById(robotId);
   if (!p) return { error: `няма робот "${robotId}"` };
@@ -139,7 +139,7 @@ export async function robotMarket(
     fetchOkxTicker(instId),
     fetchOkxCandles(instId, bar, 200),
     fetchOkxTrades(instId, 200),
-    evaluateOne(robotId, instId, polygonApiKey),
+    evaluateOne(robotId, instId, sources),
   ]);
 
   if (!ticker || candles.length < 30) {

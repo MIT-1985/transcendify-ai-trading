@@ -114,6 +114,29 @@ export interface EngineConfig {
     apiKey?: string;
     baseUrl: string;
   };
+  /**
+   * Дневна история за макро портата.
+   *
+   * Polygon покрива само големите двойки (X:BTCUSD и подобни). Alchemy дава
+   * дневни цени и за алткойните, които скенерът реално намира - GRVT, HYPE,
+   * ENA. Затова са и двата: Polygon дава пълни свещи там, където ги има,
+   * Alchemy покрива останалото.
+   */
+  alchemy: {
+    apiKey?: string;
+    baseUrl: string;
+  };
+  /**
+   * Независима цена за проверка.
+   *
+   * Дава само текуща стойност, не история - затова не става за макро, но
+   * става за това, за което е сложен: да се хване, ако потокът на OKX е
+   * заседнал или крив, преди роботът да търгува по грешна цена.
+   */
+  cryptoapis: {
+    apiKey?: string;
+    baseUrl: string;
+  };
   anthropic: {
     apiKey?: string;
     model: string;
@@ -189,6 +212,14 @@ export function loadConfig(env: Env = process.env): EngineConfig {
     polygon: {
       apiKey: env.POLYGON_API_KEY,
       baseUrl: env.POLYGON_BASE_URL ?? 'https://api.polygon.io',
+    },
+    alchemy: {
+      apiKey: env.ALCHEMY_API_KEY,
+      baseUrl: env.ALCHEMY_BASE_URL ?? 'https://api.g.alchemy.com',
+    },
+    cryptoapis: {
+      apiKey: env.CRYPTOAPIS_API_KEY,
+      baseUrl: env.CRYPTOAPIS_BASE_URL ?? 'https://rest.cryptoapis.io',
     },
     anthropic: {
       apiKey: env.ANTHROPIC_API_KEY,

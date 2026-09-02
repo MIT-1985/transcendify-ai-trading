@@ -19,7 +19,9 @@ import { LlmGateway } from './ai/llm.ts';
 import { GoogleImageClient, mimeForExtension } from './ai/images.ts';
 import { bus, type BotEvent } from './core/eventBus.js';
 import { catalogue, buyRobot, robotMarket } from './core/catalogue.ts';
-import { scanFor } from './core/scanner.ts';
+import { scanFor, type DataSources } from './core/scanner.ts';
+import { AlchemyClient } from './market/alchemy.ts';
+import { CryptoApisClient } from './market/cryptoapis.ts';
 
 /**
  * Локалният сървър - това, което фронтендът вика вместо облака на платформата.
@@ -58,6 +60,12 @@ const okx = new OkxClient({
   baseUrl: config.okx.baseUrl,
   demo: config.okx.demo,
 });
+// Alchemy покрива дневната история за всички двойки, които скенерът намира.
+// CryptoAPIs е за внасяне на пари, не за пазарни данни.
+const alchemy = new AlchemyClient({ apiKey: config.alchemy.apiKey, baseUrl: config.alchemy.baseUrl });
+const cryptoapis = new CryptoApisClient({ apiKey: config.cryptoapis.apiKey, baseUrl: config.cryptoapis.baseUrl });
+const dataSources: DataSources = { polygonApiKey: config.polygon.apiKey, alchemy };
+
 const polygon = new PolygonClient({ apiKey: config.polygon.apiKey, baseUrl: config.polygon.baseUrl });
 const claude = new ClaudeSignals(config);
 const engine = new TradingEngine(config, db, okx, polygon, claude);
@@ -153,6 +161,8 @@ const server = createServer(async (request, response) => {
         realOrdersAllowed: config.allowRealOrders,
         okx: okx.authenticated,
         polygon: polygon.available,
+        alchemy: alchemy.available,
+        cryptoapis: cryptoapis.available,
         claude: claude.available,
         images: images_.available,
       });
@@ -230,12 +240,12 @@ const server = createServer(async (request, response) => {
       // GET /api/robots/:id/scan - къде би търгувал този робот сега
       if (segments[3] === 'scan') {
         const depth = Number(url.searchParams.get('depth') ?? 8);
-        const result = await scanFor(id, config.polygon.apiKey, Math.max(1, Math.min(20, depth)));
+        const result = await scanFor(id, dataSources, Math.max(1, Math.min(20, depth)));
         return send(response, 'error' in result ? 502 : 200, result);
       }
 
       if (segments[3] === 'market') {
-        const view = await robotMarket(db, id, url.searchParams.get('pair') ?? undefined, config.polygon.apiKey);
+        const view = await robotMarket(db, id, url.searchParams.get('pair') ?? undefined, dataSources);
         return send(response, 'error' in view ? 502 : 200, view);
       }
     }

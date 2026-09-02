@@ -14,7 +14,7 @@
  * Решението минава през ОСЕМ порти и всяка трябва да пусне:
  *
  *   ликвидност → спред → движение → икономика →
- *   тренд (OKX) → сила (RSI) → натиск (тик) → макро (Polygon)
+ *   тренд (OKX) → сила (RSI) → натиск (тик) → макро (дневна история)
  *
  * Портите са едни и същи за всички роботи; праговете НЕ са. Точно това ги
  * прави различни: Спринтьорът иска натиск 18/25 и се задоволява с $5M книга;
@@ -25,7 +25,7 @@
  * 0.6% цел струва 0.65% разходи, е губеща по устройство и никакъв сигнал не я
  * поправя.
  *
- * Макрото е втори НЕЗАВИСИМ източник - Polygon, не OKX. Липсата на данни от
+ * Макрото е втори НЕЗАВИСИМ източник - Alchemy или Polygon, не OKX. Липсата на данни от
  * него не се брои за минаване: липса на потвърждение и потвърждение са
  * различни неща. Затова роботите с requireMacro търгуват само там, където и
  * двата източника говорят - обикновено големите двойки.
@@ -34,10 +34,23 @@
  * не търгува" изглежда като повреда.
  */
 import { robotById, type RobotProfile } from './robots.ts';
+import { AlchemyClient } from '../market/alchemy.ts';
 import {
   fetchOkxCandles, fetchOkxTrades, analyzeMicroTick, calcEMA, calcRSI,
   fetchPolygonDaily, analyzePolygonMacro,
 } from '../../shared/microMarketData.ts';
+
+/**
+ * Източниците за дневната история.
+ *
+ * Alchemy е основният: измерено на четиринайсет символа, връща по 30-31 дневни
+ * точки за ВСИЧКИ, включително GRVT, HYPE и ENA. Polygon дава пълни свещи с
+ * обем, но само за големите двойки - затова остава, но втори.
+ */
+export interface DataSources {
+  polygonApiKey?: string;
+  alchemy?: AlchemyClient;
+}
 
 const OKX_TICKERS = 'https://www.okx.com/api/v5/market/tickers?instType=SPOT';
 
@@ -80,6 +93,7 @@ export interface ScanResult {
   candidates: Candidate[];
   best: Candidate | null;
   polygon: boolean;
+  alchemy: boolean;
   scannedAt: string;
 }
 
@@ -114,7 +128,7 @@ export function spreadBudgetFor(p: RobotProfile): number {
 
 export async function scanFor(
   robotId: string,
-  polygonApiKey = '',
+  sources: DataSources = {},
   depth = 10,
 ): Promise<ScanResult | { error: string }> {
   const p = robotById(robotId);
@@ -136,7 +150,7 @@ export async function scanFor(
   const bar = barFor(p);
 
   const candidates = await Promise.all(
-    shortlist.map((t) => evaluate(p, t, bar, budget, polygonApiKey)),
+    shortlist.map((t) => evaluate(p, t, bar, budget, sources)),
   );
 
   candidates.sort((a, b) => b.score - a.score);
@@ -158,7 +172,8 @@ export async function scanFor(
     },
     candidates,
     best,
-    polygon: Boolean(polygonApiKey),
+    polygon: Boolean(sources.polygonApiKey),
+    alchemy: Boolean(sources.alchemy?.available),
     scannedAt: new Date().toISOString(),
   };
 }
@@ -175,7 +190,7 @@ export async function evaluate(
   t: RawTicker,
   bar: string,
   budget: number,
-  polygonApiKey: string,
+  sources: DataSources,
 ): Promise<Candidate> {
   const g = p.gates;
   const [candles, trades] = await Promise.all([
@@ -189,9 +204,9 @@ export async function evaluate(
   const rsi = closes.length >= 30 ? calcRSI(closes, 14) : null;
   const tick = analyzeMicroTick(trades);
 
-  const sources = ['OKX'];
-  const { gate: macro, spoke } = await macroGate(p, t.instId, polygonApiKey);
-  if (spoke) sources.push('Polygon');
+  const sourceList = ['OKX'];
+  const { gate: macro, spoke, via } = await macroGate(p, t.instId, sources);
+  if (spoke && via) sourceList.push(via);
 
   // Икономиката: целта е stop × съотношение. От нея се плащат две такси и
   // един спред. Ако не остане нищо, двойката е губеща по устройство - и това
@@ -255,7 +270,7 @@ export async function evaluate(
     score: scoreOf(gates, rsi, tick.tickScore),
     rsi,
     tickScore: tick.tickScore,
-    sources,
+    sources: sourceList,
   };
 }
 
@@ -271,40 +286,64 @@ export async function evaluate(
 async function macroGate(
   p: RobotProfile,
   instId: string,
-  apiKey: string,
-): Promise<{ gate: Gate; spoke: boolean }> {
+  sources: DataSources,
+): Promise<{ gate: Gate; spoke: boolean; via: string | null }> {
   const base: Gate = {
-    name: 'macro', label: 'Макро (Polygon)', passed: null,
+    name: 'macro', label: 'Макро (дневна)', passed: null,
     value: '—', threshold: p.gates.requireMacro ? 'дневната посока да не противоречи' : 'не се изисква',
   };
   if (!p.gates.requireMacro) {
-    return { gate: { ...base, note: 'този робот съди само по OKX' }, spoke: false };
+    return { gate: { ...base, note: 'този робот съди само по OKX' }, spoke: false, via: null };
   }
-  if (!apiKey) {
+
+  // Polygon пръв - дава пълни свещи. Но покрива само големите двойки, затова
+  // Alchemy го догонва там, където мълчи: измерено, той връща по трийсет
+  // дневни точки и за GRVT, HYPE и ENA, каквито скенерът реално намира.
+  let closes: number[] = [];
+  let via: string | null = null;
+
+  if (sources.alchemy?.available) {
+    const points = await sources.alchemy.dailyCloses(instId, 30).catch(() => []);
+    if (points.length >= 21) {
+      closes = points.map((x) => x.close);
+      via = 'Alchemy';
+    }
+  }
+
+  // Polygon е резервата: пълни свещи, но само за големите двойки.
+  if (closes.length < 21 && sources.polygonApiKey) {
+    const daily = await fetchPolygonDaily(sources.polygonApiKey, instId).catch(() => []);
+    if (daily.length >= 21) {
+      closes = daily.map((b) => b.close);
+      via = 'Polygon';
+    }
+  }
+
+  if (closes.length < 21) {
+    const reason = !sources.polygonApiKey && !sources.alchemy?.available
+      ? 'няма източник за дневна история'
+      : `нито Polygon, нито Alchemy имат дневна история за ${instId}`;
     return {
-      gate: { ...base, passed: false, value: 'липсва POLYGON_API_KEY',
-        note: 'този робот иска втори източник и без ключ не влиза в сделка' },
-      spoke: false,
+      gate: { ...base, passed: false, value: reason,
+        note: 'този робот иска втори източник и без него не влиза в сделка' },
+      spoke: false, via: null,
     };
   }
 
-  const daily = await fetchPolygonDaily(apiKey, instId).catch(() => []);
-  if (daily.length < 21) {
-    return {
-      gate: { ...base, passed: false, value: `Polygon няма данни за ${instId}`,
-        note: 'Polygon покрива само големите двойки' },
-      spoke: false,
-    };
-  }
-  const macro = analyzePolygonMacro(daily, []);
+  // Посоката се смята от затварянията - Alchemy дава цена, не свещ, затова
+  // тук няма нищо, което да иска обхват или обем.
+  const bars = closes.map((close) => ({ ts: 0, open: close, high: close, low: close, close, vol: 0 }));
+  const macro = analyzePolygonMacro(bars, []);
+
   return {
     gate: {
       ...base,
+      label: `Макро (${via})`,
       passed: macro.dailyDirection !== 'BEARISH',
       value: macro.dailyDirection === 'BULLISH' ? 'дневна посока нагоре'
         : macro.dailyDirection === 'BEARISH' ? 'дневна посока надолу' : 'дневна посока встрани',
     },
-    spoke: true,
+    spoke: true, via,
   };
 }
 
@@ -349,7 +388,7 @@ function barFor(p: RobotProfile): string {
 export async function evaluateOne(
   robotId: string,
   instId: string,
-  polygonApiKey = '',
+  sources: DataSources = {},
 ): Promise<Candidate | { error: string }> {
   const p = robotById(robotId);
   if (!p) return { error: `няма робот "${robotId}"` };
@@ -358,7 +397,7 @@ export async function evaluateOne(
   const t = tickers.find((x) => x.instId === instId);
   if (!t) return { error: `OKX не познава ${instId}` };
 
-  return evaluate(p, t, barFor(p), spreadBudgetFor(p), polygonApiKey);
+  return evaluate(p, t, barFor(p), spreadBudgetFor(p), sources);
 }
 
 export { barFor };
