@@ -20,6 +20,14 @@
  * истината.
  */
 import { bus, type BotEvent } from './eventBus.ts';
+
+/**
+ * Име на текущата верига от порти.
+ *
+ * Сменя се РЪЧНО при всяка промяна в това кои порти спират сделка. Служи за
+ * едно: да може по-късно да се раздели кое е измерено с кой набор правила.
+ */
+const GATE_SET = 'trend-only-v1';
 import { robotById } from './robots.ts';
 import type { Orchestrator } from './orchestrator.ts';
 import type { Database } from '../store/db.ts';
@@ -38,6 +46,15 @@ export interface PaperPosition {
   outcome?: 'target' | 'stop';
   /** Нетен резултат в проценти, СЛЕД такси. */
   netPct?: number;
+  /**
+   * С коя верига от порти е взета сделката.
+   *
+   * Без него сравнението между два режима става на око - файлът се
+   * преименува, сървърът го връща от паметта и старите редове се смесват с
+   * новите. Точно това стана веднъж и две трети от "новите" числа бяха стари.
+   * Етикетът пътува със сделката и не може да се разпадне.
+   */
+  gateSet: string;
 }
 
 export class PaperRunner {
@@ -109,6 +126,7 @@ export class PaperRunner {
       stop: price * (1 - p.stopDistancePct),
       target: price * (1 + p.stopDistancePct * p.rewardRiskRatio),
       openedAt: new Date().toISOString(),
+      gateSet: GATE_SET,
     };
     this.open.set(key, position);
     this.orchestrator.setOpenCount(botId, [...this.open.values()].filter((x) => x.botId === botId).length);
