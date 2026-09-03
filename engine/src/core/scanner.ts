@@ -11,14 +11,21 @@
  *      1385 инструмента. Оттам отпадат неликвидните и скъпите.
  *   2. Само за оцелелите се теглят свещи и сделки и се смята присъда.
  *
- * Решението минава през ОСЕМ порти и всяка трябва да пусне:
+ * Решението минава през порти, но НЕ всяка има право да го спре.
  *
- *   ликвидност → спред → движение → икономика →
- *   тренд (OKX) → сила (RSI) → натиск (тик) → макро (дневна история)
+ * Първоначално всичките осем блокираха - "всички трябва да минат" звучи
+ * разумно. Измерено, не е: веригата се оказа по-лоша от най-силното си звено.
+ * При Стълба само трендът дава +19.7 точки над нулата, а трите заедно +12.7.
  *
- * Портите са едни и същи за всички роботи; праговете НЕ са. Точно това ги
- * прави различни: Спринтьорът иска натиск 18/25 и се задоволява с $5M книга;
- * Пазителят приема натиск 10/25, но иска $25M и потвърждение от Polygon.
+ * Затова портите са три вида:
+ *
+ *   СИГНАЛНА С ДОКАЗАТЕЛСТВО   тренд - единствената, която вдига процента
+ *   СТРУКТУРНИ                 ликвидност, спред, икономика, режим, TROK -
+ *                              спират невъзможното, не филтрират сигнал
+ *   БЕЗ ДОКАЗАТЕЛСТВО          RSI, движение, натиск, макро - видими, без вето
+ *
+ * Правилото е едно: порта без измерено доказателство не спира сделка.
+ * Липсата на доказателство не е одобрение.
  *
  * Portата "икономика" е тази, която другите нямат: тя проверява дали целта на
  * робота изобщо надживява таксите и спреда за ТАЗИ двойка. Двойка, на която
@@ -38,8 +45,7 @@ import { AlchemyClient } from '../market/alchemy.ts';
 import { activeAdjustment } from './marketRules.ts';
 import type { Trok } from './trok.ts';
 import {
-  fetchOkxCandles, fetchOkxTrades, analyzeMicroTick, calcEMA, calcRSI,
-  fetchPolygonDaily, analyzePolygonMacro,
+  fetchOkxCandles, calcEMA, calcRSI,
 } from '../../shared/microMarketData.ts';
 
 /**
@@ -69,9 +75,8 @@ export interface DataSources {
 const OKX_TICKERS = 'https://www.okx.com/api/v5/market/tickers?instType=SPOT';
 
 export type GateName =
-  | 'liquidity' | 'spread' | 'movement' | 'economics'
-  | 'trend' | 'strength' | 'pressure' | 'macro'
-  | 'regime' | 'trok';
+  | 'liquidity' | 'spread' | 'economics'
+  | 'trend' | 'regime' | 'trok';
 
 export interface Gate {
   name: GateName;
@@ -104,7 +109,6 @@ export interface Candidate {
   reason: string;
   score: number;
   rsi: number | null;
-  tickScore: number;
   /** Какъв размер избра TROK и защо. */
   size: { fraction: number; label: string; j: number } | null;
   /** Кои източници са говорили за тази двойка. */
@@ -114,7 +118,7 @@ export interface Candidate {
 export interface ScanResult {
   robot: { id: string; name: string; strategy: string; stopPct: number; bar: string };
   gateConfig: Record<string, number | boolean>;
-  universe: { total: number; usdt: number; liquid: number; affordable: number; moving: number };
+  universe: { total: number; usdt: number; liquid: number; affordable: number };
   candidates: Candidate[];
   best: Candidate | null;
   polygon: boolean;
@@ -172,9 +176,7 @@ export async function scanFor(
   const usdt = tickers.filter((t) => t.instId.endsWith('-USDT'));
   const liquid = usdt.filter((t) => t.volumeUsd >= g.minVolumeUsd);
   const affordable = liquid.filter((t) => t.spreadPct <= budget);
-  const moving = affordable.filter((t) => Math.abs(t.change24hPct) >= g.minDailyRangePct);
-
-  const shortlist = moving.sort((a, b) => b.volumeUsd - a.volumeUsd).slice(0, depth);
+  const shortlist = affordable.sort((a, b) => b.volumeUsd - a.volumeUsd).slice(0, depth);
   const bar = barFor(p);
 
   const candidates = await Promise.all(
@@ -189,14 +191,10 @@ export async function scanFor(
     gateConfig: {
       minVolumeUsd: g.minVolumeUsd,
       spreadBudgetPct: Math.round(budget * 10000) / 10000,
-      minDailyRangePct: g.minDailyRangePct,
-      minTickScore: g.minTickScore,
-      maxRsi: g.maxRsi,
-      requireMacro: g.requireMacro,
     },
     universe: {
       total: tickers.length, usdt: usdt.length,
-      liquid: liquid.length, affordable: affordable.length, moving: moving.length,
+      liquid: liquid.length, affordable: affordable.length,
     },
     candidates,
     best,
@@ -221,20 +219,15 @@ export async function evaluate(
   sources: DataSources,
 ): Promise<Candidate> {
   const g = p.gates;
-  const [candles, trades] = await Promise.all([
-    fetchOkxCandles(t.instId, bar, 120).catch(() => []),
-    fetchOkxTrades(t.instId, 200).catch(() => []),
-  ]);
+  // Свещи и толкова. Сделките се теглеха само за портата "натиск", която е
+  // махната като недоказана - една заявка по-малко на двойка, тоест десет
+  // по-малко на минаване.
+  const candles = await fetchOkxCandles(t.instId, bar, 120).catch(() => []);
 
   const closes = candles.map((c) => c.close);
   const ema9 = closes.length >= 30 ? calcEMA(closes, 9) : null;
   const ema21 = closes.length >= 30 ? calcEMA(closes, 21) : null;
   const rsi = closes.length >= 30 ? calcRSI(closes, 14) : null;
-  const tick = analyzeMicroTick(trades);
-
-  const sourceList = ['OKX'];
-  const { gate: macro, spoke, via } = await macroGate(p, t.instId, sources);
-  if (spoke && via) sourceList.push(via);
 
   // Икономиката: целта е stop × съотношение. От нея се плащат две такси и
   // един спред. Ако не остане нищо, двойката е губеща по устройство - и това
@@ -256,16 +249,6 @@ export async function evaluate(
       name: 'spread', label: 'Спред', passed: t.spreadPct <= budget,
       value: `${t.spreadPct.toFixed(4)}%`, threshold: `≤ ${budget.toFixed(3)}%`,
       blocking: true,
-    },
-    {
-      // ИЗМЕРЕНА И ОСТАВЕНА БЕЗ ПРАВО НА ВЕТО.
-      //
-      // Върху десет двойки и шест робота движението не вдигна процента
-      // печеливши никъде. При Стълба веригата с него дава +12.7 точки над
-      // нулата, а само трендът - +19.7. Тоест добавянето му ВРЕДИ.
-      name: 'movement', label: 'Движение', passed: Math.abs(t.change24hPct) >= g.minDailyRangePct,
-      value: `${t.change24hPct.toFixed(2)}%`, threshold: `≥ ${g.minDailyRangePct}% за 24ч`,
-      blocking: false,
     },
     {
       // Структурна: двойка, на която целта не надживява таксите, е губеща по
@@ -292,25 +275,6 @@ export async function evaluate(
       // Стълба: 44.4% без порти → 54.3% само с тренда, +19.7 точки над нулата.
       blocking: true,
     },
-    {
-      // ИЗМЕРЕНА И ОСТАВЕНА БЕЗ ПРАВО НА ВЕТО.
-      // При Стълба сваля процента от 44.4% на 37.5%, тоест избира ПО-ЛОШИ
-      // входове. Числото остава на екрана, защото е полезно да се види.
-      name: 'strength', label: 'Сила (RSI)',
-      passed: rsi !== null ? rsi <= g.maxRsi : false,
-      value: rsi !== null ? String(rsi) : 'няма свещи', threshold: `≤ ${g.maxRsi}`,
-      blocking: false,
-    },
-    {
-      // НЕИЗМЕРЕНА: OKX не дава историческа книга със сделки, значи няма как
-      // да се провери назад. Оставена без вето по същото правило - порта без
-      // доказателство не спира сделка.
-      name: 'pressure', label: 'Натиск (тик)', passed: tick.tickScore >= g.minTickScore,
-      value: `${tick.tickScore}/25 · ${tick.buyPressurePercent}% купувачи`,
-      threshold: `≥ ${g.minTickScore}/25`,
-      blocking: false,
-    },
-    macro,
     regimeGate(),
   ];
 
@@ -330,7 +294,7 @@ export async function evaluate(
       riskNow: clamp01(volPct / (p.stopDistancePct * 100)),
       // Каква част от целта изяждат таксите и спредът.
       costRatio: clamp01(costPct / Math.max(targetPct, 1e-9)),
-      edgeNow: clamp01(scoreOf(gates, rsi, tick.tickScore) / 100),
+      edgeNow: clamp01(scoreOf(gates, rsi) / 100),
       exposureNow: clamp01((sources.openPositions ?? 0) / Math.max(p.maxConcurrent, 1)),
       instId: t.instId,
     });
@@ -363,89 +327,10 @@ export async function evaluate(
     blockedBy: blocked?.name ?? null,
     verdict,
     reason: blocked ? `${blocked.label}: ${blocked.value} при ${blocked.threshold}` : 'всички порти минават',
-    score: scoreOf(gates, rsi, tick.tickScore),
+    score: scoreOf(gates, rsi),
     rsi,
-    tickScore: tick.tickScore,
     size,
-    sources: sourceList,
-  };
-}
-
-/**
- * Втората независима гледна точка.
- *
- * Polygon покрива само големите двойки - за повечето алткойни няма нищо. Това
- * НЕ се брои за успешно преминаване: липсата на потвърждение и потвърждението
- * са различни неща. Затова портата връща null и роботите, които изискват
- * макро, спират дотук - те търгуват само там, където и двата източника
- * говорят.
- */
-async function macroGate(
-  p: RobotProfile,
-  instId: string,
-  sources: DataSources,
-): Promise<{ gate: Gate; spoke: boolean; via: string | null }> {
-  const base: Gate = {
-    name: 'macro', label: 'Макро (дневна)', passed: null,
-    value: '—', threshold: p.gates.requireMacro ? 'дневната посока да не противоречи' : 'не се изисква',
-    // Втори НЕЗАВИСИМ източник. Не е измерена назад - Polygon и Alchemy
-    // покриват само дневни затваряния, а роботите, които я изискват, работят
-    // на часова и по-дребна свещ. Оставя вето, защото не е сигнална порта, а
-    // проверка че двата източника изобщо се съгласяват за посоката.
-    blocking: p.gates.requireMacro,
-  };
-  if (!p.gates.requireMacro) {
-    return { gate: { ...base, note: 'този робот съди само по OKX' }, spoke: false, via: null };
-  }
-
-  // Polygon пръв - дава пълни свещи. Но покрива само големите двойки, затова
-  // Alchemy го догонва там, където мълчи: измерено, той връща по трийсет
-  // дневни точки и за GRVT, HYPE и ENA, каквито скенерът реално намира.
-  let closes: number[] = [];
-  let via: string | null = null;
-
-  if (sources.alchemy?.available) {
-    const points = await sources.alchemy.dailyCloses(instId, 30).catch(() => []);
-    if (points.length >= 21) {
-      closes = points.map((x) => x.close);
-      via = 'Alchemy';
-    }
-  }
-
-  // Polygon е резервата: пълни свещи, но само за големите двойки.
-  if (closes.length < 21 && sources.polygonApiKey) {
-    const daily = await fetchPolygonDaily(sources.polygonApiKey, instId).catch(() => []);
-    if (daily.length >= 21) {
-      closes = daily.map((b) => b.close);
-      via = 'Polygon';
-    }
-  }
-
-  if (closes.length < 21) {
-    const reason = !sources.polygonApiKey && !sources.alchemy?.available
-      ? 'няма източник за дневна история'
-      : `нито Polygon, нито Alchemy имат дневна история за ${instId}`;
-    return {
-      gate: { ...base, passed: false, value: reason,
-        note: 'този робот иска втори източник и без него не влиза в сделка' },
-      spoke: false, via: null,
-    };
-  }
-
-  // Посоката се смята от затварянията - Alchemy дава цена, не свещ, затова
-  // тук няма нищо, което да иска обхват или обем.
-  const bars = closes.map((close) => ({ ts: 0, open: close, high: close, low: close, close, vol: 0 }));
-  const macro = analyzePolygonMacro(bars, []);
-
-  return {
-    gate: {
-      ...base,
-      label: `Макро (${via})`,
-      passed: macro.dailyDirection !== 'BEARISH',
-      value: macro.dailyDirection === 'BULLISH' ? 'дневна посока нагоре'
-        : macro.dailyDirection === 'BEARISH' ? 'дневна посока надолу' : 'дневна посока встрани',
-    },
-    spoke: true, via,
+    sources: ['OKX'],
   };
 }
 
@@ -455,14 +340,16 @@ async function macroGate(
  * Казва коя двойка е по-близо до вход от коя, не колко ще се спечели. Затова
  * присъдата стои до нея - самò "82" би изглеждало като обещание.
  */
-function scoreOf(gates: Gate[], rsi: number | null, tickScore: number): number {
+function scoreOf(gates: Gate[], rsi: number | null): number {
   const applicable = gates.filter((x) => x.passed !== null);
   const passed = applicable.filter((x) => x.passed).length;
   const ratio = applicable.length > 0 ? passed / applicable.length : 0;
 
-  let score = ratio * 70;
-  if (rsi !== null) score += rsi > 45 && rsi < 65 ? 10 : 0;
-  score += Math.min(20, tickScore * 0.8);
+  // RSI остава ТУК, в подредбата, а не като порта. Измерването показа, че не
+  // бива да спира сделка - не че не носи никаква информация. Да подрежда е
+  // безобидно; да забранява не беше.
+  let score = ratio * 80;
+  if (rsi !== null) score += rsi > 45 && rsi < 65 ? 20 : 0;
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 

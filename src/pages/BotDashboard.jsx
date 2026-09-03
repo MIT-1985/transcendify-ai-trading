@@ -375,19 +375,18 @@ function ScanList({ scan, scanning, current, onPick }) {
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h3 className="text-sm text-slate-300 font-medium">Къде би търгувал</h3>
         <span className="text-xs text-slate-500">
-          {u.total} SPOT → {u.usdt} с USDT → {u.liquid} ликвидни → {u.affordable} по спред → {u.moving} мърдащи
+          {u.total} SPOT → {u.usdt} с USDT → {u.liquid} ликвидни → {u.affordable} по спред
         </span>
       </div>
 
+      {/* Само това, което спира сделка. Тук стояха и праговете за RSI,
+          движение, натиск и макро - изглеждаха като изисквания, а измерването
+          показа, че не помагат. Махнати са и от кода. */}
       <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-        <Chip>оборот ≥ ${Math.round(g.minVolumeUsd / 1e6)}M</Chip>
-        <Chip>спред ≤ {g.spreadBudgetPct}%</Chip>
-        <Chip>движение ≥ {g.minDailyRangePct}%</Chip>
-        <Chip>натиск ≥ {g.minTickScore}/25</Chip>
-        <Chip>RSI ≤ {g.maxRsi}</Chip>
-        <Chip warn={g.requireMacro && !scan.polygon}>
-          {g.requireMacro ? (scan.polygon ? 'макро: задължително' : 'макро: задължително · няма ключ') : 'макро: не се изисква'}
-        </Chip>
+        <Chip>спира при: оборот под ${Math.round(g.minVolumeUsd / 1e6)}M</Chip>
+        <Chip>спред над {g.spreadBudgetPct}%</Chip>
+        <Chip>цел под таксите</Chip>
+        <Chip>EMA9 под EMA21</Chip>
       </div>
 
       <div className="mt-3 overflow-x-auto">
@@ -437,7 +436,7 @@ function ScanList({ scan, scanning, current, onPick }) {
                                 {x.passed === true ? '✓' : x.passed === false ? '✗' : '·'}
                               </span>
                               <div>
-                                <span className="text-slate-300">{x.label}</span>{' '}
+                                <span className={x.blocking ? 'text-slate-300' : 'text-slate-500'}>{x.label}</span>{' '}
                                 <span className="text-slate-400">{x.value}</span>
                                 <span className="text-slate-600"> · {x.threshold}</span>
                                 {x.note && <div className="text-slate-600">{x.note}</div>}
@@ -457,18 +456,20 @@ function ScanList({ scan, scanning, current, onPick }) {
 
       <p className="text-xs text-slate-500 mt-2">
         {scan.best
-          ? <>Избор сега: <span className="text-emerald-300">{scan.best.instId}</span> — всичките осем порти минават.</>
-          : 'Нито една двойка не минава всичките осем порти. Роботът чака - това е решение, не повреда.'}
+          ? <>Избор сега: <span className="text-emerald-300">{scan.best.instId}</span> — нищо не я спира.</>
+          : 'Нито една двойка не минава. Роботът чака - това е решение, не повреда.'}
       </p>
     </div>
   );
 }
 
-function Chip({ children, warn }) {
+function Chip({ children, warn, muted }) {
   return (
     <span className={`px-2 py-0.5 rounded border ${warn
       ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-      : 'border-slate-800 text-slate-500'}`}>{children}</span>
+      : muted
+        ? 'border-transparent text-slate-600 italic'
+        : 'border-slate-800 text-slate-500'}`}>{children}</span>
   );
 }
 

@@ -13,8 +13,6 @@ test('всеки робот има порти', () => {
   for (const p of ROBOTS) {
     assert.ok(p.gates, `${p.name} няма порти`);
     assert.ok(p.gates.minVolumeUsd > 0, `${p.name} приема нулева ликвидност`);
-    assert.ok(p.gates.minTickScore >= 0 && p.gates.minTickScore <= 25, `${p.name}: натиск извън 0-25`);
-    assert.ok(p.gates.maxRsi > 50 && p.gates.maxRsi <= 100, `${p.name}: RSI таван извън смисъла`);
   }
 });
 
@@ -28,19 +26,6 @@ test('бюджетът за спред е част от стопа, не общ�
   for (const p of ROBOTS) {
     assert.ok(spreadBudgetFor(p) < p.stopDistancePct * 100, `${p.name}: спредът яде стопа`);
   }
-});
-
-test('бързият иска повече натиск от суинга', () => {
-  assert.ok(robotById('momentum')!.gates.minTickScore > robotById('guardian')!.gates.minTickScore,
-    'който държи позиция минути живее от натиска - трябва да иска повече');
-});
-
-test('търпеливите роботи искат втори източник, бързите - не', () => {
-  // Който държи позиция дни, има време да е прав по-бавно; който я държи
-  // минути, не може да чака дневна свещ от Polygon.
-  assert.equal(robotById('guardian')!.gates.requireMacro, true);
-  assert.equal(robotById('steady')!.gates.requireMacro, true);
-  assert.equal(robotById('momentum')!.gates.requireMacro, false);
 });
 
 test('никой робот не приема книга под 5 милиона', () => {
@@ -67,27 +52,32 @@ test('портите на шестте не са едни и същи', () => {
 });
 
 /**
- * Порта без доказателство не спира сделка.
+ * Кои порти изобщо съществуват.
  *
- * Измерено на десет двойки и шест робота: RSI и движението не вдигат
- * процента печеливши никъде, а при Стълба го СВАЛЯТ - веригата с тях дава
- * +12.7 точки над нулата, само трендът +19.7. Затова остават видими, но без
- * вето. Тестът пази това да не се върне по невнимание.
+ * Четири бяха махнати, след като измерването показа, че не помагат: RSI и
+ * движението свалят процента печеливши, натискът е неизмерим назад, а макрото
+ * не се задейства никога при половината роботи и вреди при другата.
+ *
+ * Тестът пази да не се върнат по навик. Всяка нова порта минава първо през
+ * scripts/measure-gate-value.ts.
  */
-test('само доказаните и структурните порти имат вето', async () => {
+test('веригата съдържа само доказаните и структурните порти', async () => {
   const { evaluate } = await import('../src/core/scanner.ts');
-  const p = robotById('steady')!;
   const candidate = await evaluate(
-    p,
+    robotById('steady')!,
     { instId: 'BTC-USDT', volumeUsd: 4e8, spreadPct: 0.001, change24hPct: 2, last: 77000 },
     '1H', 0.2, {},
   );
 
-  const byName = new Map(candidate.gates.map((g) => [g.name, g]));
-  assert.equal(byName.get('strength')?.blocking, false, 'RSI не бива да спира - измерено е, че вреди');
-  assert.equal(byName.get('movement')?.blocking, false, 'движението не бива да спира - измерено е, че вреди');
-  assert.equal(byName.get('pressure')?.blocking, false, 'натискът не е измерван назад - без вето');
-  assert.equal(byName.get('trend')?.blocking, true, 'трендът е единствената доказана сигнална порта');
-  assert.equal(byName.get('economics')?.blocking, true, 'икономиката е структурна');
-  assert.equal(byName.get('liquidity')?.blocking, true, 'ликвидността е структурна');
+  const names = new Set(candidate.gates.map((g) => g.name));
+  for (const gone of ['strength', 'movement', 'pressure', 'macro']) {
+    assert.ok(!names.has(gone as never), `${gone} е махната - не бива да се връща без измерване`);
+  }
+  for (const kept of ['liquidity', 'spread', 'economics', 'trend', 'regime']) {
+    assert.ok(names.has(kept as never), `${kept} липсва`);
+  }
+  // Всичко останало има вето - иначе не би трябвало да е тук.
+  for (const g of candidate.gates) {
+    assert.equal(g.blocking, true, `${g.name} стои във веригата без вето - или го получава, или се маха`);
+  }
 });

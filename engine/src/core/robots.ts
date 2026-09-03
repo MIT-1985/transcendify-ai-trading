@@ -73,11 +73,16 @@ export interface DcaParams {
 /**
  * Портите на робота.
  *
- * Всяка сделка минава през верига от проверки и ВСЯКА трябва да пусне. Това е
- * разликата между роботите: не различни индикатори, а различно строги порти на
- * едни и същи места. Скалпърът иска силен натиск и тесен спред, но приема
- * плитка книга; суингът иска дълбока книга и потвърждение от дневната графика,
- * но му е все едно какъв е натискът в последните двеста сделки.
+ * Тук останаха само двата прага, които наистина спират сделка. Имаше още
+ * четири - RSI, движение, натиск, макро - и всичките са махнати, след като
+ * измерването показа, че не помагат: RSI сваля процента печеливши при Стълба
+ * от 44.4% на 37.5%, движението не вдига никъде, натискът е неизмерим назад
+ * (OKX не дава историческа книга), а макрото при половината роботи не се
+ * задейства нито веднъж.
+ *
+ * Разликата между роботите вече не е в броя порти, а в свещта, стопа и целта.
+ * Това се оказа достатъчно: при Стълба само трендът дава +19.7 точки над
+ * нулата, а веригата от три порти - +12.7.
  *
  * Когато порта спре сделка, се записва КОЯ - иначе "роботът не търгува" е
  * необяснимо и изглежда като повреда.
@@ -87,14 +92,6 @@ export interface GateConfig {
   minVolumeUsd: number;
   /** Каква част от разстоянието до стопа може да отиде за спред. */
   spreadBudgetOfStop: number;
-  /** Под това движение за 24ч двойката е закотвена - само такси. */
-  minDailyRangePct: number;
-  /** Натиск на купувачите, 0-25. */
-  minTickScore: number;
-  /** Над това е купено твърде високо. */
-  maxRsi: number;
-  /** Трябва ли Polygon да потвърди посоката, когато има данни за двойката. */
-  requireMacro: boolean;
 }
 
 export interface RobotProfile {
@@ -144,7 +141,7 @@ export const ROBOTS: RobotProfile[] = [
     maxConcurrent: 1,
     cooldownMinutes: 240,
     trokTargets: { risk: 0.20, cost: 0.20, edge: 0.85, exposure: 0.30 },
-    gates: { minVolumeUsd: 25_000_000, spreadBudgetOfStop: 0.20, minDailyRangePct: 0.5, minTickScore: 10, maxRsi: 72, requireMacro: true },
+    gates: { minVolumeUsd: 25_000_000, spreadBudgetOfStop: 0.20 },
   },
   {
     id: 'ladder',
@@ -164,7 +161,7 @@ export const ROBOTS: RobotProfile[] = [
     cooldownMinutes: 360,
     dca: { intervalHours: 6, maxEntries: 8 },
     trokTargets: { risk: 0.25, cost: 0.20, edge: 0.70, exposure: 0.90 },
-    gates: { minVolumeUsd: 20_000_000, spreadBudgetOfStop: 0.10, minDailyRangePct: 0.3, minTickScore: 5,  maxRsi: 80, requireMacro: true },
+    gates: { minVolumeUsd: 20_000_000, spreadBudgetOfStop: 0.10 },
   },
   {
     id: 'shadow',
@@ -183,7 +180,7 @@ export const ROBOTS: RobotProfile[] = [
     entry: 'limit',
     maxConcurrent: 3,
     cooldownMinutes: 30,
-    gates: { minVolumeUsd: 10_000_000, spreadBudgetOfStop: 0.15, minDailyRangePct: 0.5, minTickScore: 5, maxRsi: 80, requireMacro: false },
+    gates: { minVolumeUsd: 10_000_000, spreadBudgetOfStop: 0.15 },
     trokTargets: { risk: 0.35, cost: 0.25, edge: 0.80, exposure: 0.60 },
   },
   {
@@ -201,7 +198,7 @@ export const ROBOTS: RobotProfile[] = [
     maxConcurrent: 2,
     cooldownMinutes: 60,
     trokTargets: { risk: 0.30, cost: 0.25, edge: 0.90, exposure: 0.50 },
-    gates: { minVolumeUsd: 15_000_000, spreadBudgetOfStop: 0.20, minDailyRangePct: 0.5, minTickScore: 12, maxRsi: 75, requireMacro: true },
+    gates: { minVolumeUsd: 15_000_000, spreadBudgetOfStop: 0.20 },
   },
   {
     id: 'momentum',
@@ -218,7 +215,7 @@ export const ROBOTS: RobotProfile[] = [
     maxConcurrent: 3,
     cooldownMinutes: 15,
     trokTargets: { risk: 0.40, cost: 0.30, edge: 0.90, exposure: 0.60 },
-    gates: { minVolumeUsd: 10_000_000, spreadBudgetOfStop: 0.20, minDailyRangePct: 1.0, minTickScore: 15, maxRsi: 78, requireMacro: false },
+    gates: { minVolumeUsd: 10_000_000, spreadBudgetOfStop: 0.20 },
   },
   {
     id: 'grid',
@@ -239,7 +236,7 @@ export const ROBOTS: RobotProfile[] = [
     cooldownMinutes: 0,
     grid: { rungSpacingPct: 0.005, rungs: 5 },
     trokTargets: { risk: 0.35, cost: 0.20, edge: 0.75, exposure: 0.80 },
-    gates: { minVolumeUsd: 15_000_000, spreadBudgetOfStop: 0.15, minDailyRangePct: 1.5, minTickScore: 5,  maxRsi: 85, requireMacro: false },
+    gates: { minVolumeUsd: 15_000_000, spreadBudgetOfStop: 0.15 },
   },
 ];
 
