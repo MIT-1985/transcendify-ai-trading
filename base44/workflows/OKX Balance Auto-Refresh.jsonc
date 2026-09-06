@@ -1,0 +1,44 @@
+{
+  "name": "OKX Balance Auto-Refresh",
+  "description": "\u0410\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u043d\u043e \u043e\u043f\u0440\u0435\u0441\u043d\u044f\u0432\u0430 \u0440\u0435\u0430\u043b\u043d\u0438\u0442\u0435 \u0431\u0430\u043b\u0430\u043d\u0441\u0438 \u043e\u0442 OKX API \u0437\u0430 \u0432\u0441\u0438\u0447\u043a\u0438 \u0441\u0432\u044a\u0440\u0437\u0430\u043d\u0438 \u0430\u043a\u0430\u0443\u043d\u0442\u0438 \u043d\u0430 \u0432\u0441\u0435\u043a\u0438 15 \u043c\u0438\u043d\u0443\u0442\u0438",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 15,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-04-22T06:48:55.533000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "okx_balance_auto_refresh",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "okxBalanceRefresh",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "okxBalanceRefresh"
+  }
+}
