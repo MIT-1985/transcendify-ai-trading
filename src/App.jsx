@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import PaymentSuccess from './pages/PaymentSuccess';
 import Landing from './pages/Landing';
+import OAuthConsent from './pages/OAuthConsent';
 import { base44 } from '@/api/base44Client';
 
 /**
@@ -96,6 +97,7 @@ const AuthenticatedApp = () => {
         />
       ))}
       {/* Входът е без лента: няма меню, докато няма влизане. */}
+      <Route path="/oauth/consent" element={<OAuthConsent />} />
       <Route path="/Landing" element={<Landing />} />
       {/* Старият адрес на екрана с роботите - води където и преди. */}
       <Route path="/robots" element={<Navigate to="/BotDashboard" replace />} />
